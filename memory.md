@@ -175,6 +175,16 @@ Phase 4** — see *What's still open*, item 2.
 entrance cascade, the tab filter's height-lock and scroll correction, and
 Build Your Own.
 
+One choreography bug is fixed but unverified: a course still on screen when a
+filter ran kept its `.in`, so removing the class started it fading *out* and
+re-adding it two frames later caught it before it had moved — the cascade
+played over a course that was already visible, which looked like no animation.
+Most visible on All ↔ the first tab, where the top course never leaves. Fixed
+with `.carte__body.is-resetting` (transitions off for one forced layout, under
+the `.is-swapping` cover) in `commit()`. It predates the phases — the block is
+unchanged since the initial commit. Nothing automated covers it; the browser
+pass is the test.
+
 Remaining in Phase 1: the nav/mobile-menu/footer **markup** dedupe — deferred
 because the chrome is more per-page bespoke than assumed (index has four footer
 columns, faq five, the menu pages a `footer--menu` variant), and the *values*
@@ -220,7 +230,7 @@ today, and it must keep working if the database is down, deleted or unpaid.
 
 ### Explicitly out of scope — do not build, do not break
 
-- **Build Your Own Breakfast** (`#build`, [script.js:630](script.js#L630)).
+- **Build Your Own Breakfast** (`#build`, [script.js:663](script.js#L663)).
   Stays hardcoded exactly as it is. Its chips carry `data-price` / `data-name`
   and it has its own bagel sub-field and hint map; making it editable is a
   content type of its own and the owner has not asked for it. **The Phase 1
@@ -228,7 +238,7 @@ today, and it must keep working if the database is down, deleted or unpaid.
 - **The crêpe options row** (`.mi--opts`, `#crepeOpts`) — see Constraints. It
   is modelled in the schema so it survives the conversion, but the editor does
   not expose it in the first pass.
-- **Reservations.** [script.js:749](script.js#L749) is a deliberate placeholder.
+- **Reservations.** [script.js:764](script.js#L764) is a deliberate placeholder.
   Leave it.
 - **The `MARKS`-style annotation system** — Aromati has no equivalent. N/A.
 - **Studio credit strip.** Hardcoded, ours, not the owner's to edit.
@@ -293,8 +303,8 @@ today, and it must keep working if the database is down, deleted or unpaid.
   Aromati needs this more than Uptown did: the entrance choreography, the
   reveal observers, the parallax and the menu tab cascade all need real DOM to
   exist before they run.
-- **The menu tab cascade must be replayable.** [script.js:387](script.js#L387)
-  through [script.js:614](script.js#L614) handles filtering, height-locking and
+- **The menu tab cascade must be replayable.** [script.js:405](script.js#L405)
+  through [script.js:646](script.js#L646) handles filtering, height-locking and
   scroll-position correction, and it is written around a masthead that is
   mid-entrance. When fresh data replaces the rendered menu, the cascade has to
   re-run against the new DOM without double-animating or losing scroll
@@ -332,7 +342,7 @@ was taken at plan time and the site may have moved.
 ### Hours — 5 places, not 3
 
 1. **The live open/closed pill** — ~~`script.js:755–756`~~ **done**, now
-   [script.js:777](script.js#L777) reading `SEED_HOURS`. What was there:
+   [script.js:792](script.js#L792) reading `SEED_HOURS`. What was there:
    ```js
    var OPEN  = 7 * 60;                          // 7:00 am, every day
    var CLOSE = [22, 22, 22, 23, 23, 23, 23];    // by day, Sun → Sat
@@ -466,7 +476,7 @@ from them.
 5. Dedupe the nav / mobile menu / footer chrome while it is being generated
    anyway — this is where the 11-edits-to-change-the-hours problem dies.
 6. Re-run every consumer of the old hardcoded values: the hours logic
-   ([script.js:746](script.js#L746)) reads `SEED_HOURS` and learns to handle
+   ([script.js:792](script.js#L792)) reads `SEED_HOURS` and learns to handle
    closed days; the JSON-LD is generated; both prose formats are generated.
 7. Error-guard every init block.
 

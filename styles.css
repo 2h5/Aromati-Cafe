@@ -1141,6 +1141,19 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
 }
 .course.in .mi, .course.in .build, .course.in .course__sizes{ opacity:1; transform:none; }
 
+/* A course that survives a filter never left the screen, so it is still .in
+   when the swap runs. Dropping .in starts it fading out, and re-adding it two
+   frames later catches it before it has gone anywhere — the cascade then plays
+   over a course that is already fully visible, which reads as no animation at
+   all. This snaps such a course back to the start of its entrance instead,
+   under the cover of .is-swapping, so the cascade has somewhere to play from.
+   See commit() in script.js. */
+.carte__body.is-resetting .course,
+.carte__body.is-resetting .course__head,
+.carte__body.is-resetting .mi,
+.carte__body.is-resetting .build,
+.carte__body.is-resetting .course__sizes{ transition:none; }
+
 /* ═══════════ CAFÉ ═══════════ */
 .cafe{ padding:clamp(80px,12vh,150px) 0; }
 .cafe__head{ padding:0 var(--pad); margin-bottom:clamp(44px,6vw,80px); max-width:1100px; }

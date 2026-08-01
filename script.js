@@ -565,6 +565,14 @@
         // read while the scroll is still ours, before anything is hidden
         var keep = window.scrollY;
 
+        /* Courses that stay on screen across the swap are still .in, and
+           removing a class does not rewind a transition — it starts a new one
+           the other way. Two frames later they would be re-tagged .in while
+           still all but fully visible, so their cascade would run over nothing.
+           .is-resetting turns the transitions off for one layout so they can be
+           put back at the start of the entrance. See styles.css. */
+        menuBody.classList.add("is-resetting");
+
         var shown = 0;
         courses.forEach(function (c) {
           var match = filter === "all" || c.getAttribute("data-course") === filter;
@@ -579,6 +587,13 @@
           shown++;
         });
         balance();
+
+        /* The reset only counts if the browser sees it while the transitions
+           are still off. Without a forced layout here the whole task coalesces
+           and it sees a course that was .in and is .in again — nothing to
+           animate, which is the bug this is fixing. */
+        void menuBody.offsetHeight;
+        menuBody.classList.remove("is-resetting");
 
         /* Stand perfectly still through the swap.
 
