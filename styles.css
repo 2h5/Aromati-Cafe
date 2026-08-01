@@ -525,8 +525,15 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
 .mmenu__foot > *:nth-child(1){ --d:.74s; }
 .mmenu__foot > *:nth-child(2){ --d:.79s; }
 .mmenu__foot > *:nth-child(3){ --d:.84s; }
-.mmenu__addr{ font-size:13.5px; line-height:1.5; opacity:.72; }
-.mmenu__hours{ font-size:12px; letter-spacing:.02em; color:var(--gold); opacity:.9; }
+/* Tone lives in the colour's alpha, not in `opacity`. `.mmenu__foot > *` above
+   parks every child at opacity:0 to stage the entry, and it is a single class —
+   so a plain `opacity` here ties on specificity, wins on source order, and the
+   element never reaches 0. It would then be on screen before the stagger began
+   and still be there as the panel retracts. Keeping opacity free for the
+   choreography is what makes these two behave like .mmenu__acts, which has no
+   opacity of its own and was the only child animating correctly. */
+.mmenu__addr{ font-size:13.5px; line-height:1.5; color:rgba(244,237,225,.72); }
+.mmenu__hours{ font-size:12px; letter-spacing:.02em; color:rgba(201,163,92,.9); }
 .mmenu__acts{ display:flex; flex-wrap:wrap; align-items:center; gap:14px 18px; margin-top:4px; }
 .mmenu__call{
   display:inline-flex; align-items:center; gap:9px;
