@@ -8,6 +8,37 @@ the running status. When a decision gets made, write it into *Decisions made*
 below. When the plan changes, write it into *Deviations from the plan* — do not
 silently edit a phase to match what actually happened.
 
+**Keeping it honest.** Update this file **in the same commit as the work it
+describes** — not afterwards, not at the end of a phase. A session can be
+compacted or interrupted at any point, and the difference between resuming and
+re-deriving is whether this file was already true when that happened.
+
+Four kinds of rot, all of which have already been found here at least once:
+
+| Rot | Fix |
+|---|---|
+| A cited line number that has moved | Re-check `file.js:NN` links; they drift with every edit |
+| A sketch kept beside the real thing | Delete the sketch, link the real file |
+| A position marker left behind | Move it, or delete it — there is only ever one |
+| A tool written and never mentioned | Every file in `tools/` gets a line here |
+
+**`npm run check:memory` catches all four**, and runs as part of `npm test`. It
+checks that every path this file names exists, every `file.js:NN` link lands on
+a real non-blank line, every tool and migration is mentioned, every `npm run`
+script named here is real, and that exactly one position marker exists.
+
+It cannot check whether what this file *says* is true — a phase marked done that
+isn't, a decision quietly reversed in code. That still needs a person. The
+manual audit that prompted all this found four stale line numbers, two
+undocumented tools, a superseded schema block and a phase marker three phases
+behind.
+
+The cautionary example is not hypothetical. Uptown's README still says *"Status:
+this is the demo build — pre-CMS"* and *"no schema, migrations, or storage
+buckets exist yet"*, seventeen commits and eight migrations later. **This repo's
+own `README.md` is currently that stale** — it still describes the pre-CMS site.
+Phase 8 rewrites it; until then, do not trust it.
+
 Modelled directly on the Uptown Coffee Co. CMS build (`Z:\cs lock\uptown
 coffee - kimi`), which is the reference implementation for this project. Where
 something here says "same as Uptown", that means: go read that code and port
@@ -89,6 +120,13 @@ Also done — **Phase 2: the schema and its policies, written and checkable**:
   key is not a name, and the generator refuses to run if the labels and the
   data disagree by even one field.
 
+**One-off tools, already run, kept as a record of what was done to the markup**
+— re-running them is a no-op or worse, so read the header before you do:
+`tools/add-content-hooks.mjs` (marked the two anonymous footer `<p>`s that
+render.js had no other way to find), `tools/wire-scripts.mjs` (gave every page
+the seed data and the renderer, in the order that matters: data → render.js →
+script.js), `tools/strip-menu-markup.mjs` (removed the now-generated boards).
+
 **No `menu_pages` table.** One was drafted with `title` and `lede` before
 anyone checked that `site_copy` already holds `food.headline` ("The Food Menu")
 and `food.lede`, and the same pair for the other two. Two tables owning one
@@ -96,9 +134,9 @@ string is a bug waiting for them to disagree. What was left after removing them
 was a slug and a sort order, which is a column on `menu_courses`. Same
 reasoning that dropped `faq.footButton` from the copy set in Phase 1.
 
-### The seven harnesses, and what each is for
+### The eight harnesses, and what each is for
 
-`npm test` runs all seven.
+`npm test` runs all eight.
 
 - `tools/verify-phase1.mjs` — all five pages, whole-body, running the real
   renderer, diffed against `53b3d5e` (pre-conversion). Proves nothing changed.
@@ -115,6 +153,8 @@ reasoning that dropped `faq.footButton` from the copy set in Phase 1.
 - `gen-seed-sql.mjs --check` — the committed seed migration still matches the
   seed data. Editing `seed-copy.js` and forgetting to regenerate would leave
   the site saying one thing and the database seeding another.
+- `tools/check-memory.mjs` — this file still points at reality. See *Keeping it
+  honest* at the top.
 
 The middle three exist because verify-phase1 asserts the output is *unchanged*,
 which is exactly the wrong test for a code path that never existed. The last
@@ -188,7 +228,7 @@ today, and it must keep working if the database is down, deleted or unpaid.
 - **The crêpe options row** (`.mi--opts`, `#crepeOpts`) — see Constraints. It
   is modelled in the schema so it survives the conversion, but the editor does
   not expose it in the first pass.
-- **Reservations.** [script.js:731](script.js#L731) is a deliberate placeholder.
+- **Reservations.** [script.js:749](script.js#L749) is a deliberate placeholder.
   Leave it.
 - **The `MARKS`-style annotation system** — Aromati has no equivalent. N/A.
 - **Studio credit strip.** Hardcoded, ours, not the owner's to edit.
@@ -291,14 +331,14 @@ was taken at plan time and the site may have moved.
 
 ### Hours — 5 places, not 3
 
-1. **`script.js:755–756`** — the live open/closed logic.
+1. **The live open/closed pill** — ~~`script.js:755–756`~~ **done**, now
+   [script.js:777](script.js#L777) reading `SEED_HOURS`. What was there:
    ```js
    var OPEN  = 7 * 60;                          // 7:00 am, every day
    var CLOSE = [22, 22, 22, 23, 23, 23, 23];    // by day, Sun → Sat
    ```
-   Note this model **cannot express a closed day** and assumes one opening time
-   for all seven. The schema generalises it; the renderer must handle a closed
-   day, and `CLOSE[NaN]` must not be reachable.
+   That model **could not express a closed day** and assumed one opening time
+   for all seven. Both are now per-day, and `CLOSE[NaN]` is unreachable.
 2. **`index.html:393–403`** — the Visit hours table, with `data-days="0,1,2"` /
    `data-days="3,4,5,6"` driving the "today" highlight. Day *grouping* is
    presentational and must be derived from the per-day data, not stored.
@@ -371,79 +411,23 @@ loads — do not point the CMS at them.
 
 ---
 
-## Schema sketch
+## Schema
 
-Not final. Phase 2 writes the real migration; this is the shape to write
-toward. Every table gets `id uuid primary key default gen_random_uuid()`,
-`sort_order integer not null default 0`, `created_at`, `updated_at` + a
-`touch_updated_at()` trigger — same as Uptown.
+**The schema sketch that used to sit here is gone — the real thing exists.**
+Read [`supabase/migrations/20260801000000_init_cms.sql`](supabase/migrations/20260801000000_init_cms.sql),
+which carries the same reasoning as comments next to the columns it explains,
+and [`supabase/POLICIES.md`](supabase/POLICIES.md) for what it allows in plain
+words. A sketch kept alongside a real schema is a second source of truth that
+nobody updates.
 
-```
-admin_users          user_id uuid PK → auth.users, note text
-                     (the allowlist. is_owner() reads this.)
+Three things ended up different from the sketch, all worth knowing:
 
-site_settings        key text PK, value text
-                     phone_digits, email, instagram_handle,
-                     address_street, address_locality, address_region,
-                     address_postal
-                     (single-row-per-key. Simpler than one wide row and it
-                     makes the editor a flat list of labelled fields.)
-
-business_hours       day_of_week int 0–6 UNIQUE, closed bool,
-                     opens time, closes time, note text
-                     (7 rows, always. Closed days are a flag, not a missing
-                     row — a missing row is indistinguishable from a bug.)
-
-menu_pages           slug text UNIQUE ('food'|'drinks'|'wine'),
-                     title, lede, masthead_photo_id
-                     (fixed set; the editor does not create or delete these.)
-
-menu_courses         page_id → menu_pages, course_key text, tab_label text,
-                     heading text, sizes text[] NULL, is_static bool
-                     UNIQUE (page_id, course_key) is NOT valid — food has two
-                     sections keyed "breakfast". Key on id; course_key is data.
-                     is_static marks Build-Your-Own: rendered from hardcoded
-                     markup, never touched by the editor.
-                     constraint: cardinality(sizes) <= 2   ← CSS grid is
-                     repeat(2, var(--cell)); three sizes overflow it silently.
-
-menu_items           course_id → menu_courses, name, tag text, desc text,
-                     price text, prices jsonb, price_note text, no_price bool,
-                     photo_id
-                     constraint: exactly one of (price, prices, price_note)
-                       is non-null, OR no_price is true and all three are null
-                     constraint: prices is null or jsonb_typeof = 'array'
-                     trigger:    prices length == course.sizes length, and
-                                 every element is string-or-null
-                                 (a CHECK cannot express either — same
-                                 reasoning and same trigger shape as Uptown's
-                                 check_prices_align())
-
-menu_item_pours      item_id → menu_items, label text, price text
-                     (the Bottle $60 lines. Ordered, 0..n per item.)
-
-menu_item_options    item_id → menu_items, name text, price text
-                     (the crêpe toppings. Modelled so Phase 1 does not lose
-                     them; not exposed in the editor's first pass.)
-
-faq_entries          question text, answer text, published bool
-
-site_copy            page text, section text, key text, value text,
-                     max_length int NULL
-                     UNIQUE (page, section, key)
-                     max_length is how the data-split ceiling is enforced —
-                     stored next to the field, so the rule lives with the
-                     content rather than hardcoded in the editor.
-
-photos               bucket_path text, alt text NOT NULL, width int,
-                     height int, source_path text
-                     (source_path keeps the pre-crop original so a reframe can
-                     be undone — Uptown learned this the hard way in Phase 6b.)
-```
-
-**Read policy** on every content table: `to anon using (true)`.
-**Write policies**: `to authenticated`, `using (public.is_owner()) with check
-(public.is_owner())`, one each for insert / update / delete.
+- **No `menu_pages` table.** See the status section above.
+- **`hours_exceptions` was added** — one-off dates like "closed December 25",
+  which are not a weekday pattern and are the likeliest thing an owner wants to
+  change.
+- **`site_settings` and `site_copy` got a trigger** restoring label, help and
+  position on update. RLS grants an update on a *row*, not a *column*.
 
 ---
 
@@ -454,7 +438,7 @@ the hard work, and all of it is useful even if the CMS is never finished.
 
 ---
 
-### Phase 0 — Plan. ← *you are here*
+### Phase 0 — Plan. ✅ done
 
 This document. Also: create the branch, and confirm the scope table above with
 the owner (especially the FAQ demo-notice question).
@@ -463,7 +447,9 @@ the owner (especially the FAQ demo-notice question).
 
 ---
 
-### Phase 1 — Content becomes data. **No Supabase.**
+### Phase 1 — Content becomes data. **No Supabase.** ✅ done bar two parked items
+*(step 5, the chrome dedupe, deferred; the FAQ entries parked. See the status
+section — it is more current than this list.)*
 
 The big one. Content moves out of markup into seed arrays, and the pages render
 from them.
@@ -499,7 +485,7 @@ mistakes.
 
 ---
 
-### Phase 2 — Schema + RLS, written and reviewed. **No Supabase.**
+### Phase 2 — Schema + RLS, written and reviewed. **No Supabase.** ✅ written, awaiting your read of POLICIES.md
 
 Write `supabase/migrations/` as real, ordered, committed SQL. **Do not apply.**
 There is nothing to apply it to yet, and that is the point — the SQL gets
@@ -513,7 +499,11 @@ agreed.
 
 ---
 
-### Phase 3 — Supabase project + apply. **First phase needing the DB.**
+### Phase 3 — Supabase project + apply. **First phase needing the DB.** ← *next*
+
+Step 6's seeding is already generated and committed:
+`supabase/migrations/20260801000100_seed_content.sql`. Steps 1–3 and 7 are
+dashboard work that cannot be done from here.
 
 Owner/developer tasks, done together:
 
