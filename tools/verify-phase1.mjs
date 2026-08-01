@@ -30,6 +30,21 @@ const PAGES = [
    would sit outside any #carteBody. */
 const ROOT = "body";
 
+/* Wording deliberately changed since the baseline.
+
+   The baseline does not move. Re-pinning it to a newer commit would be the
+   easy fix and the wrong one: it re-blesses whatever the conversion had
+   already broken, silently, and this check stops meaning anything. An
+   intentional edit is recorded here instead — applied as a rewrite of the old
+   text before the comparison, so everything not listed is still a bug.
+
+   An entry that matches nothing is itself a failure. A rule kept alive after
+   the text moved on is how an allowance list turns into a blindfold. */
+const INTENDED = [
+  { page: "index.html", was: "Book a Table", now: "Reserve a Table",
+    why: "renamed on request, 2026-08-01" }
+];
+
 /* Every readable string inside the board, in order. Currency symbols dropped:
    they are the one thing that legitimately moved from markup to stylesheet. */
 function visibleText(root) {
@@ -73,6 +88,7 @@ function boardOf(html, { render }) {
 }
 
 let failures = 0;
+const usedIntent = new Set();
 
 for (const page of PAGES) {
   const before = boardOf(
@@ -83,7 +99,13 @@ for (const page of PAGES) {
 
   if (!before || !after) throw new Error(`${page}: no ${ROOT}`);
 
-  const a = visibleText(before);
+  const rewrites = INTENDED.filter((r) => r.page === page);
+  const a = visibleText(before).map((s) => {
+    const hit = rewrites.find((r) => r.was === s);
+    if (!hit) return s;
+    usedIntent.add(hit);
+    return hit.now;
+  });
   const b = visibleText(after);
 
   const diffs = [];
@@ -164,6 +186,18 @@ for (const page of PAGES) {
                 `                     data: ${JSON.stringify(s.data)}`);
   }
   if (stale.length > 6) console.log(`        …and ${stale.length - 6} more drifted`);
+}
+
+/* An allowance that no longer matches anything is stale, and a stale one hides
+   whatever occupies that string next. */
+const dead = INTENDED.filter((r) => !usedIntent.has(r));
+if (dead.length) {
+  failures++;
+  console.log("\nFAIL  an intended-change entry matched nothing in the baseline");
+  for (const r of dead) {
+    console.log(`        ${r.page}: ${JSON.stringify(r.was)} — ${r.why}`);
+    console.log("        the baseline no longer says this; drop the entry");
+  }
 }
 
 console.log(failures ? `\n${failures} page(s) failed` : "\nall pages identical");

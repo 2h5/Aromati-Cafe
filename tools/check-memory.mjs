@@ -120,6 +120,35 @@ console.log(`\nauditing ${DOC} (${lines.length} lines)\n`);
   else pass(`all ${tests.length} test scripts are accounted for`);
 }
 
+/* ── 7. the Phase 1 baseline it cites is the one the harness uses ──────────
+   memory.md named the wrong commit here for a while — the first commit *of*
+   the conversion rather than the last one before it. Both exist, both look
+   plausible, and the difference is the entire value of the check. */
+{
+  const tool = readFileSync("tools/verify-phase1.mjs", "utf8");
+  const real = tool.match(/PHASE1_BASE\s*\|\|\s*"([0-9a-f]+)"/);
+  if (!real) {
+    fail("cannot find the baseline in tools/verify-phase1.mjs",
+         "the PHASE1_BASE default has been reworded — update this check");
+  } else {
+    const cited = [...text.matchAll(/`([0-9a-f]{7,40})`/g)].map((m) => m[1]);
+    const wrong = cited.filter((c) => !real[1].startsWith(c) && !c.startsWith(real[1]));
+    /* Other commits are cited legitimately; only a claim about the baseline is
+       checkable, so this looks at the sentence, not the whole file. */
+    const claims = [...text.matchAll(/verify-phase1[\s\S]{0,400}?`([0-9a-f]{7,40})`/g)].map((m) => m[1]);
+    const bad = claims.filter((c) => wrong.includes(c));
+    if (bad.length) {
+      fail("it cites the wrong Phase 1 baseline",
+           `memory.md says ${bad.join(", ")}, the harness uses ${real[1]}`);
+    } else if (!claims.length) {
+      fail("it never says which commit Phase 1 is verified against",
+           "that commit is the whole meaning of the check");
+    } else {
+      pass(`the Phase 1 baseline it cites (${real[1]}) is the one the harness uses`);
+    }
+  }
+}
+
 console.log(failures
   ? `\n${failures} thing(s) in ${DOC} have drifted — fix the file, not this check`
   : `\n${DOC} still points at reality`);

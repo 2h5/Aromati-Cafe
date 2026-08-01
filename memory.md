@@ -60,7 +60,13 @@ Done — **the three menu pages now render from data, verified identical**:
 - `render.js` — builds the boards; `createElement`/`textContent` only
 - `tools/strip-menu-markup.mjs` — removed the now-generated markup
 - `tools/verify-phase1.mjs` — jsdom harness; runs the real renderer and diffs
-  the board's visible text and class counts against commit `68ac715`
+  the board's visible text and class counts against commit `53b3d5e`, the last
+  one before the conversion. **The baseline does not move.** Re-pinning it to a
+  newer commit would re-bless whatever the conversion had already broken, and
+  the check would stop meaning anything. Deliberate wording changes since then
+  go in its `INTENDED` list instead — one entry so far, Book → Reserve a Table
+  — and an entry that stops matching fails the run, so the list cannot rot into
+  a blanket pass.
 - `styles.css` — `$` now rendered for `.mi__pours b` / `.mi__opts li b`, and
   `.mi__cell--none` for a size an item is not offered in
 - menu pages: 1245 lines → 739
