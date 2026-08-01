@@ -206,7 +206,7 @@ var SEED_MENU = {
       "tabLabel": "Breakfast",
       "heading": "Build Your Own Breakfast",
       "isStatic": true,
-      "full": true
+      "staticId": "build"
     }
   ],
   "drinks": [

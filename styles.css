@@ -944,6 +944,9 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
 .mi__cell::before{ content:"$"; font-size:.7em; opacity:.7; margin-right:.12em; }
 /* one price, no size: spans the columns and keeps the same right-hand edge */
 .mi__cell--solo{ grid-column:1 / -1; }
+/* A size the item isn't offered in. Holds its column so the prices either side
+   stay aligned, and drops the "$" — an empty cell must not read as free. */
+.mi__cell--none::before{ content:none; }
 
 /* format prices under a line — a bottle beside the pour, a board's two sizes.
    Ruled on the left so they read as a sub-entry, not another menu item. */
@@ -961,6 +964,11 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
   font-family:var(--serif); font-weight:400; font-size:14px;
   color:var(--gold); opacity:.85; font-variant-numeric:tabular-nums;
 }
+/* Every price in the data is stored bare, so the "$" is CSS's job everywhere —
+   the same rule .mi__price and .mi__cell already follow. Deliberately unstyled,
+   unlike those two: here it replaces a literal "$" that sat inside the <b> and
+   inherited its type, so leaving it plain keeps the rendering identical. */
+.mi__pours b::before, .mi__opts li b::before{ content:"$"; }
 /* the boards are priced by size only, so the line has no pour price to lead to */
 .mi--noprice .mi__desc{ margin-top:9px; }
 

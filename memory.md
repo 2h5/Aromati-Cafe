@@ -19,13 +19,28 @@ the decision, don't re-derive it.
 
 **Phase 1 — in progress**, on branch `phase1-content-as-data`.
 
-Done:
+Done — **the three menu pages now render from data, verified identical**:
 - `tools/extract-menus.mjs` — strict markup→data extractor
-- `data/seed-menu.js` — all 84 items, 17 courses, verified by shape counts
+- `data/seed-menu.js` — 84 items, 17 courses, all six price shapes
+- `data/seed-hours.js`, `data/seed-settings.js` — written, not yet consumed
+- `render.js` — builds the boards; `createElement`/`textContent` only
+- `tools/strip-menu-markup.mjs` — removed the now-generated markup
+- `tools/verify-phase1.mjs` — jsdom harness; runs the real renderer and diffs
+  the board's visible text and class counts against commit `68ac715`
+- `styles.css` — `$` now rendered for `.mi__pours b` / `.mi__opts li b`, and
+  `.mi__cell--none` for a size an item is not offered in
+- menu pages: 1245 lines → 739
 
-Next: `seed-hours.js`, `seed-settings.js`, `seed-copy.js`, then `render.js`,
-then strip the generated markup out of the pages. `seed-faq.js` is held back
-(see *What's still open*, item 1).
+`node tools/verify-phase1.mjs` → all three pages identical. Re-run it after any
+renderer change; `PHASE1_BASE` overrides the comparison commit.
+
+**Still to check in a real browser** (jsdom does not run the choreography): the
+entrance cascade, the tab filter's height-lock and scroll correction, and
+Build Your Own.
+
+Next: `render.js` grows the hours (all five consumers), then contact details,
+then the nav/mobile-menu/footer chrome dedupe, then `seed-copy.js`.
+`seed-faq.js` is held back — see *What's still open*, item 1.
 
 No Supabase project exists yet. Phases 1 and 2 are deliberately ordered so that
 all of the hard, high-value work happens *before* a database is needed.

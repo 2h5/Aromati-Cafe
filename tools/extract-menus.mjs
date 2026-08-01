@@ -147,7 +147,11 @@ function parsePage(html, slug) {
        it exists and so its position in the page order is preserved. */
     if (extraClass.includes("course--build")) {
       course.isStatic = true;
-      course.full = attrs.includes("data-full");
+      course.staticId = attr(attrs, "data-static");
+      if (!course.staticId) {
+        throw new Error(`${slug}/${courseKey}: a static course needs data-static="…" ` +
+          `so the renderer can find its markup and put it back in order`);
+      }
       courses.push(course);
       continue;
     }
