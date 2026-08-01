@@ -31,15 +31,44 @@ Done — **the three menu pages now render from data, verified identical**:
   `.mi__cell--none` for a size an item is not offered in
 - menu pages: 1245 lines → 739
 
-`node tools/verify-phase1.mjs` → all three pages identical. Re-run it after any
-renderer change; `PHASE1_BASE` overrides the comparison commit.
+Also done — **hours and contact details are single-source across all five
+pages**:
+- `render.js` writes the hours to all five consumers and the contact details
+  wherever they appear, found by what the elements already are
+  (`a[href^="tel:"]`, `.mmenu__hours`, `#hoursList`, the JSON-LD block) rather
+  than by hooks. Only the footer's two anonymous `<p>`s needed marking.
+- `script.js` reads `SEED_HOURS` instead of its own copy of the numbers, and
+  now handles closed days — which the old one-opening-time/per-day-closing-array
+  model could not express at all.
+- `tools/test-hours.mjs` — behaviour tests for what is genuinely new: run
+  grouping, closed days, the JSON-LD output, and the pill at its boundaries
+  (opening minute, closing minute, last hour, closed-today rollover).
+
+### The two harnesses, and what each is for
+
+- `node tools/verify-phase1.mjs` — all five pages, whole-body, running the real
+  renderer, diffed against `53b3d5e` (pre-conversion). Proves nothing changed.
+  `PHASE1_BASE` overrides the comparison commit.
+- `node tools/test-hours.mjs` — proves the *new* behaviour is right. Necessary
+  because verify-phase1 asserts the output is unchanged, which is exactly the
+  wrong test for a code path that never existed.
+
+**Drift check.** The hours, phone, address and Instagram handle are still
+written in the markup as well as generated, on purpose: a crawler or a reader
+with no JavaScript must still get them from the served HTML. The cost is that
+those copies can drift from the seed data with nothing looking wrong — the site
+right, the source lying. verify-phase1 therefore also asserts that the page *as
+served* already says what the renderer would make it say. Confirmed to fail when
+the two are made to disagree.
 
 **Still to check in a real browser** (jsdom does not run the choreography): the
 entrance cascade, the tab filter's height-lock and scroll correction, and
 Build Your Own.
 
-Next: `render.js` grows the hours (all five consumers), then contact details,
-then the nav/mobile-menu/footer chrome dedupe, then `seed-copy.js`.
+Next: `seed-copy.js` and the section copy, then the nav/mobile-menu/footer
+markup dedupe — deferred because the chrome is more per-page bespoke than
+assumed (index has four footer columns, faq five, the menu pages a
+`footer--menu` variant), and the *values* problem is now solved without it.
 `seed-faq.js` is held back — see *What's still open*, item 1.
 
 No Supabase project exists yet. Phases 1 and 2 are deliberately ordered so that

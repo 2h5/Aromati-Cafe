@@ -751,9 +751,14 @@
     var list = document.getElementById("hoursList");
     if (!status && !list) return;
 
-    var OPEN = 7 * 60;                                  // 7:00 am, every day
-    var CLOSE = [22, 22, 22, 23, 23, 23, 23];           // by day, Sun → Sat
+    /* The hours live in data/seed-hours.js, which render.js has already used to
+       write the table, the two prose formats and the Google listing block. This
+       reads the same array so the pill can never disagree with the page around
+       it. The old constants — one opening time, a per-day closing array — could
+       not express a closed day; this can. */
+    var HOURS = (typeof SEED_HOURS !== "undefined" && SEED_HOURS) || null;
     var DAY = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    if (!HOURS) return;                                 // no data, no claim
     var fmt;
     try {
       fmt = new Intl.DateTimeFormat("en-US", {
@@ -780,10 +785,24 @@
       return h12 + ":" + (m < 10 ? "0" + m : m) + " " + suffix;
     }
 
+    /* The next day the café is actually open, and when. Walks forward rather
+       than assuming tomorrow, so a run of closed days reads correctly instead
+       of promising a door that stays shut. Stops after a week: if every day is
+       closed there is nothing truthful to say. */
+    function nextOpening(fromDay) {
+      for (var i = 1; i <= 7; i++) {
+        var day = (fromDay + i) % 7;
+        var h = HOURS[day];
+        if (h && !h.closed) return { day: day, opens: h.opens, days: i };
+      }
+      return null;
+    }
+
     function render() {
       var now = nyNow();
-      var close = CLOSE[now.day] * 60;
-      var open = now.mins >= OPEN && now.mins < close;
+      var today = HOURS[now.day];
+      var open = !!today && !today.closed &&
+        now.mins >= today.opens && now.mins < today.closes;
 
       if (list) {
         list.querySelectorAll(".hours__line").forEach(function (li) {
@@ -791,14 +810,29 @@
           li.classList.toggle("is-today", days.indexOf(String(now.day)) > -1);
         });
       }
-      if (status) {
-        var soon = open && close - now.mins <= 60;
-        status.hidden = false;
-        status.setAttribute("data-state", open ? "open" : "closed");
-        status.textContent = open
-          ? (soon ? "Closing at " + clock(close) : "Open now · until " + clock(close))
-          : "Closed · opens " + clock(OPEN) + (now.mins >= close ? " tomorrow" : "");
+      if (!status) return;
+
+      status.hidden = false;
+      status.setAttribute("data-state", open ? "open" : "closed");
+
+      if (open) {
+        var soon = today.closes - now.mins <= 60;
+        status.textContent = soon
+          ? "Closing at " + clock(today.closes)
+          : "Open now · until " + clock(today.closes);
+        return;
       }
+
+      /* Closed. Either it has not opened yet today, or the day is done and the
+         next opening is on a later day. */
+      if (today && !today.closed && now.mins < today.opens) {
+        status.textContent = "Closed · opens " + clock(today.opens);
+        return;
+      }
+      var next = nextOpening(now.day);
+      if (!next) { status.hidden = true; return; }
+      status.textContent = "Closed · opens " + clock(next.opens) +
+        (next.days === 1 ? " tomorrow" : " " + DAY[next.day]);
     }
 
     render();
