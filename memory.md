@@ -197,9 +197,9 @@ string is a bug waiting for them to disagree. What was left after removing them
 was a slug and a sort order, which is a column on `menu_courses`. Same
 reasoning that dropped `faq.footButton` from the copy set in Phase 1.
 
-### The fifteen harnesses, and what each is for
+### The sixteen harnesses, and what each is for
 
-`npm test` runs all fifteen. The two font ones run **first**: they are the
+`npm test` runs all sixteen. The two font ones run **first**: they are the
 fastest, and they guard the thing that has broken most often.
 
 - `tools/check-fonts.mjs` — the font-loading invariants, statically. Cannot
@@ -245,6 +245,14 @@ fastest, and they guard the thing that has broken most often.
 - `gen-seed-sql.mjs --check` — the committed seed migration still matches the
   seed data. Editing `seed-copy.js` and forgetting to regenerate would leave
   the site saying one thing and the database seeding another.
+- `tools/test-live.mjs` (`npm run test:live`) — **the Phase 4 round trip.**
+  Applies the seed migration to a real Postgres, serves those rows to `data.js`
+  through a stub shaped like PostgREST, and requires what comes back out to
+  equal `data/seed-*.js` exactly: all 84 items, 26 pours, 62 copy fields, the
+  hours and the settings. A dropped pour, a shuffled course or `7.50` arriving
+  as `7.5` shows up as a diff. Also covers the paths that only matter when
+  things go wrong — no key, offline, 401, malformed JSON, an empty database, a
+  corrupt cache, and storage that throws on every call.
 - `tools/check-memory.mjs` — this file still points at reality. See *Keeping it
   honest* at the top.
 - `tools/measure-font-shift.mjs` (`npm run check:layout`) — the one harness
@@ -703,15 +711,46 @@ but not write it.
 
 ---
 
-### Phase 4 — The site reads from Supabase.
+### Phase 4 — The site reads from Supabase. ✅ built, awaiting the anon key
 
-`render.js` gains the fallback chain: `network → localStorage → SEED_*`.
-Nothing waits on the network. Fresh data folds in afterwards and only if it
-differs. The menu cascade replays cleanly over rebuilt content on all three
-menu pages.
+`data.js` holds the fallback chain: `network → localStorage → SEED_*`.
+`render.js` paints once, synchronously, from cache-or-seed, then repaints only
+if the network came back with something genuinely different. `config.js` holds
+the project URL and the publishable key.
+
+**The one thing outstanding: paste the anon key into `config.js`.** Dashboard →
+Project Settings → API Keys → the publishable/anon key. Until then the site
+runs entirely from the seeds, which is a supported state and not a broken one —
+it is exactly what happens if the database is ever unpaid or deleted.
+
+- **No SDK on the public pages.** Plain `fetch` against `/rest/v1/`. Five
+  requests; `menu_items` embeds its pours and options in one of them.
+- **Nothing waits.** The choreography needs real DOM before it runs, so a board
+  that arrives late is not slower — it is a board the animations ran past.
+- **Empty is a failure, not new content.** A project that answers with zero
+  rows is treated as unavailable. Rendering it would blank the site, which is
+  the exact failure the seed floor exists to prevent.
+- **Comparison is order-insensitive on object keys, order-sensitive on
+  arrays.** The seed files are hand-ordered and the database returns rows in
+  query order, so a raw `JSON.stringify` comparison reported "changed" on every
+  first load and replayed the whole entrance cascade over a settled board.
+  `stable()` in `data.js` sorts keys and leaves arrays alone; `test-live.mjs`
+  imports the same function so it cannot pass under a looser rule.
+- **The cascade replay.** `initMenu` now returns a teardown and is re-entrant:
+  it disconnects the observer, removes the tab listener and the spacer, empties
+  the tab bar, and restores the tab bar if a previous run removed it for having
+  only one course. `render.js` fires `aromati:board-replaced` **only when the
+  board actually changed**, so a copy-only edit does not replay anything.
+  Build Your Own is *moved* rather than rebuilt, so its listeners survive —
+  which is why the crêpe binding is now guarded with `data-opts-bound`.
 
 **Done when:** the site renders correctly with the network killed, with
-`localStorage` cleared, and with a deliberately broken Supabase URL.
+`localStorage` cleared, and with a deliberately broken Supabase URL. All three
+are covered by `npm run test:live`; the replay itself still needs the browser
+pass, since jsdom cannot run the choreography.
+
+**Item 2 of *What's still open* is now the live risk** — from here the database
+is the source of truth, and nothing yet writes values back into the markup.
 
 ---
 

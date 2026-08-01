@@ -81,7 +81,11 @@ console.log("\none block throws");
 console.log("\nevery guarded block is isolated, not just the hours");
 {
   const names = [...clean.matchAll(/boot\("([^"]+)"/g)].map((m) => m[1]);
-  check("all seven are wrapped", names.length, 7);
+  /* A count, not a floor, and deliberately so: a new boot() block should make
+     this fail once and be looked at, rather than quietly joining the set. The
+     eighth is "menu replay" (Phase 4) — it runs from an event, so unlike the
+     other seven it is never reached during a normal load. */
+  check("all eight are wrapped", names.length, 8);
 
   const survived = [];
   for (const name of names) {

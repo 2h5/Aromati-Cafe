@@ -497,33 +497,83 @@
     catch (err) { if (window.console) console.error("render: " + name + " failed", err); }
   }
 
-  if (typeof SEED_COPY === "object" && SEED_COPY) {
-    step("copy", function () { renderCopy(SEED_COPY); });
-  }
-
-  if (typeof SEED_SETTINGS === "object" && SEED_SETTINGS) {
-    step("contact", function () { renderContact(SEED_SETTINGS); });
-    step("ordering", function () { renderOrdering(SEED_SETTINGS); });
-  }
-
-  if (typeof SEED_HOURS === "object" && SEED_HOURS) {
-    step("hours", function () {
-      renderHours(SEED_HOURS, typeof SEED_HOURS_NOTE === "string" ? SEED_HOURS_NOTE : null);
-    });
-  }
-
   var host = document.getElementById("carteBody");
-  if (!host) return;                                  // not a menu page
+  var page = host && host.getAttribute("data-menu");
 
-  var page = host.getAttribute("data-menu");
-  if (!page) return;
+  /* Everything on the page, from one content object. Called once synchronously
+     with cache-or-seed, and again only if the network comes back with
+     something different. `boardChanged` is what tells script.js whether the
+     choreography has to be replayed — see below. */
+  function paint(content) {
+    var boardChanged = false;
 
-  /* No data is not a crash. The page keeps whatever markup it was served with,
-     which through Phase 1 is nothing and from Phase 4 is the seed board. */
-  if (typeof SEED_MENU !== "object" || !SEED_MENU || !SEED_MENU[page]) {
-    if (window.console) console.warn("render: no menu data for \"" + page + "\"");
-    return;
+    if (content.copy) step("copy", function () { renderCopy(content.copy); });
+
+    if (content.settings) {
+      step("contact", function () { renderContact(content.settings); });
+      step("ordering", function () { renderOrdering(content.settings); });
+    }
+
+    if (content.hours) {
+      step("hours", function () { renderHours(content.hours, content.hoursNote || null); });
+    }
+
+    if (host && page) {
+      /* No data is not a crash. The page keeps whatever markup it was served
+         with rather than being emptied. */
+      if (!content.menu || !content.menu[page]) {
+        if (window.console) console.warn("render: no menu data for \"" + page + "\"");
+      } else {
+        step("menu board", function () {
+          renderBoard(host, content.menu[page]);
+          boardChanged = true;
+        });
+      }
+    }
+    return boardChanged;
   }
 
-  step("menu board", function () { renderBoard(host, SEED_MENU[page]); });
+  /* ── first paint: synchronous, from cache or seed ──
+     Nothing here waits on anything. script.js runs immediately after and finds
+     a complete board to attach its observers to. */
+
+  var source = typeof AROMATI_DATA === "object" && AROMATI_DATA
+    ? AROMATI_DATA
+    : null;
+
+  paint(source ? source.current() : {
+    /* data.js absent — a page that was never re-wired, or a file that failed
+       to load. The seeds are still right there; use them directly rather than
+       rendering nothing. */
+    menu:      typeof SEED_MENU === "object" ? SEED_MENU : null,
+    hours:     typeof SEED_HOURS === "object" ? SEED_HOURS : null,
+    hoursNote: typeof SEED_HOURS_NOTE === "string" ? SEED_HOURS_NOTE : null,
+    settings:  typeof SEED_SETTINGS === "object" ? SEED_SETTINGS : null,
+    copy:      typeof SEED_COPY === "object" ? SEED_COPY : null
+  });
+
+  if (!source) return;
+
+  /* ── second paint: only if the network disagreed ──
+     refresh() calls back with null when there is nothing to do, which is the
+     common case: not configured, offline, or the content is unchanged. When it
+     does call back with content, the board is rebuilt underneath animations
+     that have already run, so script.js is told to tear its menu wiring down
+     and set it up again against the new nodes. Firing the event only when the
+     board actually changed keeps a copy-only edit from replaying the cascade
+     for no visible reason. */
+
+  source.refresh(function (fresh) {
+    if (!fresh) return;
+    var boardChanged = paint(fresh);
+    if (!boardChanged) return;
+    try {
+      document.dispatchEvent(new CustomEvent("aromati:board-replaced"));
+    } catch (err) {
+      /* CustomEvent is available everywhere this site runs; if it somehow is
+         not, the fresh board is on the page and static — worse than animated,
+         far better than absent. */
+      if (window.console) console.warn("render: could not announce the new board", err);
+    }
+  });
 })();

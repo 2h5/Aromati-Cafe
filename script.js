@@ -431,10 +431,32 @@
     course.style.setProperty("--d", base + "ms");
   }
 
+  /* The tab bar is removed outright when there is only one course to filter.
+     Phase 4 can replace the board with one that has several, so the node has
+     to be recoverable — a removed element with no record of where it sat
+     cannot be put back. Captured once, before anything can remove it. */
+  var tabsHome = (function () {
+    var el = document.getElementById("carteTabs");
+    return el ? { el: el, parent: el.parentNode, next: el.nextSibling } : null;
+  })();
+
+  /* Returns a teardown. initMenu is run again from scratch whenever fresh data
+     replaces the board, and everything it attaches has to come off first:
+     otherwise the click handler fires twice per tab, a second spacer stacks up
+     under the board, and the old IntersectionObserver keeps holding nodes that
+     are no longer in the document. */
   function initMenu(bodyId, tabsId) {
     var menuBody = document.getElementById(bodyId);
     var menuTabs = document.getElementById(tabsId);
-    if (!menuBody) return;
+
+    /* Put the tab bar back if a previous run removed it. */
+    if (!menuTabs && tabsHome && !tabsHome.el.isConnected) {
+      tabsHome.parent.insertBefore(tabsHome.el, tabsHome.next);
+      menuTabs = tabsHome.el;
+    }
+    if (menuTabs) while (menuTabs.firstChild) menuTabs.removeChild(menuTabs.firstChild);
+
+    if (!menuBody) return function () {};
 
     /* A filter can make the page shorter than the scroll position we are
        standing at, and the browser resolves that by clamping the scroll during
@@ -533,11 +555,13 @@
     balance();
     courses.forEach(function (c) { courseIO.observe(c); });
 
+    var onTabClick = null;
+
     if (menuTabs) {
       var activeFilter = "all";
       var swapTimer = null;
 
-      menuTabs.addEventListener("click", function (e) {
+      onTabClick = function (e) {
         var tab = e.target.closest(".ctab");
         if (!tab) return;
         var filter = tab.getAttribute("data-filter");
@@ -557,7 +581,9 @@
         clearTimeout(swapTimer);
         // no point waiting on a fade that reduced-motion has already disabled
         swapTimer = setTimeout(function () { commit(activeFilter); }, prefersReduced ? 0 : 180);
-      });
+      };
+
+      menuTabs.addEventListener("click", onTabClick);
 
       function commit(filter) {
         // read while the scroll is still ours, before anything is hidden
@@ -638,24 +664,52 @@
         });
       }
     }
+
+    return function teardown() {
+      courseIO.disconnect();
+      if (onTabClick && menuTabs) menuTabs.removeEventListener("click", onTabClick);
+      if (spacer.parentNode) spacer.parentNode.removeChild(spacer);
+      menuBody.classList.remove("is-swapping", "is-resetting", "is-single");
+    };
   }
 
   // one board per menu page; absent on the home page, where initMenu returns
-  initMenu("carteBody", "carteTabs");
+  var teardownMenu = initMenu("carteBody", "carteTabs");
 
   /* ── expandable option rows (the crêpe) ── */
-  document.querySelectorAll(".mi[data-opts]").forEach(function (mi) {
-    var btn = mi.querySelector(".mi__toggle");
-    var row = mi.querySelector(".mi__row");
-    if (!btn || !row) return;
-    function toggle() {
-      lockNav(900); // the row's height animation shifts everything below it
-      var open = mi.classList.toggle("is-open");
-      btn.setAttribute("aria-expanded", open ? "true" : "false");
-    }
-    // the button carries the semantics; the whole row is a bigger hit target
-    btn.addEventListener("click", function (e) { e.stopPropagation(); toggle(); });
-    row.addEventListener("click", toggle);
+  function bindOptionRows() {
+    document.querySelectorAll(".mi[data-opts]").forEach(function (mi) {
+      /* A rebuilt board brings new nodes, but Build Your Own is *moved* rather
+         than recreated, and a moved node keeps its listeners. Binding it twice
+         would toggle the row open and straight back shut. */
+      if (mi.hasAttribute("data-opts-bound")) return;
+      mi.setAttribute("data-opts-bound", "");
+
+      var btn = mi.querySelector(".mi__toggle");
+      var row = mi.querySelector(".mi__row");
+      if (!btn || !row) return;
+      function toggle() {
+        lockNav(900); // the row's height animation shifts everything below it
+        var open = mi.classList.toggle("is-open");
+        btn.setAttribute("aria-expanded", open ? "true" : "false");
+      }
+      // the button carries the semantics; the whole row is a bigger hit target
+      btn.addEventListener("click", function (e) { e.stopPropagation(); toggle(); });
+      row.addEventListener("click", toggle);
+    });
+  }
+  bindOptionRows();
+
+  /* ── Phase 4: fresh data replaced the board ──
+     render.js fires this only when the network came back with a menu that
+     genuinely differs from the one already on screen. Everything the previous
+     run attached comes off first — see the teardown returned by initMenu. */
+  document.addEventListener("aromati:board-replaced", function () {
+    boot("menu replay", function () {
+      if (teardownMenu) teardownMenu();
+      teardownMenu = initMenu("carteBody", "carteTabs");
+      bindOptionRows();
+    });
   });
 
   /* ── build your own breakfast ── */
