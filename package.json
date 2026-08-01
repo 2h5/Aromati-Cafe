@@ -1,0 +1,14 @@
+{
+  "name": "aromati-cafe-wine-bar",
+  "private": true,
+  "version": "1.0.0",
+  "description": "AROMATI Cafe & Wine Bar — static site (plain HTML/CSS/JS, served by Vite for preview)",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^5.4.11"
+  }
+}

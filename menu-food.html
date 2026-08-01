@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0" />
+<title>Food Menu — Aromati Café &amp; Wine Bar · Murray Hill, New York</title>
+<meta name="description" content="The food menu at Aromati Café & Wine Bar — khachapuri, khinkali, pkhali, Georgian salads, soups and desserts, served all day at 103 E 34th Street, Murray Hill, Manhattan." />
+<meta property="og:title" content="Food Menu — Aromati Café &amp; Wine Bar" />
+<meta property="og:description" content="Khachapuri, khinkali and the Georgian table, served all day on East 34th Street." />
+<meta property="og:type" content="website" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,300;1,9..144,400&family=Manrope:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Menu",
+  "name": "Food Menu",
+  "inLanguage": "en-US",
+  "hasMenuSection": [
+    { "@type": "MenuSection", "name": "Breakfast" },
+    { "@type": "MenuSection", "name": "Appetizers" },
+    { "@type": "MenuSection", "name": "Main Georgian Dishes" },
+    { "@type": "MenuSection", "name": "Hot Dishes" },
+    { "@type": "MenuSection", "name": "Soups" },
+    { "@type": "MenuSection", "name": "Desserts" }
+  ],
+  "isPartOf": {
+    "@type": "CafeOrCoffeeShop",
+    "name": "Aromati Café & Wine Bar",
+    "telephone": "+1-332-207-3847",
+    "servesCuisine": "Georgian",
+    "address": {
+      "@type": "PostalAddress",
+      "streetAddress": "103 E 34th Street",
+      "addressLocality": "New York",
+      "addressRegion": "NY",
+      "postalCode": "10016",
+      "addressCountry": "US"
+    }
+  }
+}
+</script>
+</head>
+<body class="page-menu">
+
+<!-- ══════════ NAV ══════════ -->
+<header class="nav" id="nav">
+  <a class="nav__brand" href="index.html">
+    <span class="nav__word">Aromati</span>
+    <span class="nav__tag">café · wine bar</span>
+  </a>
+  <nav class="nav__links">
+    <a href="index.html#story">Story</a>
+    <a href="index.html#kitchen">Kitchen</a>
+    <a href="index.html#cafe">Café</a>
+    <a href="index.html#wine">Wine</a>
+    <a href="index.html#visit">Visit</a>
+  </nav>
+  <div class="nav__end">
+    <a class="nav__ig" href="https://www.instagram.com/aromatinyc" target="_blank" rel="noopener" aria-label="Aromati on Instagram — @aromatinyc">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5.2"/><circle cx="12" cy="12" r="4.1"/><circle cx="17.3" cy="6.7" r="1.15" fill="currentColor" stroke="none"/></svg>
+    </a>
+    <!-- Menus dropdown. The button carries the semantics; script.js opens it on
+         click and on hover, and closes it on Escape or an outside click. -->
+    <div class="navdrop" id="navdrop">
+      <button class="nav__cta navdrop__btn is-current" type="button" id="menusBtn" aria-expanded="false" aria-controls="menusPanel">
+        <span>Menus</span><i class="navdrop__chev" aria-hidden="true"></i>
+      </button>
+      <div class="navdrop__panel" id="menusPanel">
+        <a class="is-on" aria-current="page" href="menu-food.html"><span class="navdrop__k">Food</span><span class="navdrop__d">Georgian kitchen, all day</span></a>
+        <a href="menu-drinks.html"><span class="navdrop__k">Drinks</span><span class="navdrop__d">Coffee, matcha &amp; smoothies</span></a>
+        <a href="menu-wine.html"><span class="navdrop__k">Wine</span><span class="navdrop__d">Georgian &amp; European list</span></a>
+      </div>
+    </div>
+  </div>
+  <button class="nav__burger" id="burger" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="mmenu"><i></i><i></i></button>
+</header>
+
+<!-- Mobile menu. Two sheets fall behind the contents; styles.css owns the whole
+     sequence, script.js only adds .open. inert keeps the closed panel out of the
+     tab order and the accessibility tree. -->
+<div class="mmenu" id="mmenu" aria-hidden="true" inert>
+  <div class="mmenu__wash" aria-hidden="true"></div>
+  <div class="mmenu__panel" aria-hidden="true"></div>
+  <div class="mmenu__inner">
+    <nav class="mmenu__links" aria-label="Sections">
+      <a href="index.html#story"><span class="mml__n">01</span><span class="mml__w"><span>Story</span></span><i class="mml__go" aria-hidden="true"></i></a>
+      <a href="index.html#kitchen"><span class="mml__n">02</span><span class="mml__w"><span>Kitchen</span></span><i class="mml__go" aria-hidden="true"></i></a>
+      <a href="index.html#cafe"><span class="mml__n">03</span><span class="mml__w"><span>Café</span></span><i class="mml__go" aria-hidden="true"></i></a>
+      <a href="index.html#wine"><span class="mml__n">04</span><span class="mml__w"><span>Wine</span></span><i class="mml__go" aria-hidden="true"></i></a>
+      <a href="index.html#visit"><span class="mml__n">05</span><span class="mml__w"><span>Visit</span></span><i class="mml__go" aria-hidden="true"></i></a>
+    </nav>
+    <div class="mmenu__menus">
+      <span class="mmenu__label">Menus</span>
+      <div class="mmenu__row">
+        <a class="is-on" href="menu-food.html">Food</a>
+        <a href="menu-drinks.html">Drinks</a>
+        <a href="menu-wine.html">Wine</a>
+      </div>
+    </div>
+    <div class="mmenu__foot">
+      <p class="mmenu__addr">103 E 34th Street<br>New York, NY 10016</p>
+      <p class="mmenu__hours">Sun–Tue 7am–10pm · Wed–Sat 7am–11pm</p>
+      <div class="mmenu__acts">
+        <a class="mmenu__call" href="tel:+13322073847">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M5.2 3.8h3.1l1.5 3.9-2 1.4a12.4 12.4 0 0 0 5.1 5.1l1.4-2 3.9 1.5v3.1a1.9 1.9 0 0 1-2.1 1.9A15.9 15.9 0 0 1 3.3 5.9a1.9 1.9 0 0 1 1.9-2.1Z"/></svg>
+          <span>+1 (332) 207-3847</span>
+        </a>
+        <a class="ig ig--quiet" href="https://www.instagram.com/aromatinyc" target="_blank" rel="noopener">
+          <span class="ig__mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="18" height="18" rx="5.2"/><circle cx="12" cy="12" r="4.1"/><circle cx="17.3" cy="6.7" r="1.15" fill="currentColor" stroke="none"/></svg>
+          </span>
+          <span class="ig__handle">@aromatinyc</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<main id="top">
+
+  <!-- ══════════ MASTHEAD ══════════ -->
+  <header class="mhead">
+    <div class="mhead__bg"><img src="assets/web/adjaruli.jpg" alt="" aria-hidden="true"/></div>
+    <div class="mhead__scrim"></div>
+    <div class="mhead__inner">
+      <div class="section-head section-head--light reveal">
+        <span class="section-head__no">✦</span>
+        <span class="section-head__label">The Kitchen</span>
+      </div>
+      <h1 class="mhead__title" data-split>The Food Menu</h1>
+      <p class="mhead__lede reveal">Everything comes out of the open kitchen on the ground floor. Khachapuri is blistered to order and khinkali is pleated by hand. Served all day.</p>
+      <nav class="mswitch reveal" aria-label="Menus">
+        <a class="is-on" aria-current="page" href="menu-food.html">Food</a>
+        <a href="menu-drinks.html">Drinks</a>
+        <a href="menu-wine.html">Wine</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ══════════ THE BOARD ══════════ -->
+  <section class="mboard">
+    <div class="carte" id="carte">
+      <div class="carte__masthead reveal">
+        <!-- Tabs are derived from the courses below at runtime, so adding or
+             removing a course in the CMS needs no change here. -->
+        <div class="carte__tabs" role="group" aria-label="Filter the menu by course" id="carteTabs">
+        </div>
+      </div>
+
+      <div class="carte__body" id="carteBody">
+
+        <!-- BREAKFAST -->
+        <section class="course" data-course="breakfast" data-label="Breakfast">
+          <header class="course__head"><h2>Breakfast</h2><span class="course__count"></span></header>
+          <ul class="course__items">
+            <li class="mi">
+              <div class="mi__row"><h3>Morning Plate</h3><i class="mi__leader"></i><span class="mi__price">21</span></div>
+              <p class="mi__desc">Mixed greens with scrambled eggs, avocado, sour cream and toasted sourdough. Choice of cured meats or smoked salmon.</p>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Shakshuka</h3><i class="mi__leader"></i><span class="mi__price">16</span></div>
+              <p class="mi__desc">Poached eggs in a rich tomato and bell pepper sauce, finished with garlic, paprika and fresh herbs. Served with warm toasted sourdough.</p>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Breakfast Board for Two</h3><i class="mi__leader"></i><span class="mi__price">39</span></div>
+              <p class="mi__desc">A fresh mixed greens salad with scrambled eggs, avocado and olives, served with toasted sourdough, cream cheese, house-made sauce, jam and a dairy sweet. Choice of cured meats or smoked salmon.</p>
+            </li>
+          </ul>
+        </section>
+
+        <!-- APPETIZERS -->
+        <section class="course" data-course="appetizers" data-label="Appetizers">
+          <header class="course__head"><h2>Appetizers</h2><span class="course__count"></span></header>
+          <ul class="course__items">
+            <li class="mi">
+              <div class="mi__row"><h3>Assorted Pkhali</h3><i class="mi__leader"></i><span class="mi__price">21</span></div>
+              <p class="mi__desc">Georgian vegetable and eggplant rolls with walnut and Georgian spices, with homemade cornbread or bread.</p>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Aromati’s Mix Salad</h3><i class="mi__leader"></i><span class="mi__price">17</span></div>
+              <p class="mi__desc">Fresh mixed greens with tomatoes, cucumbers, walnuts and herbs, finished with a house-made dressing.</p>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Eggplant Rolls</h3><i class="mi__leader"></i><span class="mi__price">18</span></div>
+              <p class="mi__desc">Roasted eggplant filled with garlic-walnut sauce, topped with pomegranate.</p>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Arugula Salad with Goat Cheese</h3><i class="mi__leader"></i><span class="mi__price">19</span></div>
+              <p class="mi__desc">A fresh blend of arugula, strawberries, garlic and herbs, finished with oil and house-made dressing.</p>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>The Georgian Salad</h3><i class="mi__leader"></i><span class="mi__price">17</span></div>
+              <p class="mi__desc">Tomatoes, cucumbers, onions, herbs and walnuts tossed in traditional sunflower oil and vinegar dressing.</p>
+            </li>
+          </ul>
+        </section>
+
+        <!-- MAINS -->
+        <section class="course" data-course="mains" data-label="Khachapuri &amp; Breads">
+          <header class="course__head"><h2>Main Georgian Dishes</h2><span class="course__count"></span></header>
+          <ul class="course__items">
+            <li class="mi">
+              <div class="mi__row"><h3>Penovani Khachapuri</h3><i class="mi__leader"></i><span class="mi__price">15</span></div>
+              <p class="mi__desc">Puff pastry stuffed with blended cheese.</p>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Imeruli Khachapuri</h3><i class="mi__leader"></i><span class="mi__price">19</span></div>
+              <p class="mi__desc">Round-shaped khachapuri with a cheese filling.</p>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Adjaruli Khachapuri</h3><i class="mi__leader"></i><span class="mi__price">19</span></div>
+              <p class="mi__desc">A boat-shaped khachapuri with cheese, topped with an egg yolk and butter.</p>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Lobiani</h3><i class="mi__leader"></i><span class="mi__price">17</span></div>
+              <p class="mi__desc">Traditional bean-filled homemade bread.</p>
+            </li>
+          </ul>
+        </section>
+
+        <!-- HOT DISHES -->
+        <section class="course" data-course="hot" data-label="Hot Dishes">
+          <header class="course__head"><h2>Hot Dishes</h2><span class="course__count"></span></header>
+          <ul class="course__items">
+            <li class="mi">
+              <div class="mi__row"><h3>Georgian Dumplings — Khinkali</h3><i class="mi__leader"></i><span class="mi__price">14</span></div>
+              <p class="mi__desc">Hand-folded Georgian dumplings in a flavorful, savory broth. Three per serving.</p>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Tolma</h3><i class="mi__leader"></i><span class="mi__price">16</span></div>
+              <p class="mi__desc">Seasoned ground beef wrapped in grape leaves, served with creamy homemade yogurt and garlic sour cream. Five pieces.</p>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Kvarabia</h3><i class="mi__leader"></i><span class="mi__price">12</span></div>
+              <p class="mi__desc">Megruli cheese dumplings, served with homemade yogurt. Three per serving.</p>
+            </li>
+          </ul>
+        </section>
+
+        <!-- SOUPS -->
+        <section class="course" data-course="soups" data-label="Soups">
+          <header class="course__head"><h2>Soups</h2><span class="course__count"></span></header>
+          <ul class="course__items">
+            <li class="mi">
+              <div class="mi__row"><h3>Tomato Cream Soup</h3><i class="mi__leader"></i><span class="mi__price">14</span></div>
+              <p class="mi__desc">A delicious medley of tomatoes, light cream, spices and garlic.</p>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Matsoni Soup</h3><i class="mi__leader"></i><span class="mi__price">14</span></div>
+              <p class="mi__desc">Georgian matsoni — a traditional yogurt similar to Greek — with rice, sour cream, eggs, onions, parsley, coriander, scallions and mint.</p>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Broccoli &amp; Cheddar Soup</h3><i class="mi__leader"></i><span class="mi__price">14</span></div>
+              <p class="mi__desc">Generous pieces of broccoli, creamy sharp cheddar and a touch of spice.</p>
+            </li>
+          </ul>
+        </section>
+
+        <!-- DESSERTS -->
+        <section class="course" data-course="desserts" data-label="Desserts">
+          <header class="course__head"><h2>Desserts</h2><span class="course__count"></span></header>
+          <ul class="course__items">
+            <li class="mi">
+              <div class="mi__row"><h3>Aromati’s Signature Cheesecake</h3><i class="mi__leader"></i><span class="mi__price">13</span></div>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Chimney Cake</h3><i class="mi__leader"></i><span class="mi__price">12</span></div>
+              <p class="mi__desc">Filled with white chocolate or Nutella cream, served with ice cream and your choice of fresh fruits.</p>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Aromati’s Classic Brownie</h3><i class="mi__leader"></i><span class="mi__price">11</span></div>
+              <p class="mi__desc">Served with ice cream and topped with walnuts.</p>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Pelamushi</h3><i class="mi__leader"></i><span class="mi__price">12</span></div>
+              <p class="mi__desc">Traditional Georgian grape pudding.</p>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Warm Chocolate Molten Lava Cake</h3><i class="mi__leader"></i><span class="mi__price">13</span></div>
+              <p class="mi__desc">Paired with vanilla ice cream and fresh strawberry.</p>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Cheesecake</h3><i class="mi__leader"></i><span class="mi__price">13</span></div>
+              <p class="mi__desc">Topped with melted chocolate and finished with blended pistachios.</p>
+            </li>
+            <li class="mi mi--opts" data-opts>
+              <div class="mi__row">
+                <h3>Aromati’s Crêpe <span class="mi__tag">7 toppings</span></h3>
+                <i class="mi__leader"></i>
+                <span class="mi__price">5</span>
+                <button class="mi__toggle" type="button" aria-expanded="false" aria-controls="crepeOpts">
+                  <span class="sr-only">Show toppings for Aromati’s Crêpe</span>
+                </button>
+              </div>
+              <p class="mi__desc">Made to order. Dress it however you like.</p>
+              <div class="mi__opts" id="crepeOpts">
+                <ul>
+                  <li><span>Fresh strawberry</span><b>$1.00</b></li>
+                  <li><span>Fresh banana</span><b>$1.00</b></li>
+                  <li><span>Strawberry jam</span><b>$0.50</b></li>
+                  <li><span>Mixed berry jam</span><b>$0.50</b></li>
+                  <li><span>Nutella</span><b>$2.00</b></li>
+                  <li><span>Whipped cream</span><b>$0.50</b></li>
+                  <li><span>Vanilla ice cream</span><b>$3.00</b></li>
+                </ul>
+              </div>
+            </li>
+          </ul>
+        </section>
+
+        <!-- BUILD YOUR OWN -->
+        <section class="course course--build" data-course="breakfast" data-label="Breakfast" data-full>
+          <header class="course__head"><h2>Build Your Own Breakfast</h2><span class="course__count">∞</span></header>
+
+          <div class="build" id="build">
+            <div class="build__form">
+              <div class="build__field">
+                <span class="build__label">01 — Choose a base</span>
+                <div class="chips" data-group="base">
+                  <button class="chip is-on" type="button" aria-pressed="true" data-price="5" data-name="Avocado toast">Avocado toast <em>$5</em></button>
+                  <button class="chip" type="button" aria-pressed="false" data-price="3" data-name="Bagel" data-sub="bagel">Bagel of your choice <em>$3</em></button>
+                  <button class="chip" type="button" aria-pressed="false" data-price="4" data-name="Croissant sandwich">Croissant sandwich <em>$4</em></button>
+                </div>
+                <p class="build__hint" id="buildHint">Smashed avocado on grilled sourdough.</p>
+              </div>
+
+              <!-- stays in the DOM and animates its own height open/closed;
+                   `inert` keeps it out of tab order and the a11y tree while shut -->
+              <div class="build__field build__field--sub" id="bagelField" inert>
+                <div class="build__subinner">
+                  <span class="build__label">02 — Which bagel?</span>
+                  <div class="chips chips--quiet" data-group="bagel">
+                    <button class="chip is-on" type="button" aria-pressed="true" data-name="Plain">Plain</button>
+                    <button class="chip" type="button" aria-pressed="false" data-name="Everything">Everything</button>
+                    <button class="chip" type="button" aria-pressed="false" data-name="Whole wheat">Whole wheat</button>
+                    <button class="chip" type="button" aria-pressed="false" data-name="Whole wheat everything">Whole wheat everything</button>
+                    <button class="chip" type="button" aria-pressed="false" data-name="Sesame">Sesame</button>
+                    <button class="chip" type="button" aria-pressed="false" data-name="Cinnamon raisin">Cinnamon raisin</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="build__field">
+                <span class="build__label">03 — Pile it on</span>
+                <div class="chips" data-group="add">
+                  <button class="chip" type="button" aria-pressed="false" data-price="1" data-name="Cream cheese">Cream cheese <em>$1</em></button>
+                  <button class="chip" type="button" aria-pressed="false" data-price="2" data-name="Plain spread">Plain <em>$2</em></button>
+                  <button class="chip" type="button" aria-pressed="false" data-price="3" data-name="Scallion">Scallion <em>$3</em></button>
+                  <button class="chip" type="button" aria-pressed="false" data-price="3" data-name="Jalapeño">Jalapeño <em>$3</em></button>
+                  <button class="chip" type="button" aria-pressed="false" data-price="3" data-name="Avocado spread">Avocado spread <em>$3</em></button>
+                  <button class="chip" type="button" aria-pressed="false" data-price="3" data-name="Green olive">Green olive <em>$3</em></button>
+                  <button class="chip" type="button" aria-pressed="false" data-price="3" data-name="Veggie">Veggie <em>$3</em></button>
+                  <button class="chip" type="button" aria-pressed="false" data-price="4" data-name="Salmon">Salmon <em>$4</em></button>
+                  <button class="chip" type="button" aria-pressed="false" data-price="4" data-name="Shrimp">Shrimp <em>$4</em></button>
+                  <button class="chip" type="button" aria-pressed="false" data-price="3" data-name="Prosciutto">Prosciutto <em>$3</em></button>
+                  <button class="chip" type="button" aria-pressed="false" data-price="3" data-name="Feta">Feta <em>$3</em></button>
+                  <button class="chip" type="button" aria-pressed="false" data-price="2" data-name="Bacon">Bacon <em>$2</em></button>
+                  <button class="chip" type="button" aria-pressed="false" data-price="2" data-name="Sliced cheese">Sliced cheese <em>$2</em></button>
+                  <button class="chip" type="button" aria-pressed="false" data-price="3" data-name="Comté / blue">Comté / Blue <em>$3</em></button>
+                  <button class="chip" type="button" aria-pressed="false" data-price="2" data-name="Swiss cheese">Swiss cheese <em>$2</em></button>
+                  <button class="chip" type="button" aria-pressed="false" data-price="4.5" data-name="Crumbled egg">Crumbled egg <em>$4.50</em></button>
+                  <button class="chip" type="button" aria-pressed="false" data-price="2" data-name="Avocado">Avocado <em>$2</em></button>
+                  <button class="chip" type="button" aria-pressed="false" data-price="0.5" data-name="Jalapeño pickles">Jalapeño pickles <em>$0.50</em></button>
+                </div>
+                <p class="build__note">Vegetables on the house: red onion, tomato, cucumber, lettuce, capers, pickles.</p>
+              </div>
+            </div>
+
+            <aside class="build__ticket" aria-live="polite">
+              <span class="build__ticketlabel">Your plate</span>
+              <ul class="build__lines" id="buildLines"></ul>
+              <div class="build__sum">
+                <span>Total</span>
+                <strong id="buildTotal">$5.00</strong>
+              </div>
+              <button class="build__reset" id="buildReset" type="button">Start over</button>
+            </aside>
+          </div>
+        </section>
+
+      </div>
+
+      <div class="carte__foot reveal">
+        <p>…and salads, stews, toast &amp; sweets in between.</p>
+        <a href="index.html#visit" class="btn btn--ghostlight"><span>Come Hungry</span></a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════ FOOTER ══════════ -->
+  <footer class="footer footer--menu">
+    <div class="footer__cols">
+      <div>
+        <h4>Aromati Café &amp; Wine Bar</h4>
+        <p>103 E 34th Street<br/>New York, NY 10016</p>
+      </div>
+      <div>
+        <h4>Hours</h4>
+        <p>Sun – Tue &nbsp;7:00 am – 10:00 pm<br/>Wed – Sat &nbsp;7:00 am – 11:00 pm</p>
+      </div>
+      <div>
+        <h4>Contact</h4>
+        <p><a href="tel:+13322073847">+1 (332) 207-3847</a><br/><a href="mailto:info@aromatiNY.com">info@aromatiNY.com</a></p>
+        <a class="ig ig--quiet footer__ig" href="https://www.instagram.com/aromatinyc" target="_blank" rel="noopener">
+          <span class="ig__mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="18" height="18" rx="5.2"/><circle cx="12" cy="12" r="4.1"/><circle cx="17.3" cy="6.7" r="1.15" fill="currentColor" stroke="none"/></svg>
+          </span>
+          <span class="ig__handle">@aromatinyc</span>
+        </a>
+      </div>
+      <div>
+        <h4>Menus</h4>
+        <p><a href="menu-food.html">Food</a><br/><a href="menu-drinks.html">Drinks</a><br/><a href="menu-wine.html">Wine</a></p>
+      </div>
+      <div>
+        <h4>Good to Know</h4>
+        <p><a href="faq.html">Questions</a><br/>Coffee bar · open kitchen</p>
+      </div>
+    </div>
+    <div class="footer__base">
+      <span>© <span id="year"></span> Aromati Café &amp; Wine Bar</span>
+      <span class="footer__toast">Gaumarjos — cheers. ✦</span>
+      <a href="#top">Back to top ↑</a>
+    </div>
+  </footer>
+
+  <aside class="studio-credit" aria-label="Site credit">
+    <a class="studio-credit__link" href="https://aragvelipalazzolo.com" target="_blank" rel="noopener">
+      <img class="studio-credit__mark" src="assets/img/ap-mark-gold.png" width="255" height="260" alt="" loading="lazy" decoding="async">
+      <span class="studio-credit__text">
+        <span class="studio-credit__by">Designed &amp; built by</span>
+        <span class="studio-credit__name">AragveliPalazzolo</span>
+      </span>
+      <span class="studio-credit__cta">See our work <span aria-hidden="true">↗</span></span>
+    </a>
+  </aside>
+
+</main>
+
+<button class="to-top" id="toTop" type="button" aria-label="Back to top" aria-hidden="true" tabindex="-1">
+  <span aria-hidden="true"></span>
+</button>
+
+<script src="assets/js/lenis.min.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

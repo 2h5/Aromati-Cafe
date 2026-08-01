@@ -1,0 +1,1849 @@
+/* ═══════════════════════════════════════════════════════
+   AROMATI — Café & Wine Bar
+   Design system: oxblood / cream / cognac / gold
+   Type: Fraunces (display) · Manrope (text)
+   ═══════════════════════════════════════════════════════ */
+
+:root{
+  /* lets 0 → auto interpolate, which is what animates the FAQ accordion open.
+     Ignored by engines that don't support it; they just toggle instantly. */
+  interpolate-size:allow-keywords;
+
+  --oxblood:      #4a1517;
+  --oxblood-deep: #2d0d0f;
+  --wine:         #6b1f23;
+  --cream:        #f4ede1;
+  --parchment:    #ece1cf;
+  --cognac:       #b07a4a;
+  --gold:         #c9a35c;
+  --instagram-gradient: linear-gradient(135deg, #feda75 0%, #fa7e1e 25%, #d62976 55%, #962fbf 78%, #4f5bd5 100%);
+  --ink:          #1d1310;
+  --ink-soft:     #4c3a33;
+  --hairline:     rgba(29,19,16,.16);
+  --hairline-lt:  rgba(244,237,225,.22);
+  --serif: "Fraunces", "Fraunces fallback", Georgia, serif;
+  --sans:  "Manrope", "Manrope fallback", -apple-system, "Segoe UI", sans-serif;
+  --pad: clamp(20px, 5vw, 84px);
+  --maxw: 1520px;
+  --ease: cubic-bezier(.22,1,.36,1);
+  --ease-exp: cubic-bezier(.16,1,.3,1);
+}
+
+/* ── metric-matched fallbacks ──────────────────
+   The webfonts load with font-display:swap, so the first paint of every page is
+   the fallback and the swap reflows it. Measured against the real files, the
+   default fallbacks are the wrong size — Segoe UI sets Manrope's text 3.7% too
+   narrow, Georgia sets Fraunces 10.5% too wide — which is enough to make the
+   nav visibly twitch on each navigation.
+
+   These faces are the same local fonts, scaled and re-boxed to the real ones'
+   metrics, so the fallback occupies the identical space and the swap is
+   invisible. size-adjust is the measured width ratio; the ascent and descent
+   overrides are Manrope's 1005/361 and Fraunces' 980/253 per 1000 em, divided
+   by that ratio because overrides are relative to the adjusted em.
+
+   local() only — nothing is downloaded. Where the named font is missing the
+   face simply doesn't resolve and the stack falls through unadjusted, exactly
+   as it did before.
+
+   One face per weight band: a single ratio cannot serve them all, because the
+   local font is synthesising the weights it doesn't have and each one lands
+   somewhere different. The nav alone runs 400, 600 and 700. */
+@font-face{
+  font-family:"Manrope fallback"; font-weight:100 350; src:local("Segoe UI");
+  size-adjust:101.95%; ascent-override:98.58%; descent-override:35.41%; line-gap-override:0%;
+}
+@font-face{
+  font-family:"Manrope fallback"; font-weight:351 449; src:local("Segoe UI");
+  size-adjust:103.73%; ascent-override:96.89%; descent-override:34.80%; line-gap-override:0%;
+}
+@font-face{
+  font-family:"Manrope fallback"; font-weight:450 550; src:local("Segoe UI");
+  size-adjust:105.53%; ascent-override:95.23%; descent-override:34.21%; line-gap-override:0%;
+}
+@font-face{
+  font-family:"Manrope fallback"; font-weight:551 650; src:local("Segoe UI");
+  size-adjust:107.32%; ascent-override:93.65%; descent-override:33.64%; line-gap-override:0%;
+}
+@font-face{
+  font-family:"Manrope fallback"; font-weight:651 900; src:local("Segoe UI");
+  size-adjust:109.11%; ascent-override:92.11%; descent-override:33.09%; line-gap-override:0%;
+}
+@font-face{
+  font-family:"Fraunces fallback"; font-weight:100 350; src:local("Georgia");
+  size-adjust:85.93%; ascent-override:114.05%; descent-override:29.44%; line-gap-override:0%;
+}
+@font-face{
+  font-family:"Fraunces fallback"; font-weight:351 900; src:local("Georgia");
+  size-adjust:89.45%; ascent-override:109.56%; descent-override:28.28%; line-gap-override:0%;
+}
+
+*,*::before,*::after{ margin:0; padding:0; box-sizing:border-box; }
+html{ scroll-behavior:auto; }
+html,body{ height:100%; }
+
+/* ── horizontal lock ───────────────────────────
+   `clip` rather than `hidden`, because the two differ in the way that matters
+   here: `hidden` creates a scroll container, so the axis stays scrollable by a
+   touch drag even with no scrollbar to show for it — which is the exact gesture
+   being removed. `clip` creates no scroll container, so there is nothing to pan.
+
+   It goes on html so it reaches the viewport by root propagation, which is the
+   path that actually holds; relying on body to propagate it up proved not to be.
+
+   Both boxes can safely carry `clip` precisely because it makes no scroll
+   container: html's clip stops body propagating, but body is then left clipping
+   itself with no scrollport, so `height:100%` above does not collapse it. That
+   collapse — the one that lost the scroll position behind the mobile menu — came
+   from `overflow:hidden` on body, which does make a scrollport. So the menu locks
+   the root instead now; see setMobileMenu().
+
+   `hidden` stays first on body as the fallback: pre-Safari-16 engines drop every
+   `clip` declaration as invalid, html included, which leaves html visible and
+   body's `hidden` propagating exactly as it did before.
+
+   This clips rather than cures. Anything hanging off the right edge is still
+   hanging there, just unreachable — see README for finding the offender. */
+html{ overflow-x:clip; }
+body{
+  font-family:var(--sans);
+  background:var(--cream);
+  color:var(--ink);
+  font-size:16px;
+  line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+  overflow-x:clip;
+  /* stops a horizontal drag from chaining out to the browser's own
+     swipe-to-navigate once an inner scroller (.carte__tabs) hits its end */
+  overscroll-behavior-x:none;
+}
+img{ display:block; width:100%; height:100%; object-fit:cover; }
+a{ color:inherit; text-decoration:none; }
+ul{ list-style:none; }
+::selection{ background:var(--wine); color:var(--cream); }
+
+/* thin luxe scrollbar */
+::-webkit-scrollbar{ width:10px; }
+::-webkit-scrollbar-track{ background:var(--cream); }
+::-webkit-scrollbar-thumb{ background:var(--cognac); border-radius:99px; border:2px solid var(--cream); }
+
+/* ── type helpers ─────────────────────────────── */
+h1,h2,h3{ font-family:var(--serif); font-weight:400; letter-spacing:-.01em; }
+h2{ font-size:clamp(34px, 4.6vw, 72px); line-height:1.04; }
+h2 em, .lead em{ font-style:italic; color:var(--wine); }
+p.lead, .lead{ font-size:clamp(19px,1.6vw,24px); line-height:1.5; font-weight:300; }
+
+/* split-text animation base (JS wraps words)
+   A [data-split] element is ordinary text until script.js wraps its words, and
+   the browser will happily paint it in the meantime — one frame of the finished
+   title, then the split hiding it again to animate. That is the blink. It is
+   held invisible until the wrapping has actually happened. Nothing new depends
+   on JS here: .reveal already starts at opacity:0 across the whole site. */
+[data-split]{ visibility:hidden; }
+[data-split].is-split{ visibility:visible; }
+.w{ display:inline-block; overflow:hidden; vertical-align:bottom; padding-bottom:.22em; margin-bottom:-.22em; }
+.w>i{ display:inline-block; font-style:inherit; transform:translateY(110%); transition:transform 1s var(--ease-exp); }
+.w.in>i, [data-split].in .w>i{ transform:translateY(0); }
+
+/* ── section head ─────────────────────────────── */
+.section-head{
+  display:flex; align-items:center; gap:18px;
+  padding:0 var(--pad); margin-bottom:clamp(28px,4vw,56px);
+}
+.section-head__no{
+  font-family:var(--serif); font-style:italic; font-size:15px;
+  color:var(--cognac);
+}
+.section-head__label{
+  font-size:11px; letter-spacing:.34em; text-transform:uppercase; font-weight:600;
+  display:flex; align-items:center; gap:18px;
+}
+.section-head__label::after{ content:""; height:1px; width:clamp(40px,8vw,120px); background:var(--hairline); }
+.section-head--light .section-head__label::after{ background:var(--hairline-lt); }
+/* heads that live inside a padded container inherit its gutter */
+.story__inner .section-head, .wine__inner .section-head{ padding-inline:0; }
+
+/* ── buttons ──────────────────────────────────── */
+.btn{
+  position:relative; display:inline-flex; align-items:center; justify-content:center;
+  padding:16px 34px; border-radius:99px; overflow:hidden;
+  font-size:12px; letter-spacing:.22em; text-transform:uppercase; font-weight:700;
+  transition:color .45s var(--ease), border-color .45s var(--ease);
+  isolation:isolate;
+}
+/* the same pill on a <button>, so a placeholder action still animates like a
+   link. Border is left to the variant classes, which all set their own. */
+/* :where() keeps this at zero specificity so the variant classes below still
+   win on border and colour */
+button:where(.btn){ background:none; border:0; font-family:inherit; color:inherit; cursor:pointer; }
+.btn span{ position:relative; z-index:2; }
+.btn::before{
+  content:""; position:absolute; inset:0; z-index:1; border-radius:99px;
+  transform:scaleX(0); transform-origin:right; transition:transform .55s var(--ease-exp);
+}
+.btn:hover::before{ transform:scaleX(1); transform-origin:left; }
+.btn--solid{ background:var(--wine); color:var(--cream); }
+.btn--solid::before{ background:var(--oxblood-deep); }
+.btn--ghost{ border:1px solid rgba(244,237,225,.55); color:var(--cream); }
+.btn--ghost::before{ background:var(--cream); }
+.btn--ghost:hover{ color:var(--ink); border-color:var(--cream); }
+.btn--ghostlight{ border:1px solid var(--hairline-lt); color:var(--cream); }
+.btn--ghostlight::before{ background:var(--cream); }
+.btn--ghostlight:hover{ color:var(--ink); }
+
+/* ═══════════ NAV ═══════════ */
+.nav{
+  position:fixed; top:0; left:0; right:0; z-index:900;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:22px var(--pad);
+  color:var(--cream);
+  opacity:0;
+  transform:translateY(-18px);
+  transition:transform .6s var(--ease), background .4s, color .4s, padding .4s, opacity 1s var(--ease);
+}
+.nav.in{ opacity:1; transform:none; }
+.nav.hidden{ transform:translateY(-110%); }
+.nav.scrolled{
+  background:rgba(244,237,225,.9);
+  -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px);
+  color:var(--ink); padding:14px var(--pad);
+  border-bottom:1px solid var(--hairline);
+}
+.nav__brand{ display:flex; flex-direction:column; line-height:1.1; }
+.nav__word{ font-family:var(--serif); font-size:24px; letter-spacing:.04em; }
+.nav__tag{ font-size:9px; letter-spacing:.38em; text-transform:uppercase; opacity:.7; }
+.nav__links{ display:flex; gap:clamp(18px,3vw,42px); }
+.nav__links a{
+  position:relative; font-size:12px; letter-spacing:.2em; text-transform:uppercase; font-weight:600;
+  padding:4px 0;
+}
+.nav__links a::after{
+  content:""; position:absolute; left:0; bottom:0; height:1px; width:100%;
+  background:currentColor; transform:scaleX(0); transform-origin:right;
+  transition:transform .45s var(--ease-exp);
+}
+.nav__links a:hover::after{ transform:scaleX(1); transform-origin:left; }
+.nav__end{ display:flex; align-items:center; gap:14px; }
+.nav__cta{
+  font-size:11px; letter-spacing:.22em; text-transform:uppercase; font-weight:700;
+  border:1px solid currentColor; border-radius:99px; padding:11px 24px;
+  transition:background .4s, color .4s, border-color .4s;
+}
+.nav__cta:hover{ background:var(--gold); border-color:var(--gold); color:var(--ink); }
+.nav__ig{
+  display:grid; place-items:center; width:38px; height:38px;
+  position:relative; isolation:isolate; overflow:hidden;
+  border:1px solid currentColor; border-radius:99px; opacity:.75;
+  transition:background .4s, color .4s, border-color .4s, opacity .4s, transform .4s var(--ease);
+}
+.nav__ig::before{
+  content:""; position:absolute; inset:0; z-index:-1; border-radius:inherit;
+  background:var(--instagram-gradient);
+  opacity:0; transition:opacity .4s var(--ease); pointer-events:none;
+}
+.nav__ig svg{ position:relative; z-index:1; width:17px; height:17px; }
+.nav__ig:hover{
+  opacity:1; border-color:rgba(255,255,255,.75); color:#fff;
+  transform:translateY(-2px);
+}
+.nav__ig:hover::before, .nav__ig:focus-visible::before{ opacity:1; }
+.nav__ig:focus-visible{ border-color:rgba(255,255,255,.75); color:#fff; }
+.nav__burger{ display:none; }
+
+/* ── menus dropdown ───────────────────────────
+   The trigger is the nav pill; the panel is a small card of the three menus.
+   Opens on hover for pointers and on click/keyboard for everyone else, so it
+   never depends on hover alone. */
+.navdrop{ position:relative; }
+.navdrop__btn{
+  display:inline-flex; align-items:center; gap:9px;
+  background:none; cursor:pointer; font-family:var(--sans);
+  /* A bare <button> takes the UA's ButtonText, not the nav's cream, so without a
+     colour of its own this pill rendered black — invisible against the hero
+     until the bar turned cream on scroll. It is also the nav's one real
+     destination, so it carries the gold rather than just inheriting. */
+  color:var(--gold); border-color:rgba(201,163,92,.55);
+}
+/* gold on the cream scrolled bar is too faint to read — the wine carries it */
+.nav.scrolled .navdrop__btn{ color:var(--wine); border-color:rgba(122,26,36,.45); }
+/* the current section of the site, so the pill reads as "you are here" */
+.navdrop__btn.is-current{ background:rgba(201,163,92,.13); }
+.nav.scrolled .navdrop__btn.is-current{ background:rgba(122,26,36,.08); }
+/* last, so the filled state beats both the scrolled colour and the tint */
+.navdrop__btn:hover, .navdrop.is-open .navdrop__btn,
+.nav.scrolled .navdrop__btn:hover, .nav.scrolled .navdrop.is-open .navdrop__btn{
+  background:var(--gold); border-color:var(--gold); color:var(--ink);
+}
+.navdrop__chev{
+  width:6px; height:6px; border-right:1.5px solid currentColor; border-bottom:1.5px solid currentColor;
+  transform:translateY(-2px) rotate(45deg);
+  transition:transform .4s var(--ease);
+}
+.navdrop__btn[aria-expanded="true"] .navdrop__chev{ transform:translateY(1px) rotate(-135deg); }
+
+.navdrop__panel{
+  position:absolute; top:calc(100% + 14px); right:0; z-index:10;
+  width:max(238px, 100%);
+  display:flex; flex-direction:column;
+  background:var(--oxblood-deep); color:var(--cream);
+  border:1px solid rgba(201,163,92,.28); border-radius:10px;
+  padding:8px; overflow:hidden;
+  box-shadow:0 26px 60px rgba(20,6,7,.44);
+  opacity:0; transform:translateY(-8px) scale(.98); transform-origin:top right;
+  pointer-events:none;
+  /* visibility, not just opacity: a transparent panel would still hand its
+     links to the keyboard and to screen readers. Held until the fade finishes
+     so the panel animates out rather than vanishing. */
+  visibility:hidden;
+  transition:opacity .32s var(--ease), transform .42s var(--ease-exp), visibility 0s linear .42s;
+}
+.navdrop.is-open .navdrop__panel{
+  opacity:1; transform:none; pointer-events:auto;
+  visibility:visible; transition-delay:0s, 0s, 0s;
+}
+.navdrop__panel a{
+  display:flex; flex-direction:column; gap:2px;
+  padding:11px 14px; border-radius:6px;
+  transition:background .3s var(--ease), color .3s var(--ease);
+}
+.navdrop__panel a:hover, .navdrop__panel a:focus-visible{ background:rgba(201,163,92,.14); outline:none; }
+.navdrop__panel a.is-on{ background:rgba(201,163,92,.1); }
+.navdrop__k{
+  font-family:var(--serif); font-size:18px; letter-spacing:.01em;
+  text-transform:none; font-weight:400; color:var(--gold);
+}
+.navdrop__d{ font-size:10.5px; letter-spacing:.11em; text-transform:uppercase; font-weight:600; opacity:.55; }
+
+/* ── instagram link ───────────────────────────
+   One component, three homes: the visit panel (large),
+   the mobile menu and the footer (--quiet). */
+.ig{
+  display:inline-flex; align-items:center; gap:12px;
+  font-weight:400; letter-spacing:.02em;
+  transition:color .3s;
+}
+.ig__mark{
+  display:grid; place-items:center; flex:0 0 auto;
+  width:38px; height:38px; border-radius:12px;
+  border:1px solid var(--hairline-lt); color:var(--gold);
+  transition:background .45s var(--ease), color .45s, border-color .45s, transform .45s var(--ease);
+}
+.ig__mark svg{ width:19px; height:19px; }
+.ig__go{
+  font-size:12px; opacity:0; transform:translate(-4px,4px);
+  transition:opacity .4s var(--ease), transform .4s var(--ease);
+}
+.ig:hover{ color:var(--gold); }
+.ig:hover .ig__mark{
+  background:var(--instagram-gradient); border-color:rgba(255,255,255,.75); color:#fff;
+  transform:rotate(-4deg);
+}
+.ig:hover .ig__go{ opacity:.9; transform:none; }
+.ig--quiet{ gap:9px; font-size:14px; }
+.ig--quiet .ig__mark{ width:30px; height:30px; border-radius:9px; }
+.ig--quiet .ig__mark svg{ width:15px; height:15px; }
+
+/* ═══════════ MOBILE MENU ═══════════
+   A choreographed curtain rather than a panel that appears. Two sheets fall:
+   a gold wash leads, the oxblood panel follows a beat behind, so the open
+   reads as one gesture with a colour in it instead of a single wipe. The
+   contents then arrive in reading order — sections, menus, then the footer —
+   each line rising out of its own mask.
+
+   Every delay lives in CSS, keyed off .open, so the script only flips a class.
+   The closing order is deliberately the reverse and roughly half the duration:
+   a menu that takes as long to leave as it did to arrive reads as slow, not
+   crafted. Base rules carry the fast closing transition, the .open rules carry
+   the slow staggered opening one. Timings are held in --d per element. */
+.mmenu{
+  position:fixed; inset:0; z-index:890;
+  display:flex; flex-direction:column;
+  color:var(--cream);
+  visibility:hidden; pointer-events:none;
+  transition:visibility 0s linear .7s;
+}
+.mmenu.open{ visibility:visible; pointer-events:auto; transition-delay:0s; }
+
+/* the two falling sheets. Each carries a hairline on its bottom edge, which
+   during the fall is the leading edge — the line that draws the curtain down. */
+.mmenu__wash, .mmenu__panel{
+  position:absolute; inset:0; z-index:0;
+  transform:translateY(-101%);
+  will-change:transform;
+}
+.mmenu__wash{
+  /* gold sits at the bottom because that edge leads the fall — what you see of
+     this sheet is the strip below the panel, so the warmth has to be there */
+  background:linear-gradient(180deg, var(--wine) 0%, var(--cognac) 52%, var(--gold) 100%);
+  transition:transform .58s var(--ease-exp) .06s;
+}
+.mmenu__panel{
+  background:
+    radial-gradient(125% 72% at 84% 2%, rgba(176,122,74,.26), transparent 58%),
+    radial-gradient(95% 62% at 4% 104%, rgba(201,163,92,.14), transparent 62%),
+    linear-gradient(180deg, #3a1214 0%, var(--oxblood-deep) 46%, #200809 100%);
+  border-bottom:1px solid rgba(201,163,92,.5);
+  box-shadow:0 26px 70px rgba(15,4,5,.55);
+  transition:transform .52s var(--ease-exp);
+}
+.mmenu.open .mmenu__wash{ transform:none; transition:transform .7s var(--ease-exp); }
+.mmenu.open .mmenu__panel{ transform:none; transition:transform .74s var(--ease-exp) .08s; }
+
+.mmenu__inner{
+  position:relative; z-index:1;
+  flex:1; min-height:0;
+  overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch;
+  display:flex; flex-direction:column;
+  /* safe centring: on a short viewport plain `center` overflows past the top
+     of the scroll box, where it cannot be scrolled back to */
+  justify-content:center; justify-content:safe center;
+  gap:clamp(20px,4vh,38px);
+  padding:calc(env(safe-area-inset-top, 0px) + 104px) var(--pad)
+          calc(env(safe-area-inset-bottom, 0px) + 30px);
+}
+
+/* ── section links ──
+   Number, word, chevron: a list you can aim at, not five words floating in
+   the middle of the screen. The word rides up out of a mask with a degree of
+   rotation on it, which is what makes the reveal read as printed rather than
+   slid. */
+.mmenu__links{ display:flex; flex-direction:column; }
+.mmenu__links a{
+  position:relative;
+  display:grid; grid-template-columns:2.4ch 1fr auto; align-items:center;
+  gap:clamp(10px,3vw,16px);
+  padding:clamp(10px,1.75vh,16px) 2px;
+  transition:opacity .25s var(--ease);
+}
+.mmenu__links a::after{
+  content:""; position:absolute; left:0; right:0; bottom:0; height:1px;
+  background:linear-gradient(90deg, rgba(201,163,92,.5), rgba(244,237,225,.13) 46%, transparent);
+  transform:scaleX(0); transform-origin:left;
+  transition:transform .3s var(--ease);
+}
+.mml__n{
+  font-size:10px; letter-spacing:.2em; font-weight:700; color:var(--gold);
+  opacity:0; transform:translateX(-6px);
+  transition:opacity .25s var(--ease), transform .25s var(--ease);
+}
+/* the mask is a hair taller than the line so Café's accent is not shaved off
+   by the overflow that makes the reveal work */
+.mml__w{ display:block; overflow:hidden; padding-block:.04em; }
+.mml__w > span{
+  display:block;
+  /* italic by default rather than on hover: this list only ever exists on
+     touch, where nothing hovers, so the flourish has to be the resting state */
+  font-family:var(--serif); font-weight:400; font-style:italic; letter-spacing:-.012em;
+  font-size:clamp(31px,8.4vw,50px); line-height:1.16;
+  transform:translateY(112%) rotate(2.4deg); transform-origin:0 0;
+  transition:transform .34s var(--ease);
+}
+.mml__go{
+  width:9px; height:9px; margin-right:4px;
+  border-top:1.4px solid var(--gold); border-right:1.4px solid var(--gold);
+  transform:rotate(45deg) translateX(-5px); opacity:0;
+  transition:opacity .25s var(--ease), transform .35s var(--ease);
+}
+.mmenu.open .mmenu__links a::after{ transform:scaleX(1); transition:transform .85s var(--ease-exp) var(--d); }
+.mmenu.open .mml__n{
+  opacity:.6; transform:none;
+  transition:opacity .5s var(--ease) var(--d), transform .7s var(--ease-exp) var(--d);
+}
+.mmenu.open .mml__w > span{ transform:none; transition:transform .95s var(--ease-exp) var(--d); }
+.mmenu.open .mml__go{
+  opacity:.7; transform:rotate(45deg);
+  transition:opacity .5s var(--ease) calc(var(--d) + .06s), transform .7s var(--ease-exp) calc(var(--d) + .06s);
+}
+.mmenu__links a:nth-child(1){ --d:.26s; }
+.mmenu__links a:nth-child(2){ --d:.32s; }
+.mmenu__links a:nth-child(3){ --d:.38s; }
+.mmenu__links a:nth-child(4){ --d:.44s; }
+.mmenu__links a:nth-child(5){ --d:.50s; }
+/* touch has no hover, so the press itself has to answer */
+.mmenu__links a:active{ opacity:.62; }
+.mmenu.open .mmenu__links a:active .mml__go{ transform:rotate(45deg) translateX(3px); opacity:1; transition-duration:.12s; }
+@media (hover:hover){
+  .mmenu__links a:hover .mml__w > span{ color:var(--gold); }
+  .mmenu.open .mmenu__links a:hover .mml__go{ opacity:1; transform:rotate(45deg) translateX(3px); }
+}
+
+/* ── the three menus, a second tier under the sections ── */
+.mmenu__menus{ --d:.56s; }
+.mmenu__label{
+  display:block; margin-bottom:13px;
+  font-size:10px; letter-spacing:.3em; text-transform:uppercase; font-weight:700;
+  color:var(--gold);
+  opacity:0; transform:translateY(8px);
+  transition:opacity .25s var(--ease), transform .25s var(--ease);
+}
+.mmenu.open .mmenu__label{
+  opacity:.85; transform:none;
+  transition:opacity .5s var(--ease) var(--d), transform .8s var(--ease-exp) var(--d);
+}
+.mmenu__row{ display:flex; flex-wrap:wrap; gap:9px; }
+.mmenu__row a{
+  background:rgba(244,237,225,.045);
+  border:1px solid rgba(201,163,92,.34); border-radius:99px; padding:11px 21px;
+  font-size:11px; letter-spacing:.2em; text-transform:uppercase; font-weight:700;
+  opacity:0; transform:translateY(14px) scale(.94);
+  transition:opacity .25s var(--ease), transform .25s var(--ease),
+             background .35s var(--ease), color .35s var(--ease), border-color .35s var(--ease);
+}
+.mmenu.open .mmenu__row a{
+  opacity:1; transform:none;
+  transition:opacity .55s var(--ease) var(--d), transform .85s var(--ease-exp) var(--d),
+             background .35s var(--ease), color .35s var(--ease), border-color .35s var(--ease);
+}
+.mmenu__row a:nth-child(1){ --d:.60s; }
+.mmenu__row a:nth-child(2){ --d:.655s; }
+.mmenu__row a:nth-child(3){ --d:.71s; }
+.mmenu__row a:hover, .mmenu__row a:active{ background:var(--gold); border-color:var(--gold); color:var(--oxblood-deep); }
+.mmenu__row a.is-on{ background:var(--gold); border-color:var(--gold); color:var(--oxblood-deep); }
+
+/* ── footer block ── */
+.mmenu__foot{
+  position:relative;
+  padding-top:clamp(16px,2.6vh,24px);
+  display:flex; flex-direction:column; gap:10px;
+}
+.mmenu__foot::before{
+  content:""; position:absolute; top:0; left:0; right:0; height:1px;
+  background:linear-gradient(90deg, rgba(201,163,92,.42), rgba(244,237,225,.1) 50%, transparent);
+  transform:scaleX(0); transform-origin:left;
+  transition:transform .3s var(--ease);
+}
+.mmenu.open .mmenu__foot::before{ transform:scaleX(1); transition:transform .9s var(--ease-exp) .68s; }
+.mmenu__foot > *{
+  opacity:0; transform:translateY(10px);
+  transition:opacity .22s var(--ease), transform .22s var(--ease);
+}
+.mmenu.open .mmenu__foot > *{
+  opacity:1; transform:none;
+  transition:opacity .55s var(--ease) var(--d), transform .8s var(--ease-exp) var(--d);
+}
+.mmenu__foot > *:nth-child(1){ --d:.74s; }
+.mmenu__foot > *:nth-child(2){ --d:.79s; }
+.mmenu__foot > *:nth-child(3){ --d:.84s; }
+.mmenu__addr{ font-size:13.5px; line-height:1.5; opacity:.72; }
+.mmenu__hours{ font-size:12px; letter-spacing:.02em; color:var(--gold); opacity:.9; }
+.mmenu__acts{ display:flex; flex-wrap:wrap; align-items:center; gap:14px 18px; margin-top:4px; }
+.mmenu__call{
+  display:inline-flex; align-items:center; gap:9px;
+  border:1px solid rgba(201,163,92,.4); border-radius:99px; padding:9px 16px 9px 13px;
+  font-size:13px; letter-spacing:.01em;
+  transition:background .35s var(--ease), color .35s var(--ease), border-color .35s var(--ease);
+}
+.mmenu__call svg{ width:14px; height:14px; color:var(--gold); transition:color .35s var(--ease); }
+.mmenu__call:hover, .mmenu__call:active{ background:var(--gold); border-color:var(--gold); color:var(--oxblood-deep); }
+.mmenu__call:hover svg, .mmenu__call:active svg{ color:currentColor; }
+.mmenu__foot .ig{ opacity:.9; }
+
+/* ═══════════ HERO ═══════════ */
+.hero{
+  position:relative; min-height:100svh; display:flex; flex-direction:column;
+  justify-content:flex-end; color:var(--cream); overflow:hidden;
+}
+.hero__media{ position:absolute; inset:-12% 0; z-index:0; }
+.hero__scrim{
+  position:absolute; inset:0; z-index:1;
+  background:linear-gradient(180deg, rgba(29,13,15,.42) 0%, rgba(29,13,15,.08) 38%, rgba(29,13,15,.66) 100%);
+}
+.hero__content{
+  position:relative; z-index:2; padding:0 var(--pad);
+  margin-bottom:clamp(30px,5vh,64px);
+}
+.hero__eyebrow{
+  display:inline-flex; align-items:center; gap:12px;
+  font-size:11px; letter-spacing:.34em; text-transform:uppercase; font-weight:700;
+  margin-bottom:clamp(14px,2vh,26px); color:var(--parchment);
+}
+.hero__eyebrow .dot{ width:7px; height:7px; border-radius:50%; background:var(--gold); box-shadow:0 0 0 5px rgba(201,163,92,.22); }
+.hero__title{
+  font-size:clamp(64px, 15.5vw, 236px);
+  line-height:.86; letter-spacing:.015em; font-weight:400;
+  margin-left:-.04em; margin-bottom:clamp(8px,1.4vh,18px);
+}
+.hero__title .line span{
+  display:inline-block; transform:translateY(112%);
+  transition:transform 1.1s var(--ease-exp);
+}
+.hero__title .line{ display:block; overflow:hidden; padding-bottom:.06em; }
+.hero__title.in .line span{ transform:translateY(0); }
+.hero__title .line span:nth-child(1){transition-delay:.02s}.hero__title .line span:nth-child(2){transition-delay:.07s}
+.hero__title .line span:nth-child(3){transition-delay:.12s}.hero__title .line span:nth-child(4){transition-delay:.17s}
+.hero__title .line span:nth-child(5){transition-delay:.22s}.hero__title .line span:nth-child(6){transition-delay:.27s}
+.hero__title .line span:nth-child(7){transition-delay:.32s}
+.hero__sub{
+  font-size:clamp(13px,1.4vw,17px); letter-spacing:.5em; text-transform:uppercase;
+  color:var(--gold); margin-bottom:clamp(16px,2.6vh,30px); font-weight:600;
+}
+.hero__desc{ font-size:clamp(15px,1.5vw,19px); line-height:1.65; font-weight:300; opacity:.92; margin-bottom:clamp(22px,3.4vh,38px); }
+.hero__actions{ display:flex; gap:14px; flex-wrap:wrap; }
+.hero__foot{
+  position:relative; z-index:2;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:20px var(--pad) 26px;
+  border-top:1px solid rgba(244,237,225,.18);
+  font-size:10px; letter-spacing:.26em; text-transform:uppercase; opacity:.85;
+}
+.hero__scroll{ display:flex; align-items:center; gap:12px; }
+.hero__scroll i{ position:relative; width:1px; height:34px; background:rgba(244,237,225,.4); overflow:hidden; display:block; }
+.hero__scroll i::after{ content:""; position:absolute; top:-100%; left:0; width:100%; height:100%; background:var(--gold); animation:drip 1.8s var(--ease) infinite; }
+@keyframes drip{ 0%{top:-100%} 55%{top:0} 100%{top:100%} }
+
+/* reveal helper (JS toggles .in) */
+.reveal{ opacity:0; transform:translateY(26px); transition:opacity .9s var(--ease), transform .9s var(--ease); }
+.reveal.in{ opacity:1; transform:none; }
+
+/* staggered reveal — JS tags the items and writes --d per item */
+.stagger-item{
+  opacity:0; transform:translateY(18px);
+  transition:opacity .85s var(--ease) var(--d,0ms), transform .85s var(--ease) var(--d,0ms);
+}
+.stagger-item.in{ opacity:1; transform:none; }
+
+/* ═══════════ MARQUEE ═══════════ */
+.marquee{
+  background:var(--oxblood-deep); color:var(--cream);
+  overflow:hidden; padding:20px 0; border-top:1px solid rgba(201,163,92,.25); border-bottom:1px solid rgba(201,163,92,.25);
+}
+.marquee__track{ display:flex; width:max-content; animation:marq 36s linear infinite; }
+.marquee__group{ display:flex; align-items:center; }
+.marquee__group span{
+  font-family:var(--serif); font-style:italic; font-size:clamp(18px,2vw,26px);
+  padding:0 26px; white-space:nowrap;
+}
+.marquee__group em{ color:var(--gold); font-style:normal; font-size:13px; }
+@keyframes marq{ to{ transform:translateX(-50%); } }
+
+/* ═══════════ STORY ═══════════ */
+.story{ padding:clamp(80px,12vh,150px) 0 clamp(70px,10vh,130px); }
+.story__inner{ max-width:var(--maxw); margin-inline:auto; padding:0 var(--pad); }
+.story__big{
+  max-width:19ch;
+  margin-bottom:clamp(44px,5.5vw,84px);
+}
+
+/* editorial 12-column bed: two staggered image/text pairs */
+.story__grid{
+  display:grid;
+  grid-template-columns:repeat(12,1fr);
+  column-gap:clamp(20px,3vw,48px);
+  row-gap:clamp(40px,6vw,96px);
+  align-items:start;
+}
+.story__img{
+  position:relative; overflow:hidden; border-radius:6px;
+  background:var(--parchment);
+}
+.story__img--a{ grid-column:1 / 8; aspect-ratio:3/2; }
+.story__img--b{ grid-column:6 / 13; aspect-ratio:16/10; }
+.story__img::after{
+  content:""; position:absolute; inset:auto 0 0 0; height:48%;
+  background:linear-gradient(to top, rgba(20,7,8,.72), rgba(20,7,8,.28) 42%, transparent);
+  opacity:0; transition:opacity .6s var(--ease); pointer-events:none;
+}
+.story__img figcaption{
+  position:absolute; left:clamp(18px,2vw,30px); bottom:clamp(16px,1.8vw,26px);
+  z-index:2; color:var(--cream);
+  font-size:11px; letter-spacing:.2em; text-transform:uppercase; font-weight:600;
+  text-shadow:0 1px 14px rgba(20,7,8,.75);
+  opacity:0; transform:translateY(8px);
+  transition:opacity .6s var(--ease) .1s, transform .6s var(--ease) .1s;
+}
+.story__img.in::after{ opacity:1; }
+.story__img.in figcaption{ opacity:.92; transform:none; }
+.cap__k{ color:var(--gold); font-weight:700; margin-right:.7em; }
+
+.story__text{ grid-column:8 / 13; padding-top:clamp(4px,1vw,18px); }
+.story__text p{ margin-bottom:1.35em; color:var(--ink-soft); }
+.story__text p.lead{ color:var(--ink); margin-bottom:1.1em; }
+.story__floors{
+  margin-top:clamp(24px,2.6vw,36px);
+  border-top:1px solid var(--hairline);
+}
+.story__floors li{
+  display:flex; align-items:baseline; gap:16px;
+  padding:14px 0; border-bottom:1px solid var(--hairline);
+  font-size:13.5px; color:var(--ink);
+}
+.story__floors span{
+  flex:0 0 auto; min-width:74px;
+  font-size:10px; letter-spacing:.28em; text-transform:uppercase;
+  font-weight:700; color:var(--cognac);
+}
+
+.story__quote{
+  grid-column:1 / 6; align-self:center;
+  padding-left:clamp(18px,2vw,28px);
+  border-left:2px solid var(--gold);
+}
+.story__quote p{
+  font-family:var(--serif); font-weight:300; font-style:italic;
+  font-size:clamp(21px,2.1vw,32px); line-height:1.32; color:var(--wine);
+}
+
+.story__facts{
+  display:grid; grid-template-columns:repeat(3,1fr);
+  gap:clamp(20px,3vw,48px);
+  margin-top:clamp(56px,7vw,104px);
+  border-top:1px solid var(--hairline);
+}
+.fact{ padding-top:clamp(26px,3vw,40px); position:relative; }
+.fact::before{
+  content:""; position:absolute; top:-1px; left:0; width:34px; height:2px;
+  background:var(--wine);
+  transform:scaleX(0); transform-origin:left center;
+  transition:transform .9s var(--ease-exp) var(--d,0ms);
+}
+.fact.in::before{ transform:scaleX(1); }
+.fact strong{ display:block; font-family:var(--serif); font-weight:300; font-size:clamp(40px,4.4vw,64px); line-height:1; color:var(--wine); margin-bottom:12px; font-variant-numeric:tabular-nums; }
+.fact span{ display:block; font-size:11.5px; letter-spacing:.08em; text-transform:uppercase; line-height:1.75; color:var(--ink-soft); opacity:.8; }
+
+/* image reveal (clip) */
+[data-reveal-img]{ clip-path:inset(8% 6% 8% 6% round 6px); opacity:.001; transition:clip-path 1.1s var(--ease-exp), opacity .8s ease; }
+[data-reveal-img].in{ clip-path:inset(0 0 0 0 round 6px); opacity:1; }
+
+/* ═══════════ KITCHEN ═══════════
+   Three movements: an intro, a drifting reel of plates, and the carte itself. */
+/* No overflow clipping here: it would turn the section into a scrollport and
+   kill the sticky ticket in the builder. Nothing inside overhangs anyway. */
+.kitchen{
+  background:var(--oxblood); color:var(--cream);
+  position:relative;
+  padding:clamp(80px,12vh,150px) 0 clamp(70px,10vh,130px);
+}
+/* a slow warm bloom behind the carte so the long list doesn't read flat */
+.kitchen::before{
+  content:""; position:absolute; left:50%; top:52%; z-index:0;
+  width:min(1400px,100%); aspect-ratio:1; transform:translate(-50%,-50%);
+  background:radial-gradient(circle, rgba(201,163,92,.11), transparent 62%);
+  pointer-events:none;
+}
+.kitchen > *{ position:relative; z-index:1; }
+
+.kitchen__intro{
+  padding:0 var(--pad); margin-bottom:clamp(48px,7vw,88px);
+  max-width:var(--maxw); margin-inline:auto;
+  display:grid; grid-template-columns:repeat(12,1fr);
+  column-gap:clamp(20px,3vw,48px); row-gap:clamp(20px,3vw,30px);
+  align-items:end;
+}
+.kitchen__intro h2{ grid-column:1 / 9; max-width:20ch; }
+.kitchen__lede{
+  grid-column:9 / 13; padding-bottom:.5em;
+  font-size:clamp(15px,1.1vw,17px); font-weight:300; line-height:1.8; opacity:.8;
+}
+
+/* ── the reel ──────────────────────────────────
+   Auto-drifts; hovering (or focusing a plate) holds it still. */
+.reel{ margin-bottom:clamp(64px,9vw,120px); }
+.reel__label{
+  display:flex; align-items:baseline; gap:16px; flex-wrap:wrap;
+  padding:0 var(--pad); margin-bottom:clamp(20px,2.4vw,32px);
+}
+.reel__label span{
+  font-size:11px; letter-spacing:.34em; text-transform:uppercase; font-weight:700; color:var(--gold);
+}
+.reel__label em{ font-family:var(--serif); font-style:italic; font-size:15px; opacity:.62; }
+/* The soft edges are two gradient overlays, not a mask-image. A mask forces the
+   whole box through an offscreen compositing pass, and this box contains a
+   permanently running transform animation on a track several thousand pixels
+   wide — on iOS that combination rasterises once, at a size that cannot hold the
+   track, and the plates render blank. Desktop has the headroom to hide it.
+
+   .kitchen is a flat --oxblood fill, so fading to that colour is pixel-identical
+   to fading to transparency over it, with no compositing involved. */
+.reel__viewport{
+  overflow:hidden;
+  position:relative;
+}
+.reel__viewport::before,
+.reel__viewport::after{
+  content:""; position:absolute; top:0; bottom:0; width:6%;
+  z-index:2; pointer-events:none;
+}
+.reel__viewport::before{ left:0;  background:linear-gradient(90deg,  var(--oxblood), rgba(74,21,23,0)); }
+.reel__viewport::after{  right:0; background:linear-gradient(270deg, var(--oxblood), rgba(74,21,23,0)); }
+.reel__track{
+  display:flex; width:max-content;
+  animation:reel-drift 68s linear infinite;
+}
+.reel:hover .reel__track,
+.reel:focus-within .reel__track{ animation-play-state:paused; }
+@keyframes reel-drift{ to{ transform:translateX(-50%); } }
+.reel__group{ display:flex; gap:clamp(14px,1.8vw,26px); padding-right:clamp(14px,1.8vw,26px); }
+
+.plate{
+  flex:0 0 clamp(220px,22vw,320px);
+  position:relative; border-radius:6px; overflow:hidden;
+}
+.plate img{
+  aspect-ratio:4/3.2; height:auto;
+  transition:transform 1.1s var(--ease), filter .6s var(--ease);
+  filter:saturate(.94) brightness(.92);
+}
+.plate::after{
+  content:""; position:absolute; inset:auto 0 0 0; height:56%;
+  background:linear-gradient(to top, rgba(20,7,8,.84), rgba(20,7,8,.2) 55%, transparent);
+  pointer-events:none;
+}
+.plate figcaption{
+  position:absolute; left:16px; right:16px; bottom:14px; z-index:2;
+  font-size:10.5px; letter-spacing:.22em; text-transform:uppercase; font-weight:600;
+  opacity:.82; transition:opacity .4s var(--ease), transform .5s var(--ease);
+}
+.reel:hover .plate:not(:hover) img{ filter:saturate(.7) brightness(.62); }
+.plate:hover img{ transform:scale(1.06); filter:saturate(1) brightness(1); }
+.plate:hover figcaption{ opacity:1; transform:translateY(-2px); }
+
+/* ── the carte ─────────────────────────────── */
+.carte{
+  max-width:1360px; margin-inline:auto; padding:0 var(--pad);
+}
+.carte__masthead{ margin-bottom:clamp(30px,4vw,48px); }
+
+/* course tabs */
+.carte__tabs{
+  display:flex; flex-wrap:wrap; justify-content:center; gap:8px;
+  padding-bottom:clamp(24px,3vw,38px);
+  border-bottom:1px solid var(--hairline-lt);
+}
+.ctab{
+  position:relative; isolation:isolate;
+  background:none; border:1px solid var(--hairline-lt); border-radius:99px;
+  color:var(--cream); font-family:var(--sans); cursor:pointer;
+  padding:11px 22px;
+  font-size:10.5px; letter-spacing:.2em; text-transform:uppercase; font-weight:700;
+  transition:color .4s var(--ease), border-color .4s var(--ease);
+}
+.ctab::before{
+  content:""; position:absolute; inset:0; z-index:-1; border-radius:99px;
+  background:var(--gold);
+  transform:scale(.85); opacity:0;
+  transition:transform .5s var(--ease-exp), opacity .35s var(--ease);
+}
+.ctab:hover{ border-color:rgba(201,163,92,.6); color:var(--gold); }
+.ctab.is-on{ color:var(--oxblood-deep); border-color:var(--gold); }
+.ctab.is-on::before{ transform:scale(1); opacity:1; }
+.ctab:focus-visible{ outline:2px solid var(--gold); outline-offset:3px; }
+
+/* the courses themselves */
+.carte__body{
+  display:grid; grid-template-columns:repeat(2,1fr);
+  column-gap:clamp(34px,5vw,88px); row-gap:clamp(44px,5.5vw,76px);
+  align-items:start;
+  padding-top:clamp(40px,5vw,66px);
+  /* a floor under the shortest course, so filtering barely moves the page */
+  min-height:52vh;
+  transition:opacity .18s var(--ease);
+}
+/* the beat where the outgoing courses leave and the new ones are put in place */
+.carte__body.is-swapping{ opacity:0; }
+/* holds the height a filter just removed, then gives it back gradually —
+   see the swap in script.js */
+.menu-spacer{ height:0; }
+.menu-spacer.is-collapsing{ transition:height .66s var(--ease-exp); }
+.course{ min-width:0; }
+.course--build{ grid-column:1 / -1; }
+.course.is-hidden{ display:none; }
+/* a course with no partner on its row takes the full row and centers, so
+   filtering down to one never leaves a dead column beside it */
+.course.is-alone{
+  grid-column:1 / -1;
+  width:min(100%, 640px); margin-inline:auto;
+}
+.course.is-alone .mi__desc{ padding-right:0; }
+.course__head{
+  display:flex; align-items:baseline; gap:16px;
+  padding-bottom:14px; margin-bottom:clamp(18px,2vw,26px);
+  border-bottom:1px solid rgba(201,163,92,.32);
+}
+/* h2 on the menu pages (under the page's h1), h4 anywhere it is nested deeper */
+.course__head h2, .course__head h4{
+  font-family:var(--serif); font-weight:400; font-size:clamp(21px,2vw,28px);
+  color:var(--gold); letter-spacing:.01em; line-height:1.15;
+}
+.course__count{
+  margin-left:auto;
+  font-family:var(--serif); font-style:italic; font-size:13px; opacity:.42;
+}
+.course__items{ display:flex; flex-direction:column; }
+
+/* a single menu line */
+.mi{ padding:clamp(13px,1.4vw,17px) 0; border-bottom:1px solid rgba(244,237,225,.09); }
+.mi:last-child{ border-bottom:none; }
+.mi__row{
+  display:flex; align-items:baseline; gap:12px; width:100%;
+  background:none; border:none; padding:0; text-align:left; color:inherit; font:inherit;
+}
+.mi__row h3, .mi__row h5{
+  font-family:var(--serif); font-weight:400; font-size:clamp(16.5px,1.35vw,19.5px);
+  line-height:1.25; letter-spacing:.005em;
+  transition:color .4s var(--ease);
+}
+.mi__leader{
+  flex:1 1 auto; min-width:18px; height:1px; transform:translateY(-3px);
+  background-image:radial-gradient(circle, rgba(244,237,225,.42) 1px, transparent 1px);
+  background-size:6px 1px; background-repeat:repeat-x; background-position:0 0;
+  opacity:.65;
+}
+.mi__price{
+  flex:0 0 auto;
+  font-family:var(--serif); font-size:clamp(15px,1.25vw,18px);
+  color:var(--gold); font-variant-numeric:tabular-nums;
+}
+.mi__price::before{ content:"$"; font-size:.7em; opacity:.7; margin-right:.12em; }
+.mi__desc{
+  margin-top:7px; padding-right:clamp(24px,4vw,64px);
+  font-size:13.5px; line-height:1.68; font-weight:300; opacity:.62; max-width:52ch;
+}
+.mi__tag{
+  display:inline-block; vertical-align:middle; margin-left:10px;
+  font-family:var(--sans); font-size:9px; letter-spacing:.2em; text-transform:uppercase;
+  font-weight:700; color:var(--gold); opacity:.8;
+  border:1px solid rgba(201,163,92,.4); border-radius:99px; padding:3px 9px;
+}
+.mi:hover h3, .mi:hover h5{ color:var(--gold); }
+
+/* ── priced by size ───────────────────────────
+   When a whole course is Small/Large, the sizes belong at the top as a column
+   header, not repeated on every single line. The header grid and the price
+   grid share --cell, so the columns line up down the course. */
+/* the cell has to stay wider than the word "SMALL" sitting in it, or the two
+   column labels touch on a narrow screen */
+.course--sized{ --cell:clamp(54px,4.8vw,64px); }
+.course--sized .course__head{ margin-bottom:12px; }
+.course__sizes{
+  display:grid; grid-template-columns:repeat(2, var(--cell)); justify-content:end;
+  margin-bottom:clamp(8px,1vw,14px);
+}
+.course__sizes span{
+  text-align:right;
+  font-size:9px; letter-spacing:.13em; text-transform:uppercase; font-weight:700;
+  color:var(--gold); opacity:.62;
+}
+.mi__cells{
+  flex:0 0 auto;
+  display:grid; grid-template-columns:repeat(2, var(--cell));
+}
+.mi__cell{
+  text-align:right;
+  font-family:var(--serif); font-weight:400; font-size:clamp(15px,1.25vw,18px);
+  color:var(--gold); font-variant-numeric:tabular-nums;
+  transition:color .4s var(--ease);
+}
+.mi__cell::before{ content:"$"; font-size:.7em; opacity:.7; margin-right:.12em; }
+/* one price, no size: spans the columns and keeps the same right-hand edge */
+.mi__cell--solo{ grid-column:1 / -1; }
+
+/* format prices under a line — a bottle beside the pour, a board's two sizes.
+   Ruled on the left so they read as a sub-entry, not another menu item. */
+.mi__pours{ display:flex; flex-wrap:wrap; gap:7px clamp(18px,2.4vw,34px); margin-top:11px; }
+.mi__pours li{
+  flex:1 1 128px; max-width:220px;
+  display:flex; align-items:baseline; gap:12px;
+  padding:2px 0 2px 11px; border-left:1px solid rgba(201,163,92,.4);
+}
+.mi__pours span{
+  font-size:9.5px; letter-spacing:.2em; text-transform:uppercase; font-weight:700; opacity:.5;
+}
+.mi__pours b{
+  margin-left:auto;
+  font-family:var(--serif); font-weight:400; font-size:14px;
+  color:var(--gold); opacity:.85; font-variant-numeric:tabular-nums;
+}
+/* the boards are priced by size only, so the line has no pour price to lead to */
+.mi--noprice .mi__desc{ margin-top:9px; }
+
+/* expandable option rows (the crêpe) */
+.sr-only{
+  position:absolute; width:1px; height:1px; overflow:hidden;
+  clip:rect(0 0 0 0); clip-path:inset(50%); white-space:nowrap;
+}
+.mi--opts .mi__row{ cursor:pointer; }
+.mi__toggle{
+  flex:0 0 auto; position:relative; width:13px; height:13px; margin-left:6px;
+  background:none; border:none; padding:0; cursor:pointer;
+  align-self:center; opacity:.6; transition:opacity .3s var(--ease), transform .5s var(--ease-exp);
+}
+.mi__toggle:focus-visible{ outline:2px solid var(--gold); outline-offset:4px; border-radius:2px; }
+.mi__toggle::before, .mi__toggle::after{
+  content:""; position:absolute; inset:50% 0 auto 0; height:1px; background:var(--gold);
+  transition:transform .45s var(--ease-exp);
+}
+.mi__toggle::after{ transform:rotate(90deg); }
+.mi--opts .mi__row:hover .mi__toggle{ opacity:1; }
+.mi--opts.is-open .mi__toggle{ transform:rotate(180deg); }
+.mi--opts.is-open .mi__toggle::after{ transform:rotate(0deg); }
+.mi__opts{
+  display:grid; grid-template-rows:0fr;
+  transition:grid-template-rows .6s var(--ease-exp), opacity .45s var(--ease);
+  opacity:0;
+}
+.mi--opts.is-open .mi__opts{ grid-template-rows:1fr; opacity:1; }
+.mi__opts > ul{
+  overflow:hidden; padding-top:8px;
+  display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr));
+  column-gap:clamp(20px,3vw,44px);
+}
+.mi__opts li{
+  display:flex; align-items:baseline; gap:10px;
+  padding:9px 0; border-bottom:1px solid rgba(244,237,225,.08);
+  font-size:13px; font-weight:300;
+}
+.mi__opts li span{ opacity:.72; }
+.mi__opts li b{ margin-left:auto; font-weight:400; color:var(--gold); opacity:.85; font-variant-numeric:tabular-nums; }
+
+/* ── build your own ─────────────────────────── */
+.build{
+  display:grid; grid-template-columns:1fr clamp(240px,24%,320px);
+  gap:clamp(28px,4vw,56px);
+  align-items:start;
+}
+.build__field{ margin-bottom:clamp(22px,2.6vw,32px); }
+.build__field:last-child{ margin-bottom:0; }
+.build__label{
+  display:block; margin-bottom:14px;
+  font-size:10px; letter-spacing:.3em; text-transform:uppercase; font-weight:700;
+  color:var(--gold); opacity:.75;
+}
+/* The bagel step grows and collapses in place rather than switching display,
+   so nothing below it snaps. 0fr → 1fr animates to the content's own height. */
+.build__field--sub{
+  display:grid; grid-template-rows:0fr;
+  margin-bottom:0; opacity:0;
+  transition:grid-template-rows .55s var(--ease-exp),
+             margin-bottom .55s var(--ease-exp),
+             opacity .3s var(--ease);
+}
+.build__field--sub.is-open{
+  grid-template-rows:1fr; opacity:1;
+  margin-bottom:clamp(22px,2.6vw,32px);
+  transition:grid-template-rows .55s var(--ease-exp),
+             margin-bottom .55s var(--ease-exp),
+             opacity .45s var(--ease) .12s;
+}
+/* padding/negative-margin pair leaves the clipped box room for focus rings */
+.build__subinner{ overflow:hidden; padding:4px; margin:-4px; }
+.chips{ display:flex; flex-wrap:wrap; gap:8px; }
+.chip{
+  position:relative; isolation:isolate; cursor:pointer;
+  background:none; border:1px solid rgba(244,237,225,.18); border-radius:99px;
+  color:var(--cream); font-family:var(--sans);
+  padding:9px 16px; font-size:12.5px; font-weight:500; letter-spacing:.01em;
+  display:inline-flex; align-items:baseline; gap:7px;
+  transition:border-color .35s var(--ease), color .35s var(--ease), transform .35s var(--ease);
+}
+.chip em{ font-style:normal; font-size:11px; opacity:.55; font-variant-numeric:tabular-nums; }
+.chip::before{
+  content:""; position:absolute; inset:0; z-index:-1; border-radius:99px;
+  background:rgba(201,163,92,.16); opacity:0;
+  transition:opacity .35s var(--ease);
+}
+.chip:hover{ border-color:rgba(201,163,92,.55); transform:translateY(-1px); }
+.chip:focus-visible{ outline:2px solid var(--gold); outline-offset:3px; }
+.chip.is-on{ border-color:var(--gold); color:var(--gold); }
+.chip.is-on::before{ opacity:1; }
+.chip.is-on em{ opacity:.8; }
+.chips--quiet .chip{ font-size:12px; padding:8px 14px; }
+.build__hint, .build__note{
+  margin-top:12px; font-size:12.5px; font-weight:300; line-height:1.6; opacity:.5;
+}
+.build__note{ font-style:italic; font-family:var(--serif); font-size:13.5px; }
+
+/* the running ticket */
+.build__ticket{
+  border:1px solid rgba(201,163,92,.3); border-radius:6px;
+  background:rgba(20,7,8,.34);
+  padding:clamp(20px,2.4vw,28px);
+  position:sticky; top:96px;
+}
+.build__ticketlabel{
+  display:block; padding-bottom:14px; margin-bottom:14px;
+  border-bottom:1px solid rgba(244,237,225,.12);
+  font-size:10px; letter-spacing:.3em; text-transform:uppercase; font-weight:700; color:var(--gold);
+}
+.build__lines{ display:flex; flex-direction:column; gap:8px; min-height:2em; }
+.build__lines li{
+  display:flex; align-items:baseline; gap:10px;
+  font-size:12.5px; font-weight:300;
+  animation:line-in .45s var(--ease-exp) both;
+}
+@keyframes line-in{ from{ opacity:0; transform:translateX(-6px); } to{ opacity:1; transform:none; } }
+.build__lines li span{ opacity:.75; }
+.build__lines li b{ margin-left:auto; font-weight:400; opacity:.6; font-variant-numeric:tabular-nums; }
+.build__lines li.is-base span{ opacity:1; font-weight:500; }
+.build__sum{
+  display:flex; align-items:baseline; gap:12px;
+  margin-top:18px; padding-top:16px; border-top:1px solid rgba(244,237,225,.12);
+}
+.build__sum span{ font-size:10px; letter-spacing:.3em; text-transform:uppercase; font-weight:700; opacity:.55; }
+.build__sum strong{
+  margin-left:auto;
+  font-family:var(--serif); font-weight:400; font-size:clamp(26px,2.4vw,34px);
+  color:var(--gold); font-variant-numeric:tabular-nums; line-height:1;
+}
+.build__sum strong.is-bumped{ animation:bump .5s var(--ease-exp); }
+@keyframes bump{ 40%{ transform:translateY(-4px); } 100%{ transform:none; } }
+.build__reset{
+  margin-top:18px; background:none; border:none; cursor:pointer; padding:0;
+  color:var(--cream); font-family:var(--sans);
+  font-size:10px; letter-spacing:.24em; text-transform:uppercase; font-weight:700; opacity:.45;
+  border-bottom:1px solid transparent; transition:opacity .3s, border-color .3s;
+}
+.build__reset:hover{ opacity:.9; border-bottom-color:rgba(244,237,225,.45); }
+
+/* ── carte foot ─────────────────────────────── */
+.carte__foot{
+  display:flex; align-items:center; justify-content:space-between; gap:clamp(20px,4vw,50px);
+  flex-wrap:wrap;
+  margin-top:clamp(52px,6vw,88px); padding-top:clamp(32px,4vw,50px);
+  border-top:1px solid var(--hairline-lt);
+}
+.carte__foot p{
+  font-family:var(--serif); font-style:italic; font-size:clamp(20px,2.2vw,30px);
+  line-height:1.35; color:var(--parchment); opacity:.85; max-width:22ch;
+}
+
+/* ── choreography ───────────────────────────
+   JS tags .in and writes --d, so a course's lines cascade as it arrives
+   and re-cascade when a tab swaps the view. */
+.plate, .course{
+  opacity:0; transform:translateY(22px);
+  transition:opacity .8s var(--ease) var(--d,0ms), transform .9s var(--ease-exp) var(--d,0ms);
+}
+.plate.in, .course.in{ opacity:1; transform:none; }
+.course__head{
+  clip-path:inset(0 100% 0 0);
+  transition:clip-path .9s var(--ease-exp) calc(var(--d,0ms) + 60ms);
+}
+.course.in .course__head{ clip-path:inset(0 0 0 0); }
+.mi, .build, .course__sizes{
+  opacity:0; transform:translateY(12px);
+  transition:opacity .7s var(--ease) var(--md,0ms), transform .7s var(--ease) var(--md,0ms);
+}
+.course.in .mi, .course.in .build, .course.in .course__sizes{ opacity:1; transform:none; }
+
+/* ═══════════ CAFÉ ═══════════ */
+.cafe{ padding:clamp(80px,12vh,150px) 0; }
+.cafe__head{ padding:0 var(--pad); margin-bottom:clamp(44px,6vw,80px); max-width:1100px; }
+.cafe__lede{ margin-top:clamp(18px,2.4vw,28px); font-size:clamp(16px,1.5vw,19px); color:var(--ink-soft); max-width:60ch; font-weight:300; }
+.cafe__grid{
+  display:grid; grid-template-columns:repeat(4,1fr); gap:clamp(14px,2vw,28px);
+  padding:0 var(--pad);
+}
+.cafe__card{ position:relative; border-radius:6px; overflow:hidden; aspect-ratio:3/4.1; }
+.cafe__card img{ transition:transform 1.2s var(--ease); }
+.cafe__card:hover img{ transform:scale(1.05); }
+.cafe__card figcaption{
+  position:absolute; inset:auto 0 0 0; padding:52px 18px 18px;
+  background:linear-gradient(180deg, transparent, rgba(29,13,15,.82));
+  color:var(--cream);
+  transform:translateY(12px); opacity:0; transition:opacity .5s var(--ease), transform .5s var(--ease);
+}
+.cafe__card:hover figcaption, .cafe__card.in figcaption{ transform:none; opacity:1; }
+.cafe__card figcaption strong{ display:block; font-family:var(--serif); font-weight:400; font-size:19px; margin-bottom:4px; }
+.cafe__card figcaption span{ font-size:12px; opacity:.8; font-weight:300; }
+
+/* ═══════════ WINE ═══════════ */
+.wine{ position:relative; color:var(--cream); overflow:hidden; background:var(--oxblood-deep); }
+/* The -8% is the backdrop's travel allowance: script.js clamps the parallax to
+   whatever overscan the element actually has, so the photo can never slide out
+   of its own frame however tall this section grows. */
+.wine__bg{ position:absolute; inset:-8% 0; z-index:0; }
+/* The `filter:saturate(.85)` that used to sit here is gone rather than replaced:
+   .wine__bg is the element the parallax drives, so a filter on its child puts a
+   filtered subtree inside a transform-animated, overflow-hidden parent — which
+   on iOS drops the layer and leaves the section empty. .hero__media is the same
+   structure without a filter and renders fine on device, which is what points at
+   this; .mhead__bg keeps its filter because nothing animates it. Nothing takes
+   its place because .wine__scrim already sits at 90–96% opacity over this photo,
+   where a 15% desaturation is not a difference anyone can see. */
+.wine__bg img{ object-position:center 30%; }
+.wine__scrim{
+  position:absolute; inset:0; z-index:1;
+  background:
+    radial-gradient(120% 80% at 78% 34%, rgba(45,13,15,.42), rgba(24,8,9,.9) 68%),
+    linear-gradient(180deg, rgba(24,8,9,.93), rgba(35,10,12,.84) 50%, rgba(24,8,9,.96));
+}
+.wine__inner{
+  position:relative; z-index:2;
+  max-width:var(--maxw); margin-inline:auto; padding:clamp(90px,13vh,160px) var(--pad) clamp(70px,9vh,120px);
+}
+
+/* masthead: title left, lede offset right */
+.wine__masthead{
+  display:grid; grid-template-columns:repeat(12,1fr);
+  column-gap:clamp(20px,3vw,48px); row-gap:clamp(24px,3vw,36px);
+  align-items:end;
+  margin-bottom:clamp(52px,7vw,104px);
+}
+.wine__title{ grid-column:1 / 8; max-width:14ch; }
+.wine__lede{
+  grid-column:8 / 13; padding-bottom:.4em;
+  font-size:clamp(15.5px,1.15vw,17.5px); font-weight:300; opacity:.82; line-height:1.8;
+}
+
+/* body: portrait plate left, numbered list right */
+.wine__body{
+  display:grid; grid-template-columns:repeat(12,1fr);
+  column-gap:clamp(20px,3vw,48px); row-gap:clamp(36px,4vw,56px);
+  align-items:start;
+}
+/* the plate stretches to match the list column, so the two always bottom out together */
+.wine__board{
+  grid-column:1 / 7; align-self:stretch;
+  min-height:min(72vh, 620px);
+  border-radius:6px; overflow:hidden; position:relative;
+}
+/* absolute so the photo's intrinsic height can't drive the row */
+.wine__board img{ position:absolute; inset:0; }
+.wine__board::after{
+  content:""; position:absolute; inset:auto 0 0 0; height:44%;
+  background:linear-gradient(to top, rgba(12,4,5,.78), rgba(12,4,5,.3) 42%, transparent);
+  opacity:0; transition:opacity .6s var(--ease); pointer-events:none;
+}
+.wine__board figcaption{
+  position:absolute; left:clamp(18px,2vw,28px); right:clamp(18px,2vw,28px);
+  bottom:clamp(16px,1.8vw,24px); z-index:2;
+  font-size:11px; letter-spacing:.2em; text-transform:uppercase; font-weight:600;
+  text-shadow:0 1px 14px rgba(12,4,5,.8);
+  opacity:0; transform:translateY(8px);
+  transition:opacity .6s var(--ease) .1s, transform .6s var(--ease) .1s;
+}
+.wine__board.in::after{ opacity:1; }
+.wine__board.in figcaption{ opacity:.92; transform:none; }
+
+.wine__col{ grid-column:8 / 13; }
+.wine__list{ border-top:1px solid var(--hairline-lt); }
+.wine__item{
+  display:grid; grid-template-columns:auto 1fr; align-items:baseline;
+  gap:clamp(18px,2.4vw,34px);
+  padding:clamp(22px,2.6vw,34px) clamp(10px,1.4vw,20px) clamp(22px,2.6vw,34px) 0;
+  border-bottom:1px solid var(--hairline-lt);
+  position:relative; transition:padding-left .5s var(--ease);
+}
+.wine__item::before{
+  content:""; position:absolute; inset:0 -12px; z-index:0; border-radius:3px;
+  background:linear-gradient(90deg, rgba(201,163,92,.11), transparent 70%);
+  opacity:0; transition:opacity .5s var(--ease);
+}
+.wine__item:hover::before{ opacity:1; }
+.wine__item:hover{ padding-left:10px; }
+.wine__no{
+  position:relative; z-index:1;
+  font-family:var(--serif); font-style:italic; font-size:13px;
+  color:var(--gold); opacity:.7; min-width:2.2ch;
+}
+.wine__copy{ position:relative; z-index:1; }
+.wine__key{
+  font-family:var(--serif); font-style:italic; font-size:clamp(26px,2.6vw,38px);
+  line-height:1.1; color:var(--gold); display:block; margin-bottom:10px;
+}
+.wine__item p{ font-size:14.5px; line-height:1.7; opacity:.76; font-weight:300; max-width:44ch; }
+
+.wine__cta{
+  display:flex; align-items:center; flex-wrap:wrap; gap:clamp(16px,2vw,28px);
+  margin-top:clamp(28px,3.4vw,46px);
+}
+.wine__hours{
+  font-size:10.5px; letter-spacing:.28em; text-transform:uppercase;
+  font-weight:600; color:var(--gold); opacity:.75;
+}
+
+/* ═══════════ INNER PAGES ═══════════
+   menu-food.html · menu-drinks.html · menu-wine.html · faq.html. Every page that
+   is not the one-pager opens the same way: a .mhead masthead over a dark body.
+   The menu pages then carry a .carte board; faq.html carries an accordion.
+   .page-doc is the plain variant — masthead and nav treatment, no board. */
+.page-menu, .page-doc{ background:var(--oxblood); }
+/* An inner page is arrived at by a click from a sibling, so the bar is already
+   in place: it does not animate in at all here. Any entrance — even a fade —
+   replays on every Food/Drinks/Wine switch and reads as a flinch. The scrolled
+   state and the hide-on-scroll still work; only the arrival is mute. */
+.page-menu .nav, .page-doc .nav{
+  opacity:1; transform:none;
+  /* transform is still transitioned so hide-on-scroll glides, but it never fires
+     on load: the bar's resting state is already transform:none. */
+  transition:transform .6s var(--ease), background .4s, color .4s, padding .4s;
+}
+.page-menu .nav.hidden, .page-doc .nav.hidden{ transform:translateY(-110%); }
+
+/* ── masthead ── */
+.mhead{
+  position:relative; overflow:hidden;
+  color:var(--cream); background:var(--oxblood-deep);
+  display:flex; align-items:flex-end;
+  min-height:min(64svh, 620px);
+  padding:clamp(120px,18vh,190px) 0 clamp(34px,5vh,58px);
+}
+.mhead__bg{ position:absolute; inset:0; z-index:0; }
+.mhead__bg img{ filter:saturate(.82); object-position:center 42%; transform:scale(1.04); }
+.mhead__scrim{
+  position:absolute; inset:0; z-index:1;
+  background:
+    radial-gradient(110% 90% at 20% 70%, rgba(45,13,15,.5), rgba(24,8,9,.92) 70%),
+    linear-gradient(180deg, rgba(24,8,9,.9), rgba(35,10,12,.72) 42%, rgba(24,8,9,.97));
+}
+.mhead__inner{
+  position:relative; z-index:2; width:100%;
+  max-width:var(--maxw); margin-inline:auto; padding:0 var(--pad);
+}
+.mhead .section-head{ padding-inline:0; margin-bottom:clamp(18px,2.4vw,30px); }
+.mhead .section-head__no{ color:var(--gold); }
+.mhead__title{
+  font-family:var(--serif); font-weight:400;
+  font-size:clamp(42px,6.4vw,96px); line-height:1.02; letter-spacing:-.015em;
+  max-width:16ch;
+}
+.mhead__lede{
+  margin-top:clamp(18px,2.2vw,26px); max-width:58ch;
+  font-size:clamp(15px,1.2vw,17.5px); font-weight:300; line-height:1.8;
+  /* The muting is in the colour, deliberately, not in opacity: this element is
+     also a .reveal, and an opacity here would out-cascade .reveal{opacity:0}
+     and leave the line sitting visible until its animation started. */
+  color:rgba(244,237,225,.78);
+}
+
+/* ── the food · drinks · wine switcher ── */
+.mswitch{
+  display:flex; flex-wrap:wrap; gap:8px;
+  margin-top:clamp(28px,3.6vw,44px);
+}
+.mswitch a{
+  position:relative; isolation:isolate;
+  border:1px solid var(--hairline-lt); border-radius:99px;
+  padding:12px 26px;
+  font-size:11px; letter-spacing:.22em; text-transform:uppercase; font-weight:700;
+  transition:color .4s var(--ease), border-color .4s var(--ease);
+}
+.mswitch a::before{
+  content:""; position:absolute; inset:0; z-index:-1; border-radius:99px;
+  background:var(--gold); transform:scale(.86); opacity:0;
+  transition:transform .5s var(--ease-exp), opacity .35s var(--ease);
+}
+.mswitch a:hover{ border-color:rgba(201,163,92,.6); color:var(--gold); }
+.mswitch a.is-on{ color:var(--oxblood-deep); border-color:var(--gold); }
+.mswitch a.is-on::before{ transform:scale(1); opacity:1; }
+.mswitch a:focus-visible{ outline:2px solid var(--gold); outline-offset:3px; }
+
+/* ── the board ── */
+.mboard{
+  position:relative;
+  background:var(--oxblood); color:var(--cream);
+  padding:clamp(56px,8vh,100px) 0 clamp(76px,11vh,140px);
+}
+/* the same warm bloom the kitchen section uses, so a long list never reads flat */
+.mboard::before{
+  content:""; position:absolute; left:50%; top:44%; z-index:0;
+  width:min(1400px,100%); aspect-ratio:1; transform:translate(-50%,-50%);
+  background:radial-gradient(circle, rgba(201,163,92,.1), transparent 62%);
+  pointer-events:none;
+}
+.mboard > *{ position:relative; z-index:1; }
+/* no title block above the tabs on a menu page — the masthead is the title */
+.page-menu .carte__masthead{ margin-bottom:0; }
+.page-menu .carte__tabs{ border-top:1px solid var(--hairline-lt); padding-top:clamp(24px,3vw,38px); }
+
+/* ═══════════ FAQ ═══════════
+   faq.html. Native <details>, so the accordion is keyboard- and
+   screen-reader-correct and still works with JavaScript off — there is no JS
+   behind this at all. The open/close is animated through ::details-content
+   where the browser supports it, and is an instant toggle where it doesn't,
+   which is perfectly usable rather than broken. */
+.faqs{
+  max-width:var(--maxw); margin-inline:auto; padding:0 var(--pad);
+}
+.faqs__inner{ max-width:860px; }
+.faq{ border-bottom:1px solid var(--hairline-lt); }
+.faq:first-of-type{ border-top:1px solid var(--hairline-lt); }
+.faq summary{
+  display:flex; align-items:flex-start; justify-content:space-between;
+  gap:clamp(20px,3vw,40px);
+  padding:clamp(20px,2.4vw,28px) 0;
+  cursor:pointer; list-style:none;
+}
+/* the UA triangle, removed in both dialects */
+.faq summary::-webkit-details-marker{ display:none; }
+.faq summary::marker{ content:""; }
+.faq summary:focus-visible{ outline:2px solid var(--gold); outline-offset:4px; border-radius:4px; }
+.faq__q{
+  font-family:var(--serif); font-weight:400;
+  font-size:clamp(17px,1.6vw,22px); line-height:1.35; letter-spacing:-.005em;
+  transition:color .35s var(--ease);
+}
+.faq summary:hover .faq__q{ color:var(--gold); }
+.faq__chev{
+  flex:0 0 auto; margin-top:.45em;
+  width:8px; height:8px;
+  border-right:1.5px solid var(--gold); border-bottom:1.5px solid var(--gold);
+  transform:rotate(45deg);
+  transition:transform .45s var(--ease-exp);
+}
+.faq[open] .faq__chev{ transform:translateY(3px) rotate(-135deg); }
+.faq__a{
+  padding-bottom:clamp(22px,2.6vw,30px); max-width:68ch;
+  font-size:clamp(14.5px,1.1vw,16.5px); font-weight:300; line-height:1.8;
+  color:rgba(244,237,225,.72);
+}
+.faq::details-content{
+  block-size:0; overflow:hidden;
+  transition:block-size .5s var(--ease-exp), content-visibility .5s allow-discrete;
+}
+.faq[open]::details-content{ block-size:auto; }
+
+/* ── the demo notice ──
+   Placeholder copy has to announce itself. This sits above the questions and is
+   meant to be impossible to mistake for finished content. */
+.notice{
+  position:relative;
+  margin:0 0 clamp(34px,4.5vw,56px);
+  padding:clamp(22px,2.8vw,32px) clamp(22px,2.8vw,34px);
+  border:1px solid rgba(201,163,92,.42); border-radius:14px;
+  background:
+    linear-gradient(180deg, rgba(201,163,92,.11), rgba(201,163,92,.04));
+}
+.notice__label{
+  display:inline-flex; align-items:center; gap:9px;
+  font-size:10px; letter-spacing:.3em; text-transform:uppercase; font-weight:700;
+  color:var(--gold);
+  margin-bottom:14px;
+}
+.notice__label::before{
+  content:""; width:6px; height:6px; border-radius:99px; background:var(--gold);
+}
+.notice h2{
+  font-size:clamp(21px,2.1vw,28px); line-height:1.25; margin-bottom:12px;
+}
+.notice p{
+  font-size:clamp(14px,1.05vw,15.5px); font-weight:300; line-height:1.75;
+  color:rgba(244,237,225,.74); max-width:70ch;
+}
+.notice p + p{ margin-top:11px; }
+.notice strong{ font-weight:600; color:var(--cream); }
+
+/* ═══════════ HOME TEASERS ═══════════ */
+
+/* ── a taste of the kitchen ──
+   Names and a line each, no prices: the priced list lives on menu-food.html so
+   a price only ever has to be changed in one place. */
+.taste{
+  max-width:1360px; margin-inline:auto; padding:0 var(--pad);
+}
+.taste__head{ text-align:center; margin-bottom:clamp(34px,4.4vw,56px); }
+.taste__flourish{ display:block; color:var(--gold); font-size:14px; margin-bottom:14px; opacity:.75; }
+.taste__head h3{ font-size:clamp(28px,3.2vw,46px); line-height:1.1; font-weight:400; }
+.taste__head p{
+  margin-top:12px;
+  font-size:10.5px; letter-spacing:.28em; text-transform:uppercase; font-weight:600; opacity:.5;
+}
+.taste__list{
+  display:grid; grid-template-columns:repeat(3,1fr);
+  gap:clamp(1px,.2vw,2px);
+  border-top:1px solid rgba(201,163,92,.28);
+  border-left:1px solid rgba(201,163,92,.28);
+}
+.taste__list li{
+  border-right:1px solid rgba(201,163,92,.28);
+  border-bottom:1px solid rgba(201,163,92,.28);
+  padding:clamp(22px,2.6vw,34px) clamp(18px,2vw,28px);
+  transition:background .5s var(--ease);
+}
+.taste__list li:hover{ background:rgba(201,163,92,.07); }
+.taste__list strong{
+  display:block; font-family:var(--serif); font-weight:400;
+  font-size:clamp(18px,1.6vw,23px); line-height:1.2;
+  transition:color .4s var(--ease);
+}
+.taste__list li:hover strong{ color:var(--gold); }
+.taste__list span{
+  display:block; margin-top:9px;
+  font-size:13px; line-height:1.6; font-weight:300; opacity:.6;
+}
+.taste__cta{
+  display:flex; align-items:center; justify-content:center; flex-wrap:wrap;
+  gap:clamp(16px,2.4vw,30px);
+  margin-top:clamp(38px,4.6vw,64px);
+}
+.taste__note{
+  font-size:10.5px; letter-spacing:.26em; text-transform:uppercase;
+  font-weight:600; color:var(--gold); opacity:.72;
+}
+
+/* ── café → drinks menu ── */
+.cafe__cta{
+  display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap;
+  gap:clamp(18px,3vw,44px);
+  max-width:var(--maxw); margin-inline:auto;
+  margin-top:clamp(40px,5vw,70px); padding:clamp(30px,3.6vw,46px) var(--pad) 0;
+  border-top:1px solid var(--hairline);
+}
+.cafe__cta p{
+  font-family:var(--serif); font-style:italic;
+  font-size:clamp(18px,2vw,27px); line-height:1.4;
+  color:var(--ink-soft); max-width:32ch;
+}
+
+
+/* ═══════════ GALLERY ═══════════ */
+.gallery{ padding:clamp(80px,12vh,150px) 0; }
+.gallery h2{ padding:0 var(--pad); margin-bottom:clamp(44px,6vw,80px); max-width:1000px; }
+.gallery__grid{
+  display:grid; gap:clamp(14px,2vw,26px); padding:0 var(--pad);
+  grid-template-columns:repeat(12,1fr);
+}
+.gallery__item{ border-radius:6px; overflow:hidden; }
+.g1{ grid-column:1/8; aspect-ratio:16/10; }
+.g2{ grid-column:8/13; aspect-ratio:3/3.34; }
+.g3{ grid-column:1/5; aspect-ratio:3/3.8; }
+.g3 img{
+  /* Keep the bag, bottle base, and table edge in frame as the image scales. */
+  object-position:center 100%;
+  transform-origin:center bottom;
+}
+.g4{ grid-column:5/13; aspect-ratio:16/9.4; }
+.g5{ grid-column:1/7; aspect-ratio:16/11; }
+.g6{ grid-column:7/13; aspect-ratio:16/11; }
+
+/* ═══════════ VISIT ═══════════ */
+.visit{
+  display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.02fr);
+  background:var(--oxblood-deep); color:var(--cream);
+}
+.visit__media{ position:relative; min-height:100%; }
+.visit__media[data-reveal-img]{ clip-path:inset(0); opacity:1; }
+/* The storefront is tall; on very wide screens the column would otherwise
+   stretch the panel. Sticking the image lets the panel set the height. */
+/* focal point is the sign and the doorway, a little right of centre */
+.visit__media img{ position:sticky; top:0; height:100vh; max-height:100%; object-position:56% 52%; }
+.visit__panel{
+  display:flex; justify-content:flex-start;
+  padding:clamp(56px,7vw,104px) clamp(28px,4.6vw,84px);
+}
+/* Measure cap — without it the rows run to 700px+ of dead space on wide screens. */
+.visit__inner{ width:100%; max-width:560px; }
+.visit__panel .section-head{ padding:0; }
+.visit__panel h2{ margin-bottom:clamp(28px,3.4vw,42px); }
+
+/* ── hours card ───────────────────────────────── */
+.visit__card{
+  padding:clamp(20px,2.4vw,26px) clamp(20px,2.4vw,28px);
+  border:1px solid var(--hairline-lt); border-radius:14px;
+  background:rgba(244,237,225,.035);
+}
+.visit__card-head{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:14px; flex-wrap:wrap; margin-bottom:16px;
+}
+.visit__card-title{
+  font-size:10.5px; letter-spacing:.3em; text-transform:uppercase;
+  color:var(--gold); font-weight:700;
+}
+
+/* ── contact rows ─────────────────────────────── */
+.visit__rows{
+  display:grid; grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:0 clamp(20px,2.6vw,34px); margin-top:clamp(26px,3vw,36px);
+}
+.visit__row{
+  display:flex; flex-direction:column; gap:7px;
+  padding:18px 0; border-bottom:1px solid var(--hairline-lt);
+  font-size:16px; min-width:0;
+}
+.visit__row--wide{ grid-column:1/-1; }
+.visit__row:first-child{ border-top:1px solid var(--hairline-lt); }
+.visit__row>span{
+  font-size:10px; letter-spacing:.3em; text-transform:uppercase;
+  color:var(--gold); font-weight:700; opacity:.85;
+}
+.visit__rows a{ font-weight:300; line-height:1.55; transition:color .3s; }
+.visit__rows a:hover{ color:var(--gold); }
+.visit__rows .ig{ font-weight:300; margin-top:-1px; }
+.visit__rows .ig:hover{ color:var(--gold); }
+
+/* ── hours ────────────────────────────────────── */
+.hours__status[hidden]{ display:none; }
+.hours__status{
+  display:inline-flex; align-items:center; gap:9px; white-space:nowrap;
+  font-size:10px; letter-spacing:.18em; text-transform:uppercase; font-weight:700;
+  padding:5px 12px 5px 10px; border-radius:99px;
+  border:1px solid var(--hairline-lt); opacity:.92;
+}
+.hours__status::before{
+  content:""; width:6px; height:6px; border-radius:50%;
+  background:currentColor; flex:0 0 auto;
+}
+.hours__status[data-state="open"]{ color:#8fbf8a; border-color:rgba(143,191,138,.4); }
+.hours__status[data-state="open"]::before{ box-shadow:0 0 0 0 currentColor; animation:pulse 2.6s infinite; }
+.hours__status[data-state="closed"]{ color:var(--cognac); border-color:rgba(176,122,74,.42); }
+@keyframes pulse{
+  0%  { box-shadow:0 0 0 0 rgba(143,191,138,.55); }
+  70% { box-shadow:0 0 0 7px rgba(143,191,138,0); }
+  100%{ box-shadow:0 0 0 0 rgba(143,191,138,0); }
+}
+.hours__list{ display:flex; flex-direction:column; gap:11px; }
+.hours__line{
+  display:flex; align-items:baseline; gap:12px; flex-wrap:nowrap;
+  font-weight:300; font-size:15.5px; opacity:.82;
+  transition:opacity .4s, color .4s;
+}
+.hours__days{ flex:0 0 auto; letter-spacing:.02em; white-space:nowrap; }
+.hours__leader{
+  flex:1 1 20px; min-width:20px; height:1px; margin-bottom:4px;
+  background-image:linear-gradient(90deg, var(--hairline-lt) 0 2px, transparent 2px 6px);
+  background-size:6px 1px; background-repeat:repeat-x;
+}
+.hours__time{ flex:0 0 auto; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.hours__line.is-today{ opacity:1; color:var(--gold); }
+.hours__line.is-today .hours__days{ font-weight:500; }
+.hours__note{
+  margin-top:14px; font-family:var(--serif); font-style:italic;
+  font-size:14.5px; opacity:.55; line-height:1.5;
+}
+.visit__actions{ display:flex; gap:14px; flex-wrap:wrap; margin-top:clamp(30px,4vw,44px); }
+/* placeholder reply under the actions — holds no space until it has something
+   to say, then fades up rather than shoving the footer down abruptly */
+.visit__note{
+  font-family:var(--serif); font-style:italic; font-size:15px; line-height:1.5;
+  color:var(--gold); opacity:0; max-height:0; margin-top:0;
+  transform:translateY(6px);
+  transition:opacity .5s var(--ease), transform .55s var(--ease-exp),
+             max-height .5s var(--ease), margin-top .5s var(--ease);
+}
+.visit__note.is-on{ opacity:.85; transform:none; max-height:4em; margin-top:18px; }
+
+/* ═══════════ FOOTER ═══════════ */
+.footer{ background:#180809; color:var(--cream); overflow:hidden; }
+.footer__cols{
+  display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:clamp(24px,3.4vw,52px);
+  justify-items:center; text-align:center;
+  padding:clamp(46px,6vw,80px) var(--pad);
+}
+.footer--menu .footer__cols{ grid-template-columns:repeat(5,minmax(0,1fr)); }
+.footer__cols > div{ display:flex; flex-direction:column; align-items:center; }
+.footer__cols h4{
+  font-family:var(--sans); font-size:10.5px; letter-spacing:.3em; text-transform:uppercase;
+  color:var(--gold); margin-bottom:14px; font-weight:700;
+}
+.footer__cols p{ font-size:14px; line-height:1.8; opacity:.75; font-weight:300; }
+.footer__cols a:hover{ color:var(--gold); }
+.footer__ig{ margin-top:16px; opacity:.85; }
+.footer__ig:hover{ opacity:1; }
+.footer__base{
+  display:flex; align-items:center; justify-content:space-between; gap:20px; flex-wrap:wrap;
+  padding:22px var(--pad) 28px; border-top:1px solid var(--hairline-lt);
+  font-size:11px; letter-spacing:.16em; text-transform:uppercase; opacity:.65;
+}
+.footer__toast{ font-family:var(--serif); font-style:italic; text-transform:none; letter-spacing:.04em; font-size:14px; color:var(--gold); opacity:.9; }
+
+/* ═══════════ BACK TO TOP ═══════════
+   The glass puck from the Uptown build, retoned to this palette: cream glass
+   instead of paper, ink chevron, this site's --ease.
+
+   Touch widths only. Above 760px the nav bar is still on screen and reachable,
+   so the puck would be a second way to do what the masthead already does; below
+   it the bar auto-hides on the way down and there is nothing to scroll back to.
+   760px is the burger's breakpoint, which is the same line for the same reason.
+
+   Sits at z-index 250 — under the mobile curtain at 890, so an open menu covers
+   it rather than having it float over the panel.
+
+   Hidden by default so it cannot flash in before the observer's first callback. */
+.to-top{
+  display:none;
+  position:fixed; z-index:250;
+  right:max(16px, env(safe-area-inset-right, 0px));
+  bottom:calc(16px + env(safe-area-inset-bottom, 0px));
+  place-content:center;
+  width:50px; aspect-ratio:1; padding:0; border:0; border-radius:50%;
+  color:var(--ink); cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+
+  /* Fill alpha is the transparency dial — .30 here is 70% transparent. The blur
+     and saturate behind it are a separate dial; changing both at once makes it
+     impossible to tell which one moved the look. */
+  background:rgba(244,237,225,.3);
+  -webkit-backdrop-filter:blur(18px) saturate(180%);
+          backdrop-filter:blur(18px) saturate(180%);
+  /* glass edge: bright inner rim on top, soft ambient shadow underneath */
+  box-shadow:
+    inset 0 1px 1px rgba(255,255,255,.9),
+    inset 0 -1px 1px rgba(29,19,16,.06),
+    0 1px 0 rgba(255,255,255,.45),
+    0 10px 30px rgba(29,19,16,.22);
+
+  opacity:0; visibility:hidden;
+  transform:translateY(14px) scale(.86);
+  transition:opacity .4s var(--ease), transform .5s var(--ease),
+             background-color .35s var(--ease), visibility 0s linear .4s;
+}
+@media (max-width: 760px){
+  .to-top{ display:grid; }
+}
+.to-top.is-up{
+  opacity:1; visibility:visible; transform:none;
+  transition:opacity .4s var(--ease), transform .5s var(--ease),
+             background-color .35s var(--ease), visibility 0s;
+}
+/* the mark: a chevron drawn from two borders of a rotated square */
+.to-top span{
+  display:block; width:11px; height:11px; margin-top:3px;
+  border-top:1.5px solid currentColor; border-left:1.5px solid currentColor;
+  transform:rotate(45deg);
+}
+/* press state stays ~15 points above resting, so the tap reads as a firming-up */
+.to-top:active{ transform:scale(.92); background:rgba(244,237,225,.45); }
+.to-top:focus-visible{ outline:2px solid var(--gold); outline-offset:3px; }
+/* no backdrop-filter? an opaque puck beats a see-through one fighting the photo */
+@supports not ((backdrop-filter: blur(4px)) or (-webkit-backdrop-filter: blur(4px))){
+  .to-top{ background:var(--cream); }
+}
+@media (max-width: 420px){
+  .to-top{ width:46px; }
+}
+
+/* ═══════════ RESPONSIVE ═══════════ */
+@media (max-width: 1020px){
+  .cafe__grid{ grid-template-columns:repeat(2,1fr); }
+  .cafe__card{ aspect-ratio:3/3.6; }
+  .story__big{ max-width:16ch; }
+  .story__img--a{ grid-column:1/-1; aspect-ratio:16/10; }
+  .story__text{ grid-column:1/-1; padding-top:0; }
+  .story__text p, .story__floors{ max-width:62ch; }
+  .story__quote{ grid-column:1/-1; max-width:30ch; }
+  .story__img--b{ grid-column:1/-1; aspect-ratio:16/9; }
+  .wine__title{ grid-column:1/-1; max-width:16ch; }
+  .wine__lede{ grid-column:1/-1; padding-bottom:0; max-width:62ch; }
+  .wine__board{ grid-column:1/-1; aspect-ratio:16/10; min-height:0; }
+  .wine__col{ grid-column:1/-1; }
+  .visit{ grid-template-columns:1fr; }
+  .visit__media{ min-height:0; }
+  .visit__media img{ position:static; height:auto; aspect-ratio:16/10; }
+  .visit__panel{ justify-content:center; }
+  .visit__inner{ max-width:640px; }
+  .kitchen__intro h2{ grid-column:1/-1; max-width:none; }
+  .kitchen__lede{ grid-column:1/-1; padding-bottom:0; max-width:62ch; }
+  .carte__body{ grid-template-columns:1fr; }
+  .course.is-alone{ width:auto; margin-inline:0; } /* single column already */
+  .taste__list{ grid-template-columns:repeat(2,1fr); }
+  .mhead__title{ max-width:none; }
+  .build{ grid-template-columns:1fr; }
+  .build__ticket{ position:static; }
+  .footer__cols{ grid-template-columns:repeat(3,1fr); row-gap:38px; }
+  .footer--menu .footer__cols{ grid-template-columns:repeat(3,1fr); }
+}
+@media (max-width: 760px){
+  .nav__links, .nav__cta{ display:none; }
+  .nav__end{ margin-left:auto; margin-right:10px; }
+  .nav__burger{
+    position:relative; display:grid; place-items:center; width:40px; height:40px;
+    color:inherit; border:1px solid currentColor; border-radius:50%; background:none; padding:0; cursor:pointer;
+    transition:background .45s var(--ease), color .45s var(--ease), border-color .45s var(--ease), transform .45s var(--ease);
+  }
+  .nav__burger i{
+    position:absolute; top:50%; left:50%; width:19px; height:1.5px; background:currentColor; display:block;
+    transition:transform .5s var(--ease-exp), opacity .25s var(--ease);
+  }
+  .nav__burger i:nth-child(1){ transform:translate(-50%,-4px); }
+  .nav__burger i:nth-child(2){ transform:translate(-50%,4px); }
+  /* the whole button turns as the bars cross, so the burger spins into the X
+     rather than the two bars quietly swapping angle underneath it */
+  .nav__burger.open{
+    background:var(--gold); border-color:var(--gold); color:var(--ink);
+    transform:rotate(90deg);
+  }
+  .nav__burger.open i:nth-child(1){ transform:translate(-50%,-50%) rotate(45deg); }
+  .nav__burger.open i:nth-child(2){ transform:translate(-50%,-50%) rotate(-45deg); }
+  .nav__burger:active{ transform:scale(.92); }
+  .nav__burger.open:active{ transform:rotate(90deg) scale(.92); }
+  /* the bar sits above the curtain, so while the menu is open it has to stop
+     being the cream scrolled bar and go back to riding on the dark */
+  .nav.menu-open{
+    background:transparent; -webkit-backdrop-filter:none; backdrop-filter:none;
+    border-bottom-color:transparent; color:var(--cream);
+  }
+  .hero__foot .hero__coord:first-child{ display:none; }
+  .gallery__item{ grid-column:1/-1 !important; aspect-ratio:4/3 !important; }
+  .story__big{ max-width:none; }
+  .story__img--a{ aspect-ratio:4/3; }
+  .story__img--b{ aspect-ratio:4/3; }
+  .story__facts{ grid-template-columns:1fr; gap:0; border-top:none; }
+  .fact{ border-top:1px solid var(--hairline); padding:26px 0; }
+  .fact::before{ top:-1px; }
+  .cafe__grid{ grid-template-columns:1fr; }
+  .cafe__card{ aspect-ratio:4/4.6; }
+  .wine__title{ max-width:none; }
+  .wine__board{ aspect-ratio:4/3; }
+  .wine__item{ gap:14px; }
+  .wine__cta{ flex-direction:column; align-items:flex-start; }
+  .wine__board figcaption, .story__img figcaption{ font-size:10px; letter-spacing:.13em; }
+  .plate{ flex-basis:min(64vw, 260px); }
+  .reel__label em{ display:none; }
+  .carte__tabs{ flex-wrap:nowrap; overflow-x:auto; justify-content:flex-start; scrollbar-width:none; }
+  .carte__tabs::-webkit-scrollbar{ display:none; }
+  .ctab{ flex:0 0 auto; }
+  /* the nav collapses into the burger here, so the dropdown goes with it */
+  .navdrop{ display:none; }
+  .taste__list{ grid-template-columns:1fr; }
+  .taste__cta{ flex-direction:column; }
+  .cafe__cta{ flex-direction:column; align-items:flex-start; }
+  .mhead{ min-height:0; padding-top:clamp(104px,16vh,150px); }
+  .mswitch a{ padding:11px 20px; }
+  .mi__desc{ padding-right:0; }
+  .carte__foot{ flex-direction:column; align-items:flex-start; }
+  .footer__cols{ grid-template-columns:1fr 1fr; row-gap:34px; }
+  .footer--menu .footer__cols{ grid-template-columns:1fr 1fr; }
+  .visit__rows{ grid-template-columns:1fr; }
+  .visit__row{ grid-column:1/-1; }
+  .hours__line{ font-size:15px; }
+}
+@media (max-width: 420px){
+  /* the leader dots have no room to run once the panel is this narrow */
+  .hours__line{ flex-wrap:wrap; gap:2px 10px; }
+  .hours__leader{ display:none; }
+  .hours__days{ flex:1 0 100%; font-size:11px; letter-spacing:.16em; text-transform:uppercase; opacity:.7; }
+}
+
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{ animation-duration:.01ms !important; transition-duration:.01ms !important; }
+  html{ scroll-behavior:auto; }
+  /* the mobile menu's choreography is all transition-delay, which the rule
+     above does not touch — without this the panel is instant but its contents
+     still trickle in over most of a second */
+  .mmenu, .mmenu *, .mmenu *::before, .mmenu *::after{ transition-delay:0s !important; }
+  /* the reel stops drifting and becomes an ordinary swipeable strip */
+  .reel__track{ animation:none !important; }
+  .reel__viewport{ overflow-x:auto; scrollbar-width:none; }
+  .reel__viewport::-webkit-scrollbar{ display:none; }
+  .reel__group:nth-child(2){ display:none; }
+}
+
+/* ═══════════ STUDIO CREDIT STRIP ═══════════
+   Signature line under the footer, not part of it: near-black regardless of
+   the site's palette so it reads as a mark on the frame rather than page content. */
+.studio-credit{
+  background:#0c0c0c; border-top:1px solid var(--hairline-lt);
+}
+.studio-credit__link{
+  max-width:1200px; margin-inline:auto; padding:.95rem var(--pad);
+  display:flex; align-items:center; flex-wrap:wrap; gap:.4rem .7rem;
+  color:rgba(215,226,234,.62); text-decoration:none;
+}
+.studio-credit__mark{ width:1.5rem; height:auto; opacity:.92; transition:opacity .26s var(--ease); }
+.studio-credit__text{ display:flex; align-items:baseline; flex-wrap:wrap; gap:.15rem .45rem; min-width:0; }
+.studio-credit__by{ font-size:.62rem; font-weight:600; letter-spacing:.16em; text-transform:uppercase; }
+.studio-credit__name{ color:#d7e2ea; font-size:.8rem; font-weight:700; letter-spacing:.01em; }
+.studio-credit__cta{
+  margin-left:auto; color:var(--gold); font-size:.72rem; font-weight:700; white-space:nowrap;
+  border-bottom:1px solid transparent; transition:border-color .26s var(--ease);
+}
+.studio-credit__link:hover .studio-credit__cta{ border-bottom-color:rgba(201,163,92,.7); }
+.studio-credit__link:hover .studio-credit__mark{ opacity:1; }
+.studio-credit__link:focus-visible{ outline:3px solid var(--gold); outline-offset:-3px; }
+
+@media (max-width: 608px){
+  .studio-credit__cta{ margin-left:0; flex-basis:100%; }
+  .studio-credit__text{ flex:1 1 0; }
+}

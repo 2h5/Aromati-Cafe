@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0" />
+<title>Wine List — Aromati Café &amp; Wine Bar · Murray Hill, New York</title>
+<meta name="description" content="The wine list at Aromati Café & Wine Bar — Georgian qvevri ambers, Saperavi, natural bottles and European wines, by the glass and the bottle. Second floor, 103 E 34th Street, Murray Hill." />
+<meta property="og:title" content="Wine List — Aromati Café &amp; Wine Bar" />
+<meta property="og:description" content="Georgian qvevri ambers, Saperavi and natural bottles, poured upstairs on East 34th Street." />
+<meta property="og:type" content="website" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,300;1,9..144,400&family=Manrope:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Menu",
+  "name": "Wine List",
+  "inLanguage": "en-US",
+  "hasMenuSection": [
+    { "@type": "MenuSection", "name": "Cocktails" },
+    { "@type": "MenuSection", "name": "Georgian White Wine" },
+    { "@type": "MenuSection", "name": "Georgian Natural Wine" },
+    { "@type": "MenuSection", "name": "Georgian Red Wine" },
+    { "@type": "MenuSection", "name": "European Wine & Spirits" },
+    { "@type": "MenuSection", "name": "Wine Pairings" }
+  ],
+  "isPartOf": {
+    "@type": "CafeOrCoffeeShop",
+    "name": "Aromati Café & Wine Bar",
+    "telephone": "+1-332-207-3847",
+    "address": {
+      "@type": "PostalAddress",
+      "streetAddress": "103 E 34th Street",
+      "addressLocality": "New York",
+      "addressRegion": "NY",
+      "postalCode": "10016",
+      "addressCountry": "US"
+    }
+  }
+}
+</script>
+</head>
+<body class="page-menu">
+
+<!-- ══════════ NAV ══════════ -->
+<header class="nav" id="nav">
+  <a class="nav__brand" href="index.html">
+    <span class="nav__word">Aromati</span>
+    <span class="nav__tag">café · wine bar</span>
+  </a>
+  <nav class="nav__links">
+    <a href="index.html#story">Story</a>
+    <a href="index.html#kitchen">Kitchen</a>
+    <a href="index.html#cafe">Café</a>
+    <a href="index.html#wine">Wine</a>
+    <a href="index.html#visit">Visit</a>
+  </nav>
+  <div class="nav__end">
+    <a class="nav__ig" href="https://www.instagram.com/aromatinyc" target="_blank" rel="noopener" aria-label="Aromati on Instagram — @aromatinyc">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5.2"/><circle cx="12" cy="12" r="4.1"/><circle cx="17.3" cy="6.7" r="1.15" fill="currentColor" stroke="none"/></svg>
+    </a>
+    <!-- Menus dropdown. The button carries the semantics; script.js opens it on
+         click and on hover, and closes it on Escape or an outside click. -->
+    <div class="navdrop" id="navdrop">
+      <button class="nav__cta navdrop__btn is-current" type="button" id="menusBtn" aria-expanded="false" aria-controls="menusPanel">
+        <span>Menus</span><i class="navdrop__chev" aria-hidden="true"></i>
+      </button>
+      <div class="navdrop__panel" id="menusPanel">
+        <a href="menu-food.html"><span class="navdrop__k">Food</span><span class="navdrop__d">Georgian kitchen, all day</span></a>
+        <a href="menu-drinks.html"><span class="navdrop__k">Drinks</span><span class="navdrop__d">Coffee, matcha &amp; smoothies</span></a>
+        <a class="is-on" aria-current="page" href="menu-wine.html"><span class="navdrop__k">Wine</span><span class="navdrop__d">Georgian &amp; European list</span></a>
+      </div>
+    </div>
+  </div>
+  <button class="nav__burger" id="burger" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="mmenu"><i></i><i></i></button>
+</header>
+
+<!-- Mobile menu. Two sheets fall behind the contents; styles.css owns the whole
+     sequence, script.js only adds .open. inert keeps the closed panel out of the
+     tab order and the accessibility tree. -->
+<div class="mmenu" id="mmenu" aria-hidden="true" inert>
+  <div class="mmenu__wash" aria-hidden="true"></div>
+  <div class="mmenu__panel" aria-hidden="true"></div>
+  <div class="mmenu__inner">
+    <nav class="mmenu__links" aria-label="Sections">
+      <a href="index.html#story"><span class="mml__n">01</span><span class="mml__w"><span>Story</span></span><i class="mml__go" aria-hidden="true"></i></a>
+      <a href="index.html#kitchen"><span class="mml__n">02</span><span class="mml__w"><span>Kitchen</span></span><i class="mml__go" aria-hidden="true"></i></a>
+      <a href="index.html#cafe"><span class="mml__n">03</span><span class="mml__w"><span>Café</span></span><i class="mml__go" aria-hidden="true"></i></a>
+      <a href="index.html#wine"><span class="mml__n">04</span><span class="mml__w"><span>Wine</span></span><i class="mml__go" aria-hidden="true"></i></a>
+      <a href="index.html#visit"><span class="mml__n">05</span><span class="mml__w"><span>Visit</span></span><i class="mml__go" aria-hidden="true"></i></a>
+    </nav>
+    <div class="mmenu__menus">
+      <span class="mmenu__label">Menus</span>
+      <div class="mmenu__row">
+        <a href="menu-food.html">Food</a>
+        <a href="menu-drinks.html">Drinks</a>
+        <a class="is-on" href="menu-wine.html">Wine</a>
+      </div>
+    </div>
+    <div class="mmenu__foot">
+      <p class="mmenu__addr">103 E 34th Street<br>New York, NY 10016</p>
+      <p class="mmenu__hours">Sun–Tue 7am–10pm · Wed–Sat 7am–11pm</p>
+      <div class="mmenu__acts">
+        <a class="mmenu__call" href="tel:+13322073847">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M5.2 3.8h3.1l1.5 3.9-2 1.4a12.4 12.4 0 0 0 5.1 5.1l1.4-2 3.9 1.5v3.1a1.9 1.9 0 0 1-2.1 1.9A15.9 15.9 0 0 1 3.3 5.9a1.9 1.9 0 0 1 1.9-2.1Z"/></svg>
+          <span>+1 (332) 207-3847</span>
+        </a>
+        <a class="ig ig--quiet" href="https://www.instagram.com/aromatinyc" target="_blank" rel="noopener">
+          <span class="ig__mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="18" height="18" rx="5.2"/><circle cx="12" cy="12" r="4.1"/><circle cx="17.3" cy="6.7" r="1.15" fill="currentColor" stroke="none"/></svg>
+          </span>
+          <span class="ig__handle">@aromatinyc</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<main id="top">
+
+  <!-- ══════════ MASTHEAD ══════════ -->
+  <header class="mhead">
+    <div class="mhead__bg"><img src="assets/web/wine-cabinet.jpg" alt="" aria-hidden="true"/></div>
+    <div class="mhead__scrim"></div>
+    <div class="mhead__inner">
+      <div class="section-head section-head--light reveal">
+        <span class="section-head__no">✦</span>
+        <span class="section-head__label">The Wine Bar</span>
+      </div>
+      <h1 class="mhead__title" data-split>The Wine List</h1>
+      <p class="mhead__lede reveal">Qvevri ambers, Saperavi and natural bottles chosen for the table, alongside a short European list. Poured by the glass or the bottle on the second floor.</p>
+      <nav class="mswitch reveal" aria-label="Menus">
+        <a href="menu-food.html">Food</a>
+        <a href="menu-drinks.html">Drinks</a>
+        <a class="is-on" aria-current="page" href="menu-wine.html">Wine</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ══════════ THE BOARD ══════════ -->
+  <section class="mboard">
+    <div class="carte" id="carte">
+      <div class="carte__masthead reveal">
+        <!-- Tabs are derived from the courses below at runtime, so adding or
+             removing a category in the CMS needs no change here. -->
+        <div class="carte__tabs" role="group" aria-label="Filter the wine list" id="carteTabs">
+        </div>
+      </div>
+
+      <div class="carte__body" id="carteBody">
+
+        <!-- COCKTAILS -->
+        <section class="course" data-course="cocktails" data-label="Cocktails">
+          <header class="course__head"><h2>Cocktails</h2><span class="course__count"></span></header>
+          <ul class="course__items">
+            <li class="mi">
+              <div class="mi__row"><h3>Classic Aperol Spritz</h3><i class="mi__leader"></i><span class="mi__price">17</span></div>
+              <p class="mi__desc">Aperol, prosecco, fresh orange.</p>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Aromati’s Limoncello Spritz</h3><i class="mi__leader"></i><span class="mi__price">18</span></div>
+              <p class="mi__desc">Prosecco Brut DOC, Amalfi Coast organic limoncello, dry lemon garnish.</p>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Pomegranate Spritz</h3><i class="mi__leader"></i><span class="mi__price">17</span></div>
+              <p class="mi__desc">Aperol, prosecco, pomegranate juice.</p>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Sparkling Grape Cocktail</h3><i class="mi__leader"></i><span class="mi__price">17</span></div>
+              <p class="mi__desc">Sparkling wine, Prosecco Brut DOC, grape juice, lime.</p>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Mint Mojito</h3><i class="mi__leader"></i><span class="mi__price">14</span></div>
+              <p class="mi__desc">Sparkling wine, fresh mint, lime.</p>
+            </li>
+          </ul>
+        </section>
+
+        <!-- GEORGIAN WHITE -->
+        <section class="course" data-course="white" data-label="Georgian White">
+          <header class="course__head"><h2>Georgian White Wine</h2><span class="course__count"></span></header>
+          <ul class="course__items">
+            <li class="mi">
+              <div class="mi__row"><h3>Pirosmani White</h3><i class="mi__leader"></i><span class="mi__price">15</span></div>
+              <p class="mi__desc">Table wine, Kakheti — balanced and fruity, with notes of ripe white fruit, pear, melon and citrus.</p>
+              <ul class="mi__pours"><li><span>Bottle</span><b>$60</b></li></ul>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Rkatsiteli Qvevri</h3><i class="mi__leader"></i><span class="mi__price">17</span></div>
+              <p class="mi__desc">Dry amber qvevri wine, Kakheti — pronounced spicy aromas with hints of honey and tobacco.</p>
+              <ul class="mi__pours"><li><span>Bottle</span><b>$70</b></li></ul>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Kisi Qvevri</h3><i class="mi__leader"></i><span class="mi__price">17</span></div>
+              <p class="mi__desc">Dry amber qvevri wine, Kakheti — honey and cinnamon aromas with notes of yellow and dried fruits.</p>
+              <ul class="mi__pours"><li><span>Bottle</span><b>$70</b></li></ul>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Tsolikouri</h3><i class="mi__leader"></i><span class="mi__price">16</span></div>
+              <p class="mi__desc">Imereti dry white wine, with delicate aromas of yellow and white fruits.</p>
+              <ul class="mi__pours"><li><span>Bottle</span><b>$65</b></li></ul>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Tvishi</h3><i class="mi__leader"></i><span class="mi__price">16</span></div>
+              <p class="mi__desc">Naturally semi-sweet, Lechkhumi — yellow and tropical fruit aromas with citrus undertones.</p>
+              <ul class="mi__pours"><li><span>Bottle</span><b>$65</b></li></ul>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Brut</h3><i class="mi__leader"></i><span class="mi__price">15</span></div>
+              <p class="mi__desc">Sparkling wine, Imereti · Kakheti · Kartli — pale straw, high acidity, notes of citrus, pear and stone fruit.</p>
+              <ul class="mi__pours"><li><span>Bottle</span><b>$60</b></li></ul>
+            </li>
+          </ul>
+        </section>
+
+        <!-- GEORGIAN NATURAL -->
+        <section class="course" data-course="natural" data-label="Natural">
+          <header class="course__head"><h2>Georgian Natural Wine</h2><span class="course__count"></span></header>
+          <ul class="course__items">
+            <li class="mi">
+              <div class="mi__row"><h3>Mtsvane <span class="mi__tag">2022</span></h3><i class="mi__leader"></i><span class="mi__price">16</span></div>
+              <p class="mi__desc">Single vineyard Kakheti, Manavi Wines. Dry white with crisp green apple, juicy pear and delicate floral notes.</p>
+              <ul class="mi__pours"><li><span>Bottle</span><b>$64</b></li></ul>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Rkatsiteli <span class="mi__tag">2023</span></h3><i class="mi__leader"></i><span class="mi__price">17</span></div>
+              <p class="mi__desc">Khvitsia Wine, Kardenakhi — Kakheti. Dry white with lively acidity and floral hints.</p>
+              <ul class="mi__pours"><li><span>Bottle</span><b>$68</b></li></ul>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Kisi <span class="mi__tag">2020</span></h3><i class="mi__leader"></i><span class="mi__price">18</span></div>
+              <p class="mi__desc">Kakheti, Vellino. Dry amber with ripe apricot and peach, floral hints and a touch of citrus.</p>
+              <ul class="mi__pours"><li><span>Bottle</span><b>$72</b></li></ul>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Mtsvane <span class="mi__tag">2020</span></h3><i class="mi__leader"></i><span class="mi__price">17</span></div>
+              <p class="mi__desc">Kakheti. Dry amber with primary aromas of lemon, lime and green apple, with notes of tropical fruit.</p>
+              <ul class="mi__pours"><li><span>Bottle</span><b>$68</b></li></ul>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Saperavi <span class="mi__tag">2023</span></h3><i class="mi__leader"></i><span class="mi__price">18</span></div>
+              <p class="mi__desc">Nadelebi Winery, Kakheti. Dry red, rich with dark berries — black cherry and blackberry, with hints of plum and florals.</p>
+              <ul class="mi__pours"><li><span>Bottle</span><b>$72</b></li></ul>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Sopromadze <span class="mi__tag">2022</span></h3><i class="mi__leader"></i><span class="mi__price">18</span></div>
+              <p class="mi__desc">Tsitska · Tsolikouri · Krakhuna, Kakheti. Dry white with crisp acidity and fresh citrus notes.</p>
+              <ul class="mi__pours"><li><span>Bottle</span><b>$72</b></li></ul>
+            </li>
+          </ul>
+        </section>
+
+        <!-- GEORGIAN RED -->
+        <section class="course" data-course="red" data-label="Georgian Red">
+          <header class="course__head"><h2>Georgian Red Wine</h2><span class="course__count"></span></header>
+          <ul class="course__items">
+            <li class="mi">
+              <div class="mi__row"><h3>Saperavi Qvevri</h3><i class="mi__leader"></i><span class="mi__price">17</span></div>
+              <p class="mi__desc">Dry red qvevri wine from Kakheti — aromas of dried black plum, cherry and blackberry.</p>
+              <ul class="mi__pours"><li><span>Bottle</span><b>$70</b></li></ul>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Saperavi Reserve</h3><i class="mi__leader"></i><span class="mi__price">18</span></div>
+              <p class="mi__desc">Premium red, Kakheti — plum, blackberry and cherry with spice and vanilla, aged in oak for a velvety finish.</p>
+              <ul class="mi__pours"><li><span>Bottle</span><b>$72</b></li></ul>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Kindzmarauli</h3><i class="mi__leader"></i><span class="mi__price">18</span></div>
+              <p class="mi__desc">Semi-sweet red, with a rich flavor of berries, plum and rose petals.</p>
+              <ul class="mi__pours"><li><span>Bottle</span><b>$70</b></li></ul>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Mukuzani</h3><i class="mi__leader"></i><span class="mi__price">18</span></div>
+              <p class="mi__desc">Dry red from Kakheti — rich dark berry aromas with hints of oak and spice.</p>
+              <ul class="mi__pours"><li><span>Bottle</span><b>$75</b></li></ul>
+            </li>
+          </ul>
+        </section>
+
+        <!-- EUROPEAN -->
+        <section class="course" data-course="european" data-label="European">
+          <header class="course__head"><h2>European Wine &amp; Spirits</h2><span class="course__count"></span></header>
+          <ul class="course__items">
+            <li class="mi">
+              <div class="mi__row"><h3>Barbera d’Asti</h3><i class="mi__leader"></i><span class="mi__price">15</span></div>
+              <p class="mi__desc">Piedmont — rich with floral tones of iris and rose, with hints of undergrowth, raspberry and plum.</p>
+              <ul class="mi__pours"><li><span>Bottle</span><b>$55</b></li></ul>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Friularo</h3><i class="mi__leader"></i><span class="mi__price">17</span></div>
+              <p class="mi__desc">An elegant red with an intense aroma, featuring spicy notes, violet and sour cherry.</p>
+              <ul class="mi__pours"><li><span>Bottle</span><b>$65</b></li></ul>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Sauvignon Blanc</h3><i class="mi__leader"></i><span class="mi__price">18</span></div>
+              <p class="mi__desc">Elegant and balanced, crisp acidity and flowers on the nose, with white peach, grapefruit, tropical fruit and citrus.</p>
+              <ul class="mi__pours"><li><span>Bottle</span><b>$70</b></li></ul>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Falanghina del Sannio</h3><i class="mi__leader"></i><span class="mi__price">18</span></div>
+              <p class="mi__desc">Aromatic notes of ripe apple and citrus blossom, hints of pear, peach and crushed stone, crisp with a refreshing structure.</p>
+              <ul class="mi__pours"><li><span>Bottle</span><b>$70</b></li></ul>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Chardonnay</h3><i class="mi__leader"></i><span class="mi__price">18</span></div>
+              <p class="mi__desc">Structured and fresh, with hints of apricot and green apple — intense and refined, with a robust finish.</p>
+              <ul class="mi__pours"><li><span>Bottle</span><b>$70</b></li></ul>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Prosecco Brut</h3><i class="mi__leader"></i><span class="mi__price">16</span></div>
+              <p class="mi__desc">Very fine and elegant, floral and fruity, with hints of acacia flower, green apple and almond. Dry, fresh, lively on the palate.</p>
+              <ul class="mi__pours"><li><span>Bottle</span><b>$65</b></li></ul>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Corona Extra <span class="mi__tag">12 oz</span></h3><i class="mi__leader"></i><span class="mi__price">6.50</span></div>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Heineken <span class="mi__tag">12 oz</span></h3><i class="mi__leader"></i><span class="mi__price">6</span></div>
+            </li>
+          </ul>
+        </section>
+
+        <!-- PAIRINGS -->
+        <section class="course" data-course="boards" data-label="Pairings">
+          <header class="course__head"><h2>Wine Pairings</h2><span class="course__count"></span></header>
+          <ul class="course__items">
+            <li class="mi mi--noprice">
+              <div class="mi__row"><h3>Aromati’s Charcuterie &amp; Cheese Board</h3></div>
+              <p class="mi__desc">A selection of cured meats and artisan cheeses, served with fresh fruit, olives, nuts, jam and crackers.</p>
+              <ul class="mi__pours">
+                <li><span>Small</span><b>$32</b></li>
+                <li><span>Large</span><b>$42</b></li>
+              </ul>
+            </li>
+            <li class="mi mi--noprice">
+              <div class="mi__row"><h3>Cheese Board</h3></div>
+              <p class="mi__desc">Chef’s selection of artisan cheeses, served with croutons, fresh fruit, nuts and jam.</p>
+              <ul class="mi__pours">
+                <li><span>Small</span><b>$15</b></li>
+                <li><span>Large</span><b>$25</b></li>
+              </ul>
+            </li>
+          </ul>
+        </section>
+
+      </div>
+
+      <div class="carte__foot reveal">
+        <p>Wines are available by the glass or bottle. The selection may change.</p>
+        <a href="index.html#visit" class="btn btn--ghostlight"><span>Plan a Visit</span></a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════ FOOTER ══════════ -->
+  <footer class="footer footer--menu">
+    <div class="footer__cols">
+      <div>
+        <h4>Aromati Café &amp; Wine Bar</h4>
+        <p>103 E 34th Street<br/>New York, NY 10016</p>
+      </div>
+      <div>
+        <h4>Hours</h4>
+        <p>Sun – Tue &nbsp;7:00 am – 10:00 pm<br/>Wed – Sat &nbsp;7:00 am – 11:00 pm</p>
+      </div>
+      <div>
+        <h4>Contact</h4>
+        <p><a href="tel:+13322073847">+1 (332) 207-3847</a><br/><a href="mailto:info@aromatiNY.com">info@aromatiNY.com</a></p>
+        <a class="ig ig--quiet footer__ig" href="https://www.instagram.com/aromatinyc" target="_blank" rel="noopener">
+          <span class="ig__mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="18" height="18" rx="5.2"/><circle cx="12" cy="12" r="4.1"/><circle cx="17.3" cy="6.7" r="1.15" fill="currentColor" stroke="none"/></svg>
+          </span>
+          <span class="ig__handle">@aromatinyc</span>
+        </a>
+      </div>
+      <div>
+        <h4>Menus</h4>
+        <p><a href="menu-food.html">Food</a><br/><a href="menu-drinks.html">Drinks</a><br/><a href="menu-wine.html">Wine</a></p>
+      </div>
+      <div>
+        <h4>Good to Know</h4>
+        <p><a href="faq.html">Questions</a><br/>Dining room · wine bar</p>
+      </div>
+    </div>
+    <div class="footer__base">
+      <span>© <span id="year"></span> Aromati Café &amp; Wine Bar</span>
+      <span class="footer__toast">Gaumarjos — cheers. ✦</span>
+      <a href="#top">Back to top ↑</a>
+    </div>
+  </footer>
+
+  <aside class="studio-credit" aria-label="Site credit">
+    <a class="studio-credit__link" href="https://aragvelipalazzolo.com" target="_blank" rel="noopener">
+      <img class="studio-credit__mark" src="assets/img/ap-mark-gold.png" width="255" height="260" alt="" loading="lazy" decoding="async">
+      <span class="studio-credit__text">
+        <span class="studio-credit__by">Designed &amp; built by</span>
+        <span class="studio-credit__name">AragveliPalazzolo</span>
+      </span>
+      <span class="studio-credit__cta">See our work <span aria-hidden="true">↗</span></span>
+    </a>
+  </aside>
+
+</main>
+
+<button class="to-top" id="toTop" type="button" aria-label="Back to top" aria-hidden="true" tabindex="-1">
+  <span aria-hidden="true"></span>
+</button>
+
+<script src="assets/js/lenis.min.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0" />
+<title>Drinks Menu — Aromati Café &amp; Wine Bar · Murray Hill, New York</title>
+<meta name="description" content="The drinks menu at Aromati Café & Wine Bar — espresso, cold brew, matcha, chai, smoothies and cold beverages from the ground-floor coffee bar at 103 E 34th Street, Murray Hill." />
+<meta property="og:title" content="Drinks Menu — Aromati Café &amp; Wine Bar" />
+<meta property="og:description" content="Espresso, matcha, smoothies and cold drinks from the ground-floor coffee bar on East 34th Street." />
+<meta property="og:type" content="website" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,300;1,9..144,400&family=Manrope:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Menu",
+  "name": "Drinks Menu",
+  "inLanguage": "en-US",
+  "hasMenuSection": [
+    { "@type": "MenuSection", "name": "Coffee & Espresso" },
+    { "@type": "MenuSection", "name": "Tea, Matcha & Cocoa" },
+    { "@type": "MenuSection", "name": "Smoothies" },
+    { "@type": "MenuSection", "name": "Cold Beverages" }
+  ],
+  "isPartOf": {
+    "@type": "CafeOrCoffeeShop",
+    "name": "Aromati Café & Wine Bar",
+    "telephone": "+1-332-207-3847",
+    "address": {
+      "@type": "PostalAddress",
+      "streetAddress": "103 E 34th Street",
+      "addressLocality": "New York",
+      "addressRegion": "NY",
+      "postalCode": "10016",
+      "addressCountry": "US"
+    }
+  }
+}
+</script>
+</head>
+<body class="page-menu">
+
+<!-- ══════════ NAV ══════════ -->
+<header class="nav" id="nav">
+  <a class="nav__brand" href="index.html">
+    <span class="nav__word">Aromati</span>
+    <span class="nav__tag">café · wine bar</span>
+  </a>
+  <nav class="nav__links">
+    <a href="index.html#story">Story</a>
+    <a href="index.html#kitchen">Kitchen</a>
+    <a href="index.html#cafe">Café</a>
+    <a href="index.html#wine">Wine</a>
+    <a href="index.html#visit">Visit</a>
+  </nav>
+  <div class="nav__end">
+    <a class="nav__ig" href="https://www.instagram.com/aromatinyc" target="_blank" rel="noopener" aria-label="Aromati on Instagram — @aromatinyc">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5.2"/><circle cx="12" cy="12" r="4.1"/><circle cx="17.3" cy="6.7" r="1.15" fill="currentColor" stroke="none"/></svg>
+    </a>
+    <!-- Menus dropdown. The button carries the semantics; script.js opens it on
+         click and on hover, and closes it on Escape or an outside click. -->
+    <div class="navdrop" id="navdrop">
+      <button class="nav__cta navdrop__btn is-current" type="button" id="menusBtn" aria-expanded="false" aria-controls="menusPanel">
+        <span>Menus</span><i class="navdrop__chev" aria-hidden="true"></i>
+      </button>
+      <div class="navdrop__panel" id="menusPanel">
+        <a href="menu-food.html"><span class="navdrop__k">Food</span><span class="navdrop__d">Georgian kitchen, all day</span></a>
+        <a class="is-on" aria-current="page" href="menu-drinks.html"><span class="navdrop__k">Drinks</span><span class="navdrop__d">Coffee, matcha &amp; smoothies</span></a>
+        <a href="menu-wine.html"><span class="navdrop__k">Wine</span><span class="navdrop__d">Georgian &amp; European list</span></a>
+      </div>
+    </div>
+  </div>
+  <button class="nav__burger" id="burger" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="mmenu"><i></i><i></i></button>
+</header>
+
+<!-- Mobile menu. Two sheets fall behind the contents; styles.css owns the whole
+     sequence, script.js only adds .open. inert keeps the closed panel out of the
+     tab order and the accessibility tree. -->
+<div class="mmenu" id="mmenu" aria-hidden="true" inert>
+  <div class="mmenu__wash" aria-hidden="true"></div>
+  <div class="mmenu__panel" aria-hidden="true"></div>
+  <div class="mmenu__inner">
+    <nav class="mmenu__links" aria-label="Sections">
+      <a href="index.html#story"><span class="mml__n">01</span><span class="mml__w"><span>Story</span></span><i class="mml__go" aria-hidden="true"></i></a>
+      <a href="index.html#kitchen"><span class="mml__n">02</span><span class="mml__w"><span>Kitchen</span></span><i class="mml__go" aria-hidden="true"></i></a>
+      <a href="index.html#cafe"><span class="mml__n">03</span><span class="mml__w"><span>Café</span></span><i class="mml__go" aria-hidden="true"></i></a>
+      <a href="index.html#wine"><span class="mml__n">04</span><span class="mml__w"><span>Wine</span></span><i class="mml__go" aria-hidden="true"></i></a>
+      <a href="index.html#visit"><span class="mml__n">05</span><span class="mml__w"><span>Visit</span></span><i class="mml__go" aria-hidden="true"></i></a>
+    </nav>
+    <div class="mmenu__menus">
+      <span class="mmenu__label">Menus</span>
+      <div class="mmenu__row">
+        <a href="menu-food.html">Food</a>
+        <a class="is-on" href="menu-drinks.html">Drinks</a>
+        <a href="menu-wine.html">Wine</a>
+      </div>
+    </div>
+    <div class="mmenu__foot">
+      <p class="mmenu__addr">103 E 34th Street<br>New York, NY 10016</p>
+      <p class="mmenu__hours">Sun–Tue 7am–10pm · Wed–Sat 7am–11pm</p>
+      <div class="mmenu__acts">
+        <a class="mmenu__call" href="tel:+13322073847">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M5.2 3.8h3.1l1.5 3.9-2 1.4a12.4 12.4 0 0 0 5.1 5.1l1.4-2 3.9 1.5v3.1a1.9 1.9 0 0 1-2.1 1.9A15.9 15.9 0 0 1 3.3 5.9a1.9 1.9 0 0 1 1.9-2.1Z"/></svg>
+          <span>+1 (332) 207-3847</span>
+        </a>
+        <a class="ig ig--quiet" href="https://www.instagram.com/aromatinyc" target="_blank" rel="noopener">
+          <span class="ig__mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="18" height="18" rx="5.2"/><circle cx="12" cy="12" r="4.1"/><circle cx="17.3" cy="6.7" r="1.15" fill="currentColor" stroke="none"/></svg>
+          </span>
+          <span class="ig__handle">@aromatinyc</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<main id="top">
+
+  <!-- ══════════ MASTHEAD ══════════ -->
+  <header class="mhead">
+    <div class="mhead__bg"><img src="assets/web/latte-art.jpg" alt="" aria-hidden="true"/></div>
+    <div class="mhead__scrim"></div>
+    <div class="mhead__inner">
+      <div class="section-head section-head--light reveal">
+        <span class="section-head__no">✦</span>
+        <span class="section-head__label">The Café</span>
+      </div>
+      <h1 class="mhead__title" data-split>Hot &amp; Cold Drinks</h1>
+      <p class="mhead__lede reveal">The ground floor is a New York coffee bar: espresso pulled properly, matcha whisked to order, smoothies blended fresh. From seven in the morning.</p>
+      <nav class="mswitch reveal" aria-label="Menus">
+        <a href="menu-food.html">Food</a>
+        <a class="is-on" aria-current="page" href="menu-drinks.html">Drinks</a>
+        <a href="menu-wine.html">Wine</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ══════════ THE BOARD ══════════ -->
+  <section class="mboard">
+    <div class="carte" id="carte">
+      <div class="carte__masthead reveal">
+        <!-- Tabs are derived from the courses below at runtime, so adding or
+             removing a category in the CMS needs no change here. -->
+        <div class="carte__tabs" role="group" aria-label="Filter the drinks menu" id="carteTabs">
+        </div>
+      </div>
+
+      <div class="carte__body" id="carteBody">
+
+        <!-- COFFEE
+             Priced by size, so the sizes are a column header rather than a
+             label repeated on every line. An item with one price spans both
+             columns; the number still lands in the same right-hand edge. -->
+        <section class="course course--sized" data-course="coffee" data-label="Coffee">
+          <header class="course__head"><h2>Coffee &amp; Espresso</h2><span class="course__count"></span></header>
+          <div class="course__sizes" aria-hidden="true"><span>Small</span><span>Large</span></div>
+          <ul class="course__items">
+            <li class="mi">
+              <div class="mi__row"><h3>Espresso</h3><i class="mi__leader"></i>
+                <span class="mi__cells"><b class="mi__cell mi__cell--solo">3</b></span>
+              </div>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Americano</h3><i class="mi__leader"></i>
+                <span class="mi__cells"><b class="mi__cell mi__cell--solo">4</b></span>
+              </div>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Cortado</h3><i class="mi__leader"></i>
+                <span class="mi__cells"><b class="mi__cell mi__cell--solo">4</b></span>
+              </div>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Drip Coffee</h3><i class="mi__leader"></i>
+                <span class="mi__cells"><b class="mi__cell">4</b><b class="mi__cell">5</b></span>
+              </div>
+              <p class="mi__desc">Fresh pot, all morning.</p>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Cold Brew</h3><i class="mi__leader"></i>
+                <span class="mi__cells"><b class="mi__cell">5</b><b class="mi__cell">6</b></span>
+              </div>
+              <p class="mi__desc">Slow-steeped, served over ice.</p>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Cappuccino</h3><i class="mi__leader"></i>
+                <span class="mi__cells"><b class="mi__cell">5</b><b class="mi__cell">6</b></span>
+              </div>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Latte</h3><i class="mi__leader"></i>
+                <span class="mi__cells"><b class="mi__cell">6</b><b class="mi__cell">7</b></span>
+              </div>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Iced Latte</h3><i class="mi__leader"></i>
+                <span class="mi__cells"><b class="mi__cell">6</b><b class="mi__cell">7</b></span>
+              </div>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Mocha Latte</h3><i class="mi__leader"></i>
+                <span class="mi__cells"><b class="mi__cell">6</b><b class="mi__cell">7</b></span>
+              </div>
+            </li>
+          </ul>
+        </section>
+
+        <!-- TEA & MATCHA -->
+        <section class="course course--sized" data-course="tea" data-label="Tea &amp; Matcha">
+          <header class="course__head"><h2>Tea, Matcha &amp; Cocoa</h2><span class="course__count"></span></header>
+          <div class="course__sizes" aria-hidden="true"><span>Small</span><span>Large</span></div>
+          <ul class="course__items">
+            <li class="mi">
+              <div class="mi__row"><h3>Matcha Latte</h3><i class="mi__leader"></i>
+                <span class="mi__cells"><b class="mi__cell">6</b><b class="mi__cell">7</b></span>
+              </div>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Strawberry Matcha</h3><i class="mi__leader"></i>
+                <span class="mi__cells"><b class="mi__cell">7</b><b class="mi__cell">8</b></span>
+              </div>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Chai Latte</h3><i class="mi__leader"></i>
+                <span class="mi__cells"><b class="mi__cell">6</b><b class="mi__cell">7</b></span>
+              </div>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Turmeric Latte</h3><i class="mi__leader"></i>
+                <span class="mi__cells"><b class="mi__cell">7</b><b class="mi__cell">8</b></span>
+              </div>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Hot Chocolate</h3><i class="mi__leader"></i>
+                <span class="mi__cells"><b class="mi__cell">5</b><b class="mi__cell">6</b></span>
+              </div>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Hot Tea</h3><i class="mi__leader"></i>
+                <span class="mi__cells"><b class="mi__cell">3</b><b class="mi__cell">4</b></span>
+              </div>
+              <p class="mi__desc">Different flavors — ask at the counter.</p>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Iced Tea</h3><i class="mi__leader"></i>
+                <span class="mi__cells"><b class="mi__cell">4</b><b class="mi__cell">5</b></span>
+              </div>
+              <p class="mi__desc">Passion fruit and regular.</p>
+            </li>
+          </ul>
+        </section>
+
+        <!-- SMOOTHIES -->
+        <section class="course" data-course="smoothies" data-label="Smoothies">
+          <header class="course__head"><h2>Smoothies</h2><span class="course__count"></span></header>
+          <ul class="course__items">
+            <li class="mi">
+              <div class="mi__row"><h3>Grape Harmony</h3><i class="mi__leader"></i><span class="mi__price">12</span></div>
+              <p class="mi__desc">Smucker’s Squeeze grape jelly, banana, blueberry and zero-sugar grape juice, mixed with hazelnut.</p>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Blush Velvet</h3><i class="mi__leader"></i><span class="mi__price">12</span></div>
+              <p class="mi__desc">Almond milk, strawberry, banana, date, coconut cream and coconut flakes.</p>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Green Glow</h3><i class="mi__leader"></i><span class="mi__price">12</span></div>
+              <p class="mi__desc">Coconut water, spinach, ginger, pineapple and cucumber.</p>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Wake Me Up</h3><i class="mi__leader"></i><span class="mi__price">12</span></div>
+              <p class="mi__desc">Almond milk, banana, espresso, cacao nibs, cocoa powder and protein.</p>
+            </li>
+          </ul>
+        </section>
+
+        <!-- COLD BEVERAGES -->
+        <section class="course" data-course="cold" data-label="Cold Beverages">
+          <header class="course__head"><h2>Cold Beverages</h2><span class="course__count"></span></header>
+          <ul class="course__items">
+            <li class="mi">
+              <div class="mi__row"><h3>Saratoga Still Water</h3><i class="mi__leader"></i><span class="mi__price">2.50</span></div>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Classic Coke</h3><i class="mi__leader"></i><span class="mi__price">3</span></div>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Diet Coke</h3><i class="mi__leader"></i><span class="mi__price">3</span></div>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Natural Lemonade</h3><i class="mi__leader"></i><span class="mi__price">4.50</span></div>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Orange Juice</h3><i class="mi__leader"></i><span class="mi__price">4.50</span></div>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Georgian Lemonade</h3><i class="mi__leader"></i><span class="mi__price">5</span></div>
+              <p class="mi__desc">Tarragon · Pear · Lemon.</p>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>S.Pellegrino Sparkling Water <span class="mi__tag">750 ml</span></h3><i class="mi__leader"></i><span class="mi__price">7</span></div>
+            </li>
+            <li class="mi">
+              <div class="mi__row"><h3>Borjomi Sparkling Water <span class="mi__tag">750 ml</span></h3><i class="mi__leader"></i><span class="mi__price">7.50</span></div>
+              <p class="mi__desc">The Georgian mineral water, straight from Borjomi.</p>
+            </li>
+          </ul>
+        </section>
+
+      </div>
+
+      <div class="carte__foot reveal">
+        <p>Ask about drink customizations.</p>
+        <a href="index.html#visit" class="btn btn--ghostlight"><span>Find the Café</span></a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════ FOOTER ══════════ -->
+  <footer class="footer footer--menu">
+    <div class="footer__cols">
+      <div>
+        <h4>Aromati Café &amp; Wine Bar</h4>
+        <p>103 E 34th Street<br/>New York, NY 10016</p>
+      </div>
+      <div>
+        <h4>Hours</h4>
+        <p>Sun – Tue &nbsp;7:00 am – 10:00 pm<br/>Wed – Sat &nbsp;7:00 am – 11:00 pm</p>
+      </div>
+      <div>
+        <h4>Contact</h4>
+        <p><a href="tel:+13322073847">+1 (332) 207-3847</a><br/><a href="mailto:info@aromatiNY.com">info@aromatiNY.com</a></p>
+        <a class="ig ig--quiet footer__ig" href="https://www.instagram.com/aromatinyc" target="_blank" rel="noopener">
+          <span class="ig__mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="18" height="18" rx="5.2"/><circle cx="12" cy="12" r="4.1"/><circle cx="17.3" cy="6.7" r="1.15" fill="currentColor" stroke="none"/></svg>
+          </span>
+          <span class="ig__handle">@aromatinyc</span>
+        </a>
+      </div>
+      <div>
+        <h4>Menus</h4>
+        <p><a href="menu-food.html">Food</a><br/><a href="menu-drinks.html">Drinks</a><br/><a href="menu-wine.html">Wine</a></p>
+      </div>
+      <div>
+        <h4>Good to Know</h4>
+        <p><a href="faq.html">Questions</a><br/>Coffee bar · open kitchen</p>
+      </div>
+    </div>
+    <div class="footer__base">
+      <span>© <span id="year"></span> Aromati Café &amp; Wine Bar</span>
+      <span class="footer__toast">Gaumarjos — cheers. ✦</span>
+      <a href="#top">Back to top ↑</a>
+    </div>
+  </footer>
+
+  <aside class="studio-credit" aria-label="Site credit">
+    <a class="studio-credit__link" href="https://aragvelipalazzolo.com" target="_blank" rel="noopener">
+      <img class="studio-credit__mark" src="assets/img/ap-mark-gold.png" width="255" height="260" alt="" loading="lazy" decoding="async">
+      <span class="studio-credit__text">
+        <span class="studio-credit__by">Designed &amp; built by</span>
+        <span class="studio-credit__name">AragveliPalazzolo</span>
+      </span>
+      <span class="studio-credit__cta">See our work <span aria-hidden="true">↗</span></span>
+    </a>
+  </aside>
+
+</main>
+
+<button class="to-top" id="toTop" type="button" aria-label="Back to top" aria-hidden="true" tabindex="-1">
+  <span aria-hidden="true"></span>
+</button>
+
+<script src="assets/js/lenis.min.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

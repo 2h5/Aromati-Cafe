@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0" />
+<title>AROMATI — Café &amp; Wine Bar · Murray Hill, New York</title>
+<meta name="description" content="Aromati Café & Wine Bar — a bi-level Georgian-inspired café and natural wine bar at 103 E 34th Street, Murray Hill, Manhattan. Khachapuri, khinkali, amber wine, and coffee." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,300;1,9..144,400&family=Manrope:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "CafeOrCoffeeShop",
+  "name": "Aromati Café & Wine Bar",
+  "address": {
+    "@type": "PostalAddress",
+    "streetAddress": "103 E 34th Street",
+    "addressLocality": "New York",
+    "addressRegion": "NY",
+    "postalCode": "10016",
+    "addressCountry": "US"
+  },
+  "telephone": "+1-332-207-3847",
+  "email": "info@aromatiNY.com",
+  "servesCuisine": "Georgian",
+  "sameAs": ["https://www.instagram.com/aromatinyc"],
+  "openingHoursSpecification": [
+    { "@type": "OpeningHoursSpecification", "dayOfWeek": ["Sunday","Monday","Tuesday"], "opens": "07:00", "closes": "22:00" },
+    { "@type": "OpeningHoursSpecification", "dayOfWeek": ["Wednesday","Thursday","Friday","Saturday"], "opens": "07:00", "closes": "23:00" }
+  ]
+}
+</script>
+</head>
+<body>
+
+<!-- ══════════ NAV ══════════ -->
+<header class="nav" id="nav">
+  <a class="nav__brand" href="#top">
+    <span class="nav__word">Aromati</span>
+    <span class="nav__tag">café · wine bar</span>
+  </a>
+  <nav class="nav__links">
+    <a href="#story">Story</a>
+    <a href="#kitchen">Kitchen</a>
+    <a href="#cafe">Café</a>
+    <a href="#wine">Wine</a>
+    <a href="#visit">Visit</a>
+  </nav>
+  <div class="nav__end">
+    <a class="nav__ig" href="https://www.instagram.com/aromatinyc" target="_blank" rel="noopener" aria-label="Aromati on Instagram — @aromatinyc">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5.2"/><circle cx="12" cy="12" r="4.1"/><circle cx="17.3" cy="6.7" r="1.15" fill="currentColor" stroke="none"/></svg>
+    </a>
+    <!-- Menus dropdown. The button carries the semantics; script.js opens it on
+         click and on hover, and closes it on Escape or an outside click. -->
+    <div class="navdrop" id="navdrop">
+      <button class="nav__cta navdrop__btn" type="button" id="menusBtn" aria-expanded="false" aria-controls="menusPanel">
+        <span>Menus</span><i class="navdrop__chev" aria-hidden="true"></i>
+      </button>
+      <div class="navdrop__panel" id="menusPanel">
+        <a href="menu-food.html"><span class="navdrop__k">Food</span><span class="navdrop__d">Georgian kitchen, all day</span></a>
+        <a href="menu-drinks.html"><span class="navdrop__k">Drinks</span><span class="navdrop__d">Coffee, matcha &amp; smoothies</span></a>
+        <a href="menu-wine.html"><span class="navdrop__k">Wine</span><span class="navdrop__d">Georgian &amp; European list</span></a>
+      </div>
+    </div>
+  </div>
+  <button class="nav__burger" id="burger" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="mmenu"><i></i><i></i></button>
+</header>
+
+<!-- Mobile menu. Two sheets fall behind the contents; styles.css owns the whole
+     sequence, script.js only adds .open. inert keeps the closed panel out of the
+     tab order and the accessibility tree. -->
+<div class="mmenu" id="mmenu" aria-hidden="true" inert>
+  <div class="mmenu__wash" aria-hidden="true"></div>
+  <div class="mmenu__panel" aria-hidden="true"></div>
+  <div class="mmenu__inner">
+    <nav class="mmenu__links" aria-label="Sections">
+      <a href="#story"><span class="mml__n">01</span><span class="mml__w"><span>Story</span></span><i class="mml__go" aria-hidden="true"></i></a>
+      <a href="#kitchen"><span class="mml__n">02</span><span class="mml__w"><span>Kitchen</span></span><i class="mml__go" aria-hidden="true"></i></a>
+      <a href="#cafe"><span class="mml__n">03</span><span class="mml__w"><span>Café</span></span><i class="mml__go" aria-hidden="true"></i></a>
+      <a href="#wine"><span class="mml__n">04</span><span class="mml__w"><span>Wine</span></span><i class="mml__go" aria-hidden="true"></i></a>
+      <a href="#visit"><span class="mml__n">05</span><span class="mml__w"><span>Visit</span></span><i class="mml__go" aria-hidden="true"></i></a>
+    </nav>
+    <div class="mmenu__menus">
+      <span class="mmenu__label">Menus</span>
+      <div class="mmenu__row">
+        <a href="menu-food.html">Food</a>
+        <a href="menu-drinks.html">Drinks</a>
+        <a href="menu-wine.html">Wine</a>
+      </div>
+    </div>
+    <div class="mmenu__foot">
+      <p class="mmenu__addr">103 E 34th Street<br>New York, NY 10016</p>
+      <p class="mmenu__hours">Sun–Tue 7am–10pm · Wed–Sat 7am–11pm</p>
+      <div class="mmenu__acts">
+        <a class="mmenu__call" href="tel:+13322073847">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M5.2 3.8h3.1l1.5 3.9-2 1.4a12.4 12.4 0 0 0 5.1 5.1l1.4-2 3.9 1.5v3.1a1.9 1.9 0 0 1-2.1 1.9A15.9 15.9 0 0 1 3.3 5.9a1.9 1.9 0 0 1 1.9-2.1Z"/></svg>
+          <span>+1 (332) 207-3847</span>
+        </a>
+        <a class="ig ig--quiet" href="https://www.instagram.com/aromatinyc" target="_blank" rel="noopener">
+          <span class="ig__mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="18" height="18" rx="5.2"/><circle cx="12" cy="12" r="4.1"/><circle cx="17.3" cy="6.7" r="1.15" fill="currentColor" stroke="none"/></svg>
+          </span>
+          <span class="ig__handle">@aromatinyc</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<main id="top">
+
+  <!-- ══════════ HERO ══════════ -->
+  <section class="hero">
+    <div class="hero__media" data-parallax="0.25">
+      <img src="assets/web/hero-dining.jpg" alt="The upstairs dining room at Aromati — cane chairs, tufted leather, burgundy walls" />
+    </div>
+    <div class="hero__scrim"></div>
+    <div class="hero__content">
+      <p class="hero__eyebrow reveal"><span class="dot"></span>Murray Hill · Manhattan</p>
+      <h1 class="hero__title" aria-label="Aromati">
+        <span class="line"><span>A</span><span>R</span><span>O</span><span>M</span><span>A</span><span>T</span><span>I</span></span>
+      </h1>
+      <p class="hero__sub reveal">Café &nbsp;✦&nbsp; Wine Bar</p>
+      <p class="hero__desc reveal">Two floors on East 34th Street where Georgian cooking,<br/>natural wine and coffee share one table.</p>
+      <div class="hero__actions reveal">
+        <a href="menu-food.html" class="btn btn--solid"><span>See the Menus</span></a>
+        <a href="#wine" class="btn btn--ghost"><span>The Wine Bar</span></a>
+      </div>
+    </div>
+    <div class="hero__foot">
+      <span class="hero__coord">40.7447° N — 73.9825° W</span>
+      <a class="hero__scroll" href="#story"><span>Scroll</span><i></i></a>
+      <span class="hero__coord">103 E 34th St, NY 10016</span>
+    </div>
+  </section>
+
+  <!-- ══════════ MARQUEE ══════════ -->
+  <div class="marquee" aria-hidden="true">
+    <div class="marquee__track">
+      <div class="marquee__group">
+        <span>Adjaruli Khachapuri</span><em>✦</em><span>Amber Wine</span><em>✦</em><span>Tiramisu Latte</span><em>✦</em><span>Khinkali</span><em>✦</em><span>Saperavi</span><em>✦</em><span>Shoti’s Puri</span><em>✦</em><span>Maple Cold Foam</span><em>✦</em><span>Qvevri</span><em>✦</em>
+      </div>
+      <div class="marquee__group">
+        <span>Adjaruli Khachapuri</span><em>✦</em><span>Amber Wine</span><em>✦</em><span>Tiramisu Latte</span><em>✦</em><span>Khinkali</span><em>✦</em><span>Saperavi</span><em>✦</em><span>Shoti’s Puri</span><em>✦</em><span>Maple Cold Foam</span><em>✦</em><span>Qvevri</span><em>✦</em>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ STORY ══════════ -->
+  <section class="story" id="story">
+    <div class="story__inner">
+      <div class="section-head">
+        <span class="section-head__no">01</span>
+        <span class="section-head__label">The Idea</span>
+      </div>
+      <h2 class="story__big" data-split>
+        Georgian cooking for a Manhattan morning.
+      </h2>
+
+      <div class="story__grid">
+        <figure class="story__img story__img--a" data-reveal-img>
+          <img src="assets/web/dining-corner.jpg" alt="Burgundy wall, organic mirror and cane chairs inside Aromati" data-parallax-img />
+          <figcaption><span class="cap__k">Upstairs</span> Burgundy, cane &amp; oak</figcaption>
+        </figure>
+
+        <div class="story__text">
+          <p class="lead">Aromati, from the Georgian word for <em>aroma</em>, is a bi-level café and wine bar in Murray Hill, where American coffee culture meets the oldest food and wine traditions in Europe.</p>
+          <p>Downstairs, an open kitchen and coffee bar move at the pace of the city: espresso pulled, matcha whisked, khachapuri blistering in the oven. Upstairs, the room slows down into burgundy walls, tufted leather, cane and oak, and low globe light, a dining room and wine bar built for long evenings.</p>
+          <ul class="story__floors">
+            <li><span>Ground</span>Café</li>
+            <li><span>Above</span>Dining room &amp; wine bar</li>
+          </ul>
+        </div>
+
+        <blockquote class="story__quote reveal">
+          <p>Georgia has been making wine for eight thousand years. We think it belongs at the table, whatever the occasion.</p>
+        </blockquote>
+
+        <figure class="story__img story__img--b" data-reveal-img>
+          <img src="assets/web/golden-hour.jpg" alt="Golden hour light across the window tables at Aromati" data-parallax-img />
+          <figcaption><span class="cap__k">Golden hour</span> East 34th Street</figcaption>
+        </figure>
+      </div>
+
+      <div class="story__facts">
+        <div class="fact"><strong>2</strong><span>Floors — café below,<br/>wine bar above</span></div>
+        <div class="fact"><strong data-count="8000">8,000</strong><span>Years of Georgian<br/>winemaking behind the list</span></div>
+        <div class="fact"><strong>10016</strong><span>In the heart of<br/>Murray Hill</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════ KITCHEN ══════════ -->
+  <section class="kitchen" id="kitchen">
+
+    <div class="section-head section-head--light reveal">
+      <span class="section-head__no">02</span>
+      <span class="section-head__label">The Kitchen</span>
+    </div>
+
+    <div class="kitchen__intro">
+      <h2 data-split>Bread, cheese, and broth: a few staples of the Georgian table.</h2>
+      <p class="kitchen__lede reveal">Everything comes out of the open kitchen on the ground floor. Khachapuri is blistered to order and khinkali is pleated by hand.</p>
+    </div>
+
+    <!-- ── photo reel: the dishes we have shot so far ── -->
+    <div class="reel" data-reel>
+      <div class="reel__label reveal"><span>A few plates</span><em>photographed in the room</em></div>
+      <div class="reel__viewport">
+        <div class="reel__track" data-reel-track>
+          <div class="reel__group">
+            <figure class="plate"><img src="assets/web/adjaruli.jpg" alt="Adjaruli khachapuri — cheese boat with egg yolk and butter" loading="lazy" decoding="async"/><figcaption>Adjaruli Khachapuri</figcaption></figure>
+            <figure class="plate"><img src="assets/web/khinkali.jpg" alt="Khinkali — Georgian soup dumplings" loading="lazy" decoding="async"/><figcaption>Khinkali</figcaption></figure>
+            <figure class="plate"><img src="assets/web/imeruli.jpg" alt="Imeruli khachapuri — round cheese-filled bread" loading="lazy" decoding="async"/><figcaption>Imeruli Khachapuri</figcaption></figure>
+            <figure class="plate"><img src="assets/web/badrijani.jpg" alt="Eggplant rolls with walnut paste and pomegranate" loading="lazy" decoding="async"/><figcaption>Eggplant Rolls</figcaption></figure>
+            <figure class="plate"><img src="assets/web/pkhali-board.jpg" alt="Assorted pkhali with warm cornbread" loading="lazy" decoding="async"/><figcaption>Assorted Pkhali</figcaption></figure>
+            <figure class="plate"><img src="assets/web/shoti-ajika.jpg" alt="Shoti’s puri, canoe-shaped Georgian bread with ajika" loading="lazy" decoding="async"/><figcaption>Shoti’s Puri &amp; Ajika</figcaption></figure>
+            <figure class="plate"><img src="assets/web/tolma.jpg" alt="Tolma — grape leaves with garlic sour cream" loading="lazy" decoding="async"/><figcaption>Tolma</figcaption></figure>
+            <figure class="plate"><img src="assets/web/georgian-salad.jpg" alt="The Georgian salad with walnut dressing" loading="lazy" decoding="async"/><figcaption>The Georgian Salad</figcaption></figure>
+            <figure class="plate"><img src="assets/web/honey-cake.jpg" alt="Layered honey cake with pistachio" loading="lazy" decoding="async"/><figcaption>Honey Cake</figcaption></figure>
+          </div>
+          <div class="reel__group" aria-hidden="true">
+            <figure class="plate"><img src="assets/web/adjaruli.jpg" alt="" loading="lazy" decoding="async"/><figcaption>Adjaruli Khachapuri</figcaption></figure>
+            <figure class="plate"><img src="assets/web/khinkali.jpg" alt="" loading="lazy" decoding="async"/><figcaption>Khinkali</figcaption></figure>
+            <figure class="plate"><img src="assets/web/imeruli.jpg" alt="" loading="lazy" decoding="async"/><figcaption>Imeruli Khachapuri</figcaption></figure>
+            <figure class="plate"><img src="assets/web/badrijani.jpg" alt="" loading="lazy" decoding="async"/><figcaption>Eggplant Rolls</figcaption></figure>
+            <figure class="plate"><img src="assets/web/pkhali-board.jpg" alt="" loading="lazy" decoding="async"/><figcaption>Assorted Pkhali</figcaption></figure>
+            <figure class="plate"><img src="assets/web/shoti-ajika.jpg" alt="" loading="lazy" decoding="async"/><figcaption>Shoti’s Puri &amp; Ajika</figcaption></figure>
+            <figure class="plate"><img src="assets/web/tolma.jpg" alt="" loading="lazy" decoding="async"/><figcaption>Tolma</figcaption></figure>
+            <figure class="plate"><img src="assets/web/georgian-salad.jpg" alt="" loading="lazy" decoding="async"/><figcaption>The Georgian Salad</figcaption></figure>
+            <figure class="plate"><img src="assets/web/honey-cake.jpg" alt="" loading="lazy" decoding="async"/><figcaption>Honey Cake</figcaption></figure>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── a taste of the kitchen ──
+         Signature dishes only, and deliberately without prices: the priced list
+         lives on menu-food.html so there is one place a price can go stale. -->
+    <div class="taste">
+      <div class="taste__head reveal">
+        <span class="taste__flourish" aria-hidden="true">✦</span>
+        <h3>Popular plates</h3>
+        <p>Breakfast, appetizers, khachapuri, hot dishes, soups &amp; desserts</p>
+      </div>
+
+      <ul class="taste__list">
+        <li class="reveal"><strong>Adjaruli Khachapuri</strong><span>Boat-shaped, cheese, egg yolk &amp; butter</span></li>
+        <li class="reveal"><strong>Khinkali</strong><span>Hand-pleated dumplings in savory broth</span></li>
+        <li class="reveal"><strong>Assorted Pkhali</strong><span>Walnut, herbs &amp; warm cornbread</span></li>
+        <li class="reveal"><strong>Shakshuka</strong><span>Poached eggs, tomato, pepper &amp; paprika</span></li>
+        <li class="reveal"><strong>Tolma</strong><span>Grape leaves with garlic sour cream</span></li>
+        <li class="reveal"><strong>Aromati’s Crêpe</strong><span>Made to order, dressed seven ways</span></li>
+      </ul>
+
+      <div class="taste__cta reveal">
+        <a href="menu-food.html" class="btn btn--ghostlight"><span>See the Full Food Menu</span></a>
+        <span class="taste__note">Second floor · menu highlights</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════ CAFÉ ══════════ -->
+  <section class="cafe" id="cafe">
+    <div class="section-head">
+      <span class="section-head__no">03</span>
+      <span class="section-head__label">The Café</span>
+    </div>
+    <div class="cafe__head">
+      <h2 data-split>Downstairs runs on espresso.</h2>
+      <p class="cafe__lede">The ground floor is a New York coffee bar with espresso drinks, matcha, and pastries for the morning.</p>
+    </div>
+    <div class="cafe__grid">
+      <figure class="cafe__card" data-reveal-img>
+        <img src="assets/web/tiramisu-latte.jpg" alt="Tiramisu latte in a branded Aromati cup" data-parallax-img/>
+        <figcaption><strong>Tiramisu Latte</strong><span>mascarpone cream, cocoa, a ladyfinger on top</span></figcaption>
+      </figure>
+      <figure class="cafe__card" data-reveal-img>
+        <img src="assets/web/maple-latte-outpainted.png" alt="Maple syrup iced latte with cold foam" data-parallax-img/>
+        <figcaption><strong>Maple Syrup Iced Latte</strong><span>topped with silky maple cold foam</span></figcaption>
+      </figure>
+      <figure class="cafe__card" data-reveal-img>
+        <img src="assets/web/matcha-trio.jpg" alt="Three fruit matcha lattes held in a stack" data-parallax-img/>
+        <figcaption><strong>Fruit Matchas</strong><span>strawberry, mango &amp; blueberry, layered over ice</span></figcaption>
+      </figure>
+      <figure class="cafe__card" data-reveal-img>
+        <img src="assets/web/latte-art-outpainted.png" alt="Flat white with rosetta latte art" data-parallax-img/>
+        <figcaption><strong>The Classics</strong><span>flat whites &amp; cappuccinos, poured properly</span></figcaption>
+      </figure>
+    </div>
+    <div class="cafe__cta reveal">
+      <p>The drinks menu includes espresso, matcha, chai, smoothies, and cold drinks.</p>
+      <a href="menu-drinks.html" class="btn btn--solid"><span>See the Drinks Menu</span></a>
+    </div>
+  </section>
+
+  <!-- ══════════ WINE ══════════ -->
+  <section class="wine" id="wine">
+    <div class="wine__bg" data-parallax="0.18">
+      <img src="assets/web/wine-cabinet.jpg" alt="" aria-hidden="true"/>
+    </div>
+    <div class="wine__scrim"></div>
+    <div class="wine__inner">
+      <div class="section-head section-head--light">
+        <span class="section-head__no">04</span>
+        <span class="section-head__label">The Wine Bar</span>
+      </div>
+      <div class="wine__masthead">
+        <h2 class="wine__title" data-split>A wine list shaped by Georgia.</h2>
+        <p class="wine__lede">Upstairs, the list brings together qvevri ambers, Saperavi, natural wines, and a short European selection. Wines are available by the glass or bottle, with pairings for the table.</p>
+      </div>
+
+      <div class="wine__body">
+        <figure class="wine__board" data-reveal-img>
+          <img src="assets/web/wine-board.jpg" alt="Saperavi and a cheese and charcuterie board at Aromati" data-parallax-img/>
+          <figcaption><span class="cap__k">Upstairs</span> Boards, bottles &amp; the long way home</figcaption>
+        </figure>
+
+        <div class="wine__col">
+        <ol class="wine__list">
+          <li class="wine__item">
+            <span class="wine__no">I</span>
+            <div class="wine__copy">
+              <span class="wine__key">Amber</span>
+              <p>Amber wines bring notes of honey, spice, dried fruit, and citrus.</p>
+            </div>
+          </li>
+          <li class="wine__item">
+            <span class="wine__no">II</span>
+            <div class="wine__copy">
+              <span class="wine__key">Saperavi</span>
+              <p>Saperavi is a Georgian red with dark berry, plum, and cherry notes.</p>
+            </div>
+          </li>
+          <li class="wine__item">
+            <span class="wine__no">III</span>
+            <div class="wine__copy">
+              <span class="wine__key">Qvevri</span>
+              <p>The list includes qvevri wines in both amber and red styles.</p>
+            </div>
+          </li>
+        </ol>
+
+        <div class="wine__cta reveal">
+          <p class="wine__hours">Second floor · wine bar</p>
+          <a href="menu-wine.html" class="btn btn--ghostlight"><span>Read the Wine List</span></a>
+        </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ══════════ GALLERY ══════════ -->
+  <section class="gallery">
+    <div class="section-head">
+      <span class="section-head__no">05</span>
+      <span class="section-head__label">The Room</span>
+    </div>
+    <h2 data-split>Cane, leather, burgundy — and light that lingers.</h2>
+    <div class="gallery__grid">
+      <figure class="gallery__item g1" data-reveal-img><img src="assets/web/dining-wide.jpg" alt="The full dining room — banquette, mirrors, pendant globes" data-parallax-img/></figure>
+      <figure class="gallery__item g2" data-reveal-img><img src="assets/web/dining-detail.jpg" alt="Tables set with wine glasses beneath pendant lights" data-parallax-img/></figure>
+      <figure class="gallery__item g3" data-reveal-img><img src="assets/web/saperavi-bag.jpg" alt="A bottle of Saperavi with an Aromati wine bag" data-parallax-img/></figure>
+      <figure class="gallery__item g4" data-reveal-img><img src="assets/web/georgian-salad.jpg" alt="Georgian salad with walnut dressing and pomegranate" data-parallax-img/></figure>
+      <figure class="gallery__item g5" data-reveal-img><img src="assets/web/cappuccino.jpg" alt="Cappuccino with heart latte art" data-parallax-img/></figure>
+      <figure class="gallery__item g6" data-reveal-img><img src="assets/web/strawberry-salad.jpg" alt="Strawberry and goat cheese salad" data-parallax-img/></figure>
+    </div>
+  </section>
+
+  <!-- ══════════ VISIT ══════════ -->
+  <section class="visit" id="visit">
+    <div class="visit__media" data-reveal-img>
+      <img src="assets/web/storefront-exterior.jpg" alt="The Aromati storefront on East 34th Street" data-parallax-img/>
+    </div>
+    <div class="visit__panel">
+      <div class="visit__inner">
+        <div class="section-head section-head--light">
+          <span class="section-head__no">06</span>
+          <span class="section-head__label">Visit</span>
+        </div>
+        <h2 data-split>Come say hello,<br/>Murray Hill.</h2>
+
+        <!-- Hours get their own card: the status pill is filled in by script.js
+             against New York time, and the matching line gets .is-today. -->
+        <div class="visit__card">
+          <div class="visit__card-head">
+            <span class="visit__card-title">Hours</span>
+            <p class="hours__status" id="hoursStatus" hidden></p>
+          </div>
+          <ul class="hours__list" id="hoursList">
+            <li class="hours__line" data-days="0,1,2">
+              <span class="hours__days">Sun — Tue</span>
+              <i class="hours__leader"></i>
+              <span class="hours__time">7:00 am – 10:00 pm</span>
+            </li>
+            <li class="hours__line" data-days="3,4,5,6">
+              <span class="hours__days">Wed — Sat</span>
+              <i class="hours__leader"></i>
+              <span class="hours__time">7:00 am – 11:00 pm</span>
+            </li>
+          </ul>
+          <p class="hours__note">Mornings for coffee, evenings for wine.</p>
+        </div>
+
+        <ul class="visit__rows">
+          <li class="visit__row visit__row--wide">
+            <span>Address</span>
+            <a href="https://maps.google.com/?q=Aromati+Cafe+and+Wine+Bar+103+E+34th+St+New+York+NY+10016" target="_blank" rel="noopener">103 E 34th Street, New York, NY 10016</a>
+          </li>
+          <li class="visit__row"><span>Phone</span><a href="tel:+13322073847">+1 (332) 207-3847</a></li>
+          <li class="visit__row"><span>Email</span><a href="mailto:info@aromatiNY.com">info@aromatiNY.com</a></li>
+          <li class="visit__row visit__row--wide">
+            <span>Instagram</span>
+            <a class="ig" href="https://www.instagram.com/aromatinyc" target="_blank" rel="noopener">
+              <span class="ig__mark" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="5.2"/><circle cx="12" cy="12" r="4.1"/><circle cx="17.3" cy="6.7" r="1.15" fill="currentColor" stroke="none"/></svg>
+              </span>
+              <span class="ig__handle">@aromatinyc</span>
+              <span class="ig__go" aria-hidden="true">↗</span>
+            </a>
+          </li>
+        </ul>
+
+        <div class="visit__actions">
+          <a class="btn btn--solid" href="https://maps.google.com/?q=Aromati+Cafe+and+Wine+Bar+103+E+34th+St+New+York+NY+10016" target="_blank" rel="noopener"><span>Get Directions</span></a>
+          <!-- Placeholder until the reservation system is wired up. Still a
+               real button so it keeps the hover and press animations. -->
+          <button type="button" class="btn btn--ghostlight" id="bookBtn" aria-describedby="bookNote"><span>Book a Table</span></button>
+        </div>
+        <p class="visit__note" id="bookNote" role="status" aria-live="polite"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════ FOOTER ══════════ -->
+  <footer class="footer">
+    <div class="footer__cols">
+      <div>
+        <h4>Aromati Café &amp; Wine Bar</h4>
+        <p>103 E 34th Street<br/>New York, NY 10016</p>
+      </div>
+      <div>
+        <h4>Hours</h4>
+        <p>Sun – Tue &nbsp;7:00 am – 10:00 pm<br/>Wed – Sat &nbsp;7:00 am – 11:00 pm</p>
+      </div>
+      <div>
+        <h4>Contact</h4>
+        <p><a href="tel:+13322073847">+1 (332) 207-3847</a><br/><a href="mailto:info@aromatiNY.com">info@aromatiNY.com</a></p>
+        <a class="ig ig--quiet footer__ig" href="https://www.instagram.com/aromatinyc" target="_blank" rel="noopener">
+          <span class="ig__mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="18" height="18" rx="5.2"/><circle cx="12" cy="12" r="4.1"/><circle cx="17.3" cy="6.7" r="1.15" fill="currentColor" stroke="none"/></svg>
+          </span>
+          <span class="ig__handle">@aromatinyc</span>
+        </a>
+      </div>
+      <div>
+        <h4>Good to Know</h4>
+        <p><a href="faq.html">Questions</a><br/>Dining room · wine bar</p>
+      </div>
+    </div>
+    <div class="footer__base">
+      <span>© <span id="year"></span> Aromati Café &amp; Wine Bar</span>
+      <span class="footer__toast">Gaumarjos — cheers. ✦</span>
+      <a href="#top">Back to top ↑</a>
+    </div>
+  </footer>
+
+  <!-- Studio credit. Deliberately outside the shop's palette so it reads as a
+       signature on the frame, not as content in the page. -->
+  <aside class="studio-credit" aria-label="Site credit">
+    <a class="studio-credit__link" href="https://aragvelipalazzolo.com" target="_blank" rel="noopener">
+      <img class="studio-credit__mark" src="assets/img/ap-mark-gold.png" width="255" height="260" alt="" loading="lazy" decoding="async">
+      <span class="studio-credit__text">
+        <span class="studio-credit__by">Designed &amp; built by</span>
+        <span class="studio-credit__name">AragveliPalazzolo</span>
+      </span>
+      <span class="studio-credit__cta">See our work <span aria-hidden="true">↗</span></span>
+    </a>
+  </aside>
+
+</main>
+
+<button class="to-top" id="toTop" type="button" aria-label="Back to top" aria-hidden="true" tabindex="-1">
+  <span aria-hidden="true"></span>
+</button>
+
+<script src="assets/js/lenis.min.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
