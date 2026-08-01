@@ -252,6 +252,10 @@ fastest, and they guard the thing that has broken most often.
 - `gen-seed-sql.mjs --check` — the committed seed migration still matches the
   seed data. Editing `seed-copy.js` and forgetting to regenerate would leave
   the site saying one thing and the database seeding another.
+- `tools/measure-headlines.mjs` — a measuring tape, **not** in `npm test` and
+  deliberately not a guard: it prints where each `data-split` headline takes an
+  extra line, at three widths, and leaves the judgement to a person. See open
+  item 0 for what its first run found.
 - `tools/test-replay.mjs` (`npm run test:replay`) — **the second harness that
   drives a real browser.** Loads a menu page with `fetch` stubbed to return a
   menu that differs from the seed, and checks the rebuild leaves nothing
@@ -1194,13 +1198,38 @@ bucket, and it must run *after* a successful save, never speculatively.
 
 ## What's still open / needs input
 
-0. **Headline length caps are provisional.** `tools/copy-labels.mjs` sets
-   `maxLength` on the ten `data-split` headlines — 72 for the home page's h2s,
-   32 for an inner page's masthead h1. Those numbers were reasoned about, not
-   measured: they are sized to catch something obviously too long, not to find
-   the point where the animation actually wraps. Check them during the browser
-   pass and correct them; a cap that is too tight blocks a legitimate edit, and
-   one that is too loose lets the layout break.
+0. **Headline length caps — measured 2026-08-01, and a character count turns
+   out to be the wrong control.** `tools/measure-headlines.mjs` grows each of
+   the ten `data-split` headlines a word at a time in real Chrome, at 1600,
+   1024 and 390px, and records where it takes an extra line.
+
+   The finding is not "the numbers are wrong", it is that **a character count
+   is a poor proxy for the thing it is meant to prevent.** `cafe.headline`
+   ships at 28 characters on one line while the measured ceiling for that slot
+   is 23. Both are true, and the gap is the point: character count does not
+   track rendered width. Glyphs differ — "Wine Bar" and "khinkali" are the same
+   eight characters and not the same width — and lines break at spaces, so the
+   last word fits whole or moves whole. On top of that the copy vocabulary lets
+   the owner place an explicit line break, which moves the wrap more than any
+   length limit does.
+
+   Read the tool's ceiling column as a **word-quantised lower bound**: the last
+   whole word that fitted, so the true ceiling sits between it and the next
+   word boundary. Useful for comparing slots, wrong for setting a precise cap.
+   Nine of the ten caps "fail" against a straight character measure, which is
+   itself a good sign that the measure is not the constraint.
+
+   **Nothing was changed on the strength of it.** The quantity that actually
+   describes the constraint is the rendered line count of the real element, and
+   the place to enforce that is the Phase 5 editor,
+   which can measure the live element as it is typed — the same way it will
+   check contrast and alt text. The existing character caps stay as a coarse
+   backstop against something absurd.
+
+   Also worth knowing before sizing anything: 390px is where everything wraps.
+   Sizing every cap to hold there is harsh; the alternative is to accept an
+   extra line on a phone. That is a design call, which is why the tool prints a
+   table and does not fail a build.
 1. ⏸️ **The FAQ demo notice — DEFERRED 2026-08-01, awaiting the owner.**
    **Parked by decision 2026-08-01 — do not let it block anything.** `faq.html`
    still gets its nav, hours, contact details and page copy like every other
