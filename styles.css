@@ -1373,7 +1373,23 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
    label does the work the .morder__label does here */
 .order{ display:flex; flex-wrap:wrap; gap:4px 22px; }
 .order__link{ line-height:1.55; }
-.order__go{ font-size:.82em; opacity:.55; }
+
+/* The arrow flies out of the word and settles where it belongs — the same
+   move as .ig__go, so a link that leaves the site behaves the same way
+   wherever it appears. It holds its space at opacity:0 and only opacity and
+   transform change, so nothing reflows and the underline below .morder__link
+   does not twitch. inline-block because a transform does nothing to an inline
+   box. Keyboard focus gets it too: it is the cue that the link goes off-site,
+   and that is not a pointer-only fact. */
+.order__go{
+  display:inline-block;
+  font-size:.82em; opacity:0; transform:translate(-4px,4px);
+  transition:opacity .4s var(--ease), transform .4s var(--ease);
+}
+.order__link:hover .order__go,
+.order__link:focus-visible .order__go,
+.morder__link:hover .order__go,
+.morder__link:focus-visible .order__go{ opacity:.75; transform:none; }
 .mswitch a{
   position:relative; isolation:isolate;
   border:1px solid var(--hairline-lt); border-radius:99px;
