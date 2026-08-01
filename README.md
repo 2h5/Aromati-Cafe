@@ -176,7 +176,7 @@ site requires it**, and `npm run build` is not part of shipping.
   hidden below 760px where the burger menu takes over.
 - **Reduced motion** is respected throughout: transitions collapse, the photo
   reel stops drifting and becomes a swipeable strip.
-- **Book a Table is a deliberate placeholder.** It says so when pressed rather
+- **Reserve a Table is a deliberate placeholder.** It says so when pressed rather
   than pretending to be wired up.
 - **The page is locked against sideways panning** — `overflow-x:clip` on `html`
   and `body`, plus `minimum-scale=1` in every page's viewport meta so the lock
