@@ -801,6 +801,32 @@ bucket, and it must run *after* a successful save, never speculatively.
 - **2026-08-01** — Uptown audited before porting (results in the Security
   section). Clean, with two minor gaps: no CSP, no `robots.txt`. Aromati adds
   a CSP from the start rather than inheriting the gap.
+- **2026-08-01** — **One account, as Uptown does it.** The owner holds a single
+  login and may share it. `admin_users` still works as an allowlist, so a second
+  account is an INSERT and no migration, but no audit trail is built: no
+  `changed_by`, no per-row history. Revisit if staff ever get their own logins —
+  see *What's still open*, item 3.
+- **2026-08-01** — **Hours stay per-day, and the owner is never asked.** The
+  schema question is moot: the days already differ (Sun–Tue close 22:00,
+  Wed–Sat 23:00). The flexible shape is built and the editor hides it — seven
+  rows, an *apply to every day* button, a per-day *closed* box. Guessing wrong
+  this way costs a slightly busier panel; guessing wrong the other way costs a
+  migration and an editor rewrite on the first holiday.
+- **2026-08-01** — **Date exceptions get a table in Phase 2**, even though the
+  Phase 5 panel for them may come later. "Closed December 25" is not a weekday
+  pattern and is the likeliest thing an owner actually wants to change. Cheap
+  as SQL now, awkward to retrofit.
+- **2026-08-01** — **Wine attributes stay free text.** Vintage remains a tag,
+  region remains inside the description prose; both are editable strings. No
+  `vintage INT`, no region enum. The menu already carries six price shapes — a
+  structured field is one more thing the real menu can do that the schema
+  cannot ("NV", "2019/2020 blend"). Accepted cost: no filtering by region or
+  vintage, no enforced formatting. Neither exists on the site today.
+- **2026-08-01** — **Hosting is Cloudflare Pages** (already live, used for
+  preview deployments). Two consequences: a CSP is available via a `_headers`
+  file, so the Phase 0 plan to ship one stands; and every branch gets a public
+  `*.pages.dev` URL, so `admin.html` will be publicly reachable from the moment
+  it exists — see *What's still open*, item 4.
 
 ---
 
@@ -828,16 +854,28 @@ bucket, and it must run *after* a successful save, never speculatively.
    failing the moment the owner edits anything. Design it as part of Phase 4,
    not as an afterthought. The menus do not have this problem — their markup was
    removed rather than kept.
-3. **Hosting.** Where does this run once it needs an HTTP origin? Affects the
-   CSP work and the fonts decision on `admin.html`.
-4. **Does the owner need per-day opening times**, or is 7:00 am every day
-   permanent? The schema supports it either way; it changes how much the Hours
-   panel shows.
-5. **Wine attributes.** The wine list currently encodes vintage in `.mi__tag`
-   and region inside the description prose. Does the owner want those as real
-   fields (filterable, consistently formatted), or is free text fine?
-6. **Multiple editors, ever?** The allowlist table supports it. Worth knowing
-   now, because "the owner" vs "staff" changes whether an audit trail matters.
+3. **Staff logins would need an audit trail.** Settled for now as one shared
+   account (see *Decisions*), which is why no `changed_by` column exists. If
+   that changes, add the columns before the second account is created, not
+   after — history that was never recorded cannot be backfilled.
+4. **`admin.html` will be public on every preview deployment.** Cloudflare
+   Pages gives each branch its own `*.pages.dev` URL, and the admin page ships
+   with the rest of the site. Supabase auth is the real gate and RLS is the
+   real defence, so this is not a hole — but it does mean the login page is
+   reachable by anyone who guesses a preview URL, and that the anon key is
+   readable there. Decide before Phase 5 whether to put Cloudflare Access in
+   front of previews (free tier covers it) or accept it. Either way the RLS in
+   Phase 2 has to be right on its own merits, because it is what is actually
+   holding the door.
+5. **Does Cloudflare Pages run a build, or serve the repo root?** It matters
+   more than it sounds: until this session `npm run build` produced a `dist/`
+   that loaded no JavaScript at all while printing `✓ built`. If Pages is
+   configured with a build command and `dist` as the output directory, the
+   deployed site has been broken. If it serves the root, it has been fine —
+   the source tree *is* the site. Check the Pages project settings. The
+   recommendation is no build command and root as the output: this site needs
+   no build step, and removing it removes the whole class of silent failure.
+   `vite.config.js` then exists only for local preview.
 
 ---
 
