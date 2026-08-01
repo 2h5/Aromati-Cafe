@@ -1362,11 +1362,17 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
   font-size:10px; letter-spacing:.3em; text-transform:uppercase; font-weight:700;
   color:var(--gold); opacity:.85;
 }
-.morder__link{
+.morder__link{ transition:color .3s var(--ease); }
+/* The rule underlines the word, not the link. The arrow holds a space inside
+   the link even when it is invisible — that is what keeps the layout still on
+   hover — and a border on the link would draw a line under that space too,
+   running past the end of the word with nothing above it. */
+.morder__link .order__name{
   border-bottom:1px solid rgba(244,237,225,.22); padding-bottom:2px;
-  transition:color .3s var(--ease), border-color .3s var(--ease);
+  transition:border-color .3s var(--ease);
 }
-.morder__link:hover{ color:var(--gold); border-bottom-color:var(--gold); }
+.morder__link:hover{ color:var(--gold); }
+.morder__link:hover .order__name{ border-bottom-color:var(--gold); }
 .morder__link:focus-visible{ outline:2px solid var(--gold); outline-offset:3px; }
 
 /* the same pair in the Visit table on the home page, where the row's own
