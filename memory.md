@@ -80,10 +80,25 @@ Also done — **Phase 2: the schema and its policies, written and checkable**:
   none.
 - `tools/test-policies.mjs` — breaks each of the seven rules on purpose and
   requires the checker to catch it *and name which rule fired*.
+- `supabase/migrations/20260801000100_seed_content.sql` — **generated**, by
+  `tools/gen-seed-sql.mjs`, from `data/seed-*.js`: 17 sections, 84 items, 26
+  pours, 7 options, 62 copy fields. Deterministic, so it reviews as a diff.
+  Ends with a block that asserts the row counts, because a partial apply
+  otherwise leaves a menu quietly missing its last section.
+- `tools/copy-labels.mjs` — the one hand-written file in the copy pipeline. A
+  key is not a name, and the generator refuses to run if the labels and the
+  data disagree by even one field.
 
-### The six harnesses, and what each is for
+**No `menu_pages` table.** One was drafted with `title` and `lede` before
+anyone checked that `site_copy` already holds `food.headline` ("The Food Menu")
+and `food.lede`, and the same pair for the other two. Two tables owning one
+string is a bug waiting for them to disagree. What was left after removing them
+was a slug and a sort order, which is a column on `menu_courses`. Same
+reasoning that dropped `faq.footButton` from the copy set in Phase 1.
 
-`npm test` runs all six.
+### The seven harnesses, and what each is for
+
+`npm test` runs all seven.
 
 - `tools/verify-phase1.mjs` — all five pages, whole-body, running the real
   renderer, diffed against `53b3d5e` (pre-conversion). Proves nothing changed.
@@ -97,6 +112,9 @@ Also done — **Phase 2: the schema and its policies, written and checkable**:
   last statement in `script.js` still runs.
 - `tools/check-policies.mjs` — the RLS invariants, over the migration text.
 - `tools/test-policies.mjs` — proves the checker above can fail.
+- `gen-seed-sql.mjs --check` — the committed seed migration still matches the
+  seed data. Editing `seed-copy.js` and forgetting to regenerate would leave
+  the site saying one thing and the database seeding another.
 
 The middle three exist because verify-phase1 asserts the output is *unchanged*,
 which is exactly the wrong test for a code path that never existed. The last
@@ -858,7 +876,18 @@ bucket, and it must run *after* a successful save, never speculatively.
 
 ## What's still open / needs input
 
+0. **Headline length caps are provisional.** `tools/copy-labels.mjs` sets
+   `maxLength` on the ten `data-split` headlines — 72 for the home page's h2s,
+   32 for an inner page's masthead h1. Those numbers were reasoned about, not
+   measured: they are sized to catch something obviously too long, not to find
+   the point where the animation actually wraps. Check them during the browser
+   pass and correct them; a cap that is too tight blocks a legitimate edit, and
+   one that is too loose lets the layout break.
 1. ⏸️ **The FAQ demo notice — DEFERRED 2026-08-01, awaiting the owner.**
+   **Parked by decision 2026-08-01 — do not let it block anything.** `faq.html`
+   still gets its nav, hours, contact details and page copy like every other
+   page; `faq_entries` exists and is empty; the seed migration skips it. Pick
+   it back up when the owner answers, not before.
    `faq.html` opens with a note saying its 18 questions are placeholder copy and
    asking whether to keep the page at all. Until the owner answers:
    - **Do not transcribe the FAQ into seed data.** If the page is cut, the work

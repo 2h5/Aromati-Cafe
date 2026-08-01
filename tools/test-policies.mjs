@@ -20,7 +20,13 @@ import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 
 const SOURCE = "supabase/migrations/20260801000000_init_cms.sql";
-const clean = readFileSync(SOURCE, "utf8");
+
+/* Line endings are normalised because the mutations below match multi-line
+   strings, and git hands this file back with CRLF on Windows after any
+   checkout. Without this the mutations silently stop matching and every case
+   reports "changed nothing" — which is the guard working, but for a reason
+   that has nothing to do with the SQL. */
+const clean = readFileSync(SOURCE, "utf8").replace(/\r\n/g, "\n");
 
 let failures = 0;
 
@@ -84,7 +90,7 @@ mutation(
   "2. a table with RLS on and every policy forgotten",
   clean.replace(/create policy "photos[\s\S]*?with check \(public\.is_owner\(\)\);/, "")
        /* the grant has to go too, or rule 6 fires first and masks this */
-       .replace(/(grant update on\n  public\.site_settings, public\.business_hours, public\.menu_pages,\n  public\.site_copy), public\.photos/, "$1"),
+       .replace(/(grant update on[\s\S]*?public\.site_copy), public\.photos/, "$1"),
   "no table is silently unreachable"
 );
 

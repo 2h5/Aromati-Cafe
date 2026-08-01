@@ -1,6 +1,7 @@
 # What the database allows, in plain words
 
-This describes `migrations/20260801000000_init_cms.sql`. Phase 2's job is that
+This describes `migrations/20260801000000_init_cms.sql` — 11 tables, 32
+policies. Phase 2's job is that
 this file gets read and agreed **before** the SQL is applied to anything. If a
 sentence here says something you did not intend, that is the finding — the SQL
 is wrong, not this summary.
@@ -66,7 +67,6 @@ hold **values** — the words in a slot the website already has. Others hold
 |---|---|
 | `site_settings` | The set of settings is whatever the site renders. A new one means new markup. |
 | `business_hours` | There are seven weekdays. To close a day you tick *closed*; the row stays. |
-| `menu_pages` | Three menu pages, because there are three `.html` files. |
 | `site_copy` | One row per `data-copy` hook in the markup. |
 | `photos` | One row per photo slot in the markup. Changing the picture is an edit; removing the slot is not. |
 

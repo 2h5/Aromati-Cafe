@@ -282,37 +282,25 @@ create trigger hours_exceptions_touch
 
 
 -- ----------------------------------------------------------------------------
--- 5. menu_pages — food, drinks, wine
+-- 5. menu_courses
 --
--- A fixed set of three. The editor does not create or delete these: a fourth
--- menu page would need a fourth .html file, which is a developer change.
--- Enforced by granting update but not insert or delete (see the policies).
--- ----------------------------------------------------------------------------
-
-create table public.menu_pages (
-  id         uuid primary key default gen_random_uuid(),
-  slug       text not null unique check (slug in ('food', 'drinks', 'wine')),
-  title      text not null check (length(btrim(title)) > 0),
-  lede       text,
-  sort_order integer not null default 0,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-create trigger menu_pages_touch
-  before update on public.menu_pages
-  for each row execute function public.touch_updated_at();
-
-
--- ----------------------------------------------------------------------------
--- 6. menu_courses
+-- There is no menu_pages table, deliberately. One was drafted, with title and
+-- lede columns, before anyone checked what site_copy already held — which is
+-- food.headline ("The Food Menu"), food.lede, and the same pair for drinks and
+-- wine. Two tables owning one string is a bug waiting for them to disagree, and
+-- site_copy is the better owner: those strings are already reachable from the
+-- same editor panel as every other headline on the site.
+--
+-- What was left of menu_pages after removing them was a slug and a sort order,
+-- which is a column, not a table. Same reasoning that dropped faq.footButton
+-- from the copy set in Phase 1.
 --
 -- Three distinct strings per course, all editable, all different in the real
 -- data: course_key is the filter key ("mains"), tab_label is the tab caption
 -- ("Khachapuri & Breads") and heading is the visible <h2> ("Main Georgian
 -- Dishes"). They are not derivable from each other.
 --
--- UNIQUE (page_id, course_key) is NOT valid — the food page has two sections
+-- UNIQUE (page, course_key) is NOT valid — the food page has two sections
 -- keyed "breakfast". The surrogate id is the only key; course_key is data.
 --
 -- sizes is the per-course column header, e.g. ARRAY['Small','Large']. NULL
@@ -325,7 +313,7 @@ create trigger menu_pages_touch
 
 create table public.menu_courses (
   id         uuid primary key default gen_random_uuid(),
-  page_id    uuid not null references public.menu_pages (id) on delete cascade,
+  page       text not null check (page in ('food', 'drinks', 'wine')),
   course_key text not null check (course_key ~ '^[a-z][a-z0-9-]*$'),
   tab_label  text not null check (length(btrim(tab_label)) > 0),
   heading    text not null check (length(btrim(heading))   > 0),
@@ -355,7 +343,7 @@ create table public.menu_courses (
     check (is_static = false or length(btrim(coalesce(static_id, ''))) > 0)
 );
 
-create index menu_courses_page_idx on public.menu_courses (page_id, sort_order, id);
+create index menu_courses_page_idx on public.menu_courses (page, sort_order, id);
 
 create trigger menu_courses_touch
   before update on public.menu_courses
@@ -363,7 +351,7 @@ create trigger menu_courses_touch
 
 
 -- ----------------------------------------------------------------------------
--- 7. menu_items
+-- 6. menu_items
 --
 -- Four mutually exclusive price shapes, one row per item:
 --
@@ -476,7 +464,7 @@ create trigger menu_items_prices_align
 
 
 -- ----------------------------------------------------------------------------
--- 8. menu_item_pours — the "Bottle $60" lines
+-- 7. menu_item_pours — the "Bottle $60" lines
 --
 -- A supplementary price alongside the item's own, 0..n per item. Its own table
 -- rather than a jsonb column because they are ordered, individually editable,
@@ -501,7 +489,7 @@ create trigger menu_item_pours_touch
 
 
 -- ----------------------------------------------------------------------------
--- 9. menu_item_options — the crêpe toppings
+-- 8. menu_item_options — the crêpe toppings
 --
 -- Modelled so Phase 1's data has somewhere to live and nothing is lost on the
 -- way into the database. NOT exposed in the editor's first pass: the toppings
@@ -527,7 +515,7 @@ create trigger menu_item_options_touch
 
 
 -- ----------------------------------------------------------------------------
--- 10. faq_entries
+-- 9. faq_entries
 --
 -- The table is created; no rows are seeded. faq.html currently opens with a
 -- notice saying its 18 questions are placeholder copy and asking the owner
@@ -558,7 +546,7 @@ create trigger faq_entries_touch
 
 
 -- ----------------------------------------------------------------------------
--- 11. site_copy — the 62 editable strings
+-- 10. site_copy — the 62 editable strings
 --
 -- One row per [data-copy] hook in the markup. The set of slots is defined by
 -- the site, not by the owner: adding one means adding markup to render it,
@@ -614,7 +602,7 @@ create trigger site_copy_value_only
 
 
 -- ----------------------------------------------------------------------------
--- 12. photos
+-- 11. photos
 --
 -- Keyed by slot — the position in the site that shows the photo — for the same
 -- reason site_copy is keyed by hook: the set of places a photo can go is the
@@ -677,7 +665,6 @@ create trigger photos_touch
 alter table public.site_settings      enable row level security;
 alter table public.business_hours     enable row level security;
 alter table public.hours_exceptions   enable row level security;
-alter table public.menu_pages         enable row level security;
 alter table public.menu_courses       enable row level security;
 alter table public.menu_items         enable row level security;
 alter table public.menu_item_pours    enable row level security;
@@ -726,18 +713,6 @@ create policy "hours_exceptions owner delete"
   on public.hours_exceptions for delete to authenticated using (public.is_owner());
 
 -- Full CRUD here, unlike business_hours: holidays genuinely come and go.
-
-
--- ---- menu_pages ------------------------------------------------------------
-create policy "menu_pages public read"
-  on public.menu_pages for select to anon, authenticated using (true);
-
-create policy "menu_pages owner update"
-  on public.menu_pages for update to authenticated
-  using (public.is_owner()) with check (public.is_owner());
-
--- No insert or delete: there are three menu pages because there are three
--- .html files. A fourth is a developer change.
 
 
 -- ---- menu_courses ----------------------------------------------------------
@@ -857,7 +832,7 @@ create policy "photos owner update"
 
 grant select on
   public.site_settings, public.business_hours, public.hours_exceptions,
-  public.menu_pages, public.menu_courses, public.menu_items,
+  public.menu_courses, public.menu_items,
   public.menu_item_pours, public.menu_item_options,
   public.faq_entries, public.site_copy, public.photos
   to anon, authenticated;
@@ -870,7 +845,7 @@ grant insert, update, delete on
 
 -- Tables whose row set is fixed: values change, rows do not
 grant update on
-  public.site_settings, public.business_hours, public.menu_pages,
+  public.site_settings, public.business_hours,
   public.site_copy, public.photos
   to authenticated;
 
