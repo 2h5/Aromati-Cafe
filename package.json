@@ -19,9 +19,9 @@
     "check:memory": "node tools/check-memory.mjs",
     "extract": "node tools/extract-menus.mjs && node tools/extract-copy.mjs",
     "gen:seed": "node tools/gen-seed-sql.mjs",
-    "check:layout": "node tools/measure-masthead.mjs"
+    "check:layout": "node tools/measure-font-shift.mjs",
+    "fetch:fonts": "node tools/fetch-fonts.mjs"
   },
-
   "devDependencies": {
     "jsdom": "^29.1.1",
     "vite": "^5.4.11"

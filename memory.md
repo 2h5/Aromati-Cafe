@@ -168,11 +168,13 @@ reasoning that dropped `faq.footButton` from the copy set in Phase 1.
   the site saying one thing and the database seeding another.
 - `tools/check-memory.mjs` — this file still points at reality. See *Keeping it
   honest* at the top.
-- `tools/measure-masthead.mjs` — the one harness that drives a real browser.
-  Headless Chrome, measuring the masthead before and after the webfonts land,
-  on the shipped copy and on deliberately longer copy. Skips cleanly where
+- `tools/measure-font-shift.mjs` (`npm run check:layout`) — the one harness
+  that drives a real browser. Headless Chrome, measuring the nav and the
+  masthead before and after `document.fonts.ready`, on all five pages, twice
+  each: as shipped and with deliberately longer copy standing in for what the
+  owner will type. Fails if anything moves by half a pixel. Skips cleanly where
   there is no Chrome. jsdom cannot answer anything about layout, which is why
-  every visual regression so far has been found by eye. See open item 00.
+  every visual regression so far had to be found by eye first.
 
 ### Delivery links (DoorDash, Grubhub)
 
@@ -892,6 +894,34 @@ bucket, and it must run *after* a successful save, never speculatively.
 
 *(Append here as decisions land. Format: date — decision — why.)*
 
+- **2026-08-01** — **The webfonts are self-hosted** (`assets/fonts/`, fetched by
+  `tools/fetch-fonts.mjs`, preloaded in every page's head). Loaded from Google
+  they arrive *after* the first paint, so every page was laid out twice: the nav
+  wordmark measured 121.91px in the fallback and 119.08px after, and on the menu
+  pages a re-wrapped lede moved the masthead's bottom edge — a hard colour seam
+  across the page — by 31.5px.
+
+  What was tried first and is *not* enough: the metric-matched fallback faces
+  already in `styles.css` took the nav from ~12px of movement down to 2.83px,
+  and `ch` → `em` on the masthead measures fixed the seam for the copy that
+  ships. Neither reaches zero. `size-adjust` is one ratio for a whole face while
+  individual letters differ, so a long headline still broke in a different place
+  — measured at **97.9px** of movement with owner-length copy. There is no
+  tuning that fixes the general case; the swap itself has to go.
+
+  Trade-off taken: ~312 kB of woff2 in the repo and a step to re-run if the font
+  stack changes, in exchange for no swap at all and one less third-party origin.
+  `display=optional` was the alternative and was rejected: it also holds still,
+  but a first-ever visit then renders in Georgia rather than Fraunces, and the
+  serif *is* the identity of this site. Self-hosting keeps Fraunces on the first
+  paint. It also matches what the project already does — `admin.html` loads the
+  Supabase SDK from `vendor/`, never a CDN; the fonts were the last exception —
+  and it removes two origins from the CSP that Phase 0 still owes.
+
+  Both families are SIL Open Font License, which permits this; the licences sit
+  beside the files. `npm run check:layout` fails if anything moves again, and
+  was confirmed to fail by putting one page back on Google.
+
 - **2026-08-01** — Build Your Own Breakfast stays hardcoded. The owner has not
   asked for it, and it is a bespoke content type whose editor would cost as
   much as a menu page.
@@ -937,37 +967,6 @@ bucket, and it must run *after* a successful save, never speculatively.
 ---
 
 ## What's still open / needs input
-
-00. ⚠️ **How the webfonts load — decided by a person, then made fatal.**
-   The masthead's bottom edge is a hard colour seam across the page, and it
-   moves when the webfonts swap in and re-wrap the text above it. Measured, in
-   Chrome, by `tools/measure-masthead.mjs`:
-
-   | copy | `display=swap` (today) | `display=optional` |
-   |---|---|---|
-   | as shipped | 558.03 → 558.03px, still | still |
-   | a long headline + lede | 816.84 → **718.94px**, 97.9px jump | 816.84 → 816.84px, still |
-
-   The `ch` → `em` conversion on `.mhead__title` / `.mhead__lede` fixed the
-   shipped copy: `ch` is the width of the font's "0" and the metric-matched
-   fallbacks do not equalise it, so the lede's box was 8% narrower before the
-   swap and wrapped to an extra line. **That fix cannot cover owner-typed
-   copy** — size-adjust is one ratio per face, so individual letters still
-   differ and a long line still breaks in a different place.
-
-   `min-height` is not a cushion and never was: at a 900px window it resolves
-   to 515px against content needing 558px, so the masthead is sized by what is
-   written in it. That is the ordinary case on a laptop.
-
-   `display=optional` fixes it completely and permanently, at a real cost: a
-   first-ever visit renders in the metric-matched fallback (Georgia / Segoe UI)
-   rather than Fraunces / Manrope, with the real fonts from the next navigation
-   on. Self-hosting with a preload is the other way and keeps Fraunces on first
-   paint, but is more work and still swaps on a slow connection.
-
-   **Until this is answered the stress case is a warning, not a failure**, via
-   `STRESS_IS_FATAL` in the tool. Flip it to `true` as soon as it is decided —
-   whichever way it goes. A warning nobody has to act on stops being read.
 
 0. **Headline length caps are provisional.** `tools/copy-labels.mjs` sets
    `maxLength` on the ten `data-split` headlines — 72 for the home page's h2s,
