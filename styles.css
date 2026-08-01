@@ -1330,13 +1330,33 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
 }
 .mhead .section-head{ padding-inline:0; margin-bottom:clamp(18px,2.4vw,30px); }
 .mhead .section-head__no{ color:var(--gold); }
+/* The two measures below are in em, not ch, and that is load-bearing.
+
+   `ch` is the advance width of that font's "0", and the metric-matched
+   fallbacks above do not equalise it — size-adjust is one ratio for the whole
+   face, while "0" sits somewhere different in Georgia than in Fraunces. So a
+   ch measure is a different number of pixels before and after the webfonts
+   land: this lede's box was 557.78px on the fallback and 602.91px after the
+   swap, 8% wider, which re-wrapped three lines into two and moved the bottom
+   edge of the masthead 31.5px. That edge is a hard colour seam across the
+   whole page, so it read as the page glitching on every reload.
+
+   In em the box is the same width in both states, so the swap cannot change
+   where the text breaks. The values are the ch measures as they rendered in
+   the real fonts, so the line lengths are unchanged. Measured, not guessed —
+   see tools/measure-masthead.mjs, which fails if this edge ever moves again.
+
+   The rest of the stylesheet still uses ch in places. Those sit lower down the
+   page with no seam under them, and are left alone deliberately: converting
+   them all would re-break every line in the site to fix something nobody can
+   see. Any ch measure that ends up above the fold needs this treatment. */
 .mhead__title{
   font-family:var(--serif); font-weight:400;
   font-size:clamp(42px,6.4vw,96px); line-height:1.02; letter-spacing:-.015em;
-  max-width:16ch;
+  max-width:9.5em;      /* was 16ch */
 }
 .mhead__lede{
-  margin-top:clamp(18px,2.2vw,26px); max-width:58ch;
+  margin-top:clamp(18px,2.2vw,26px); max-width:34.45em;   /* was 58ch */
   font-size:clamp(15px,1.2vw,17.5px); font-weight:300; line-height:1.8;
   /* The muting is in the colour, deliberately, not in opacity: this element is
      also a .reveal, and an opacity here would out-cascade .reveal{opacity:0}

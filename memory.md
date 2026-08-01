@@ -140,9 +140,9 @@ string is a bug waiting for them to disagree. What was left after removing them
 was a slug and a sort order, which is a column on `menu_courses`. Same
 reasoning that dropped `faq.footButton` from the copy set in Phase 1.
 
-### The nine harnesses, and what each is for
+### The ten harnesses, and what each is for
 
-`npm test` runs all nine.
+`npm test` runs all ten.
 
 - `tools/verify-phase1.mjs` — all five pages, whole-body, running the real
   renderer, diffed against `53b3d5e` (pre-conversion). Proves nothing changed.
@@ -168,6 +168,11 @@ reasoning that dropped `faq.footButton` from the copy set in Phase 1.
   the site saying one thing and the database seeding another.
 - `tools/check-memory.mjs` — this file still points at reality. See *Keeping it
   honest* at the top.
+- `tools/measure-masthead.mjs` — the one harness that drives a real browser.
+  Headless Chrome, measuring the masthead before and after the webfonts land,
+  on the shipped copy and on deliberately longer copy. Skips cleanly where
+  there is no Chrome. jsdom cannot answer anything about layout, which is why
+  every visual regression so far has been found by eye. See open item 00.
 
 ### Delivery links (DoorDash, Grubhub)
 
@@ -932,6 +937,37 @@ bucket, and it must run *after* a successful save, never speculatively.
 ---
 
 ## What's still open / needs input
+
+00. ⚠️ **How the webfonts load — decided by a person, then made fatal.**
+   The masthead's bottom edge is a hard colour seam across the page, and it
+   moves when the webfonts swap in and re-wrap the text above it. Measured, in
+   Chrome, by `tools/measure-masthead.mjs`:
+
+   | copy | `display=swap` (today) | `display=optional` |
+   |---|---|---|
+   | as shipped | 558.03 → 558.03px, still | still |
+   | a long headline + lede | 816.84 → **718.94px**, 97.9px jump | 816.84 → 816.84px, still |
+
+   The `ch` → `em` conversion on `.mhead__title` / `.mhead__lede` fixed the
+   shipped copy: `ch` is the width of the font's "0" and the metric-matched
+   fallbacks do not equalise it, so the lede's box was 8% narrower before the
+   swap and wrapped to an extra line. **That fix cannot cover owner-typed
+   copy** — size-adjust is one ratio per face, so individual letters still
+   differ and a long line still breaks in a different place.
+
+   `min-height` is not a cushion and never was: at a 900px window it resolves
+   to 515px against content needing 558px, so the masthead is sized by what is
+   written in it. That is the ordinary case on a laptop.
+
+   `display=optional` fixes it completely and permanently, at a real cost: a
+   first-ever visit renders in the metric-matched fallback (Georgia / Segoe UI)
+   rather than Fraunces / Manrope, with the real fonts from the next navigation
+   on. Self-hosting with a preload is the other way and keeps Fraunces on first
+   paint, but is more work and still swaps on a slow connection.
+
+   **Until this is answered the stress case is a warning, not a failure**, via
+   `STRESS_IS_FATAL` in the tool. Flip it to `true` as soon as it is decided —
+   whichever way it goes. A warning nobody has to act on stops being read.
 
 0. **Headline length caps are provisional.** `tools/copy-labels.mjs` sets
    `maxLength` on the ten `data-split` headlines — 72 for the home page's h2s,
