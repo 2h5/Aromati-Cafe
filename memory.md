@@ -204,9 +204,9 @@ string is a bug waiting for them to disagree. What was left after removing them
 was a slug and a sort order, which is a column on `menu_courses`. Same
 reasoning that dropped `faq.footButton` from the copy set in Phase 1.
 
-### The seventeen harnesses, and what each is for
+### The eighteen harnesses, and what each is for
 
-`npm test` runs all seventeen. The two font ones run **first**: they are the
+`npm test` runs all eighteen. The two font ones run **first**: they are the
 fastest, and they guard the thing that has broken most often.
 
 - `tools/check-fonts.mjs` — the font-loading invariants, statically. Cannot
@@ -252,6 +252,22 @@ fastest, and they guard the thing that has broken most often.
 - `gen-seed-sql.mjs --check` — the committed seed migration still matches the
   seed data. Editing `seed-copy.js` and forgetting to regenerate would leave
   the site saying one thing and the database seeding another.
+- `tools/test-replay.mjs` (`npm run test:replay`) — **the second harness that
+  drives a real browser.** Loads a menu page with `fetch` stubbed to return a
+  menu that differs from the seed, and checks the rebuild leaves nothing
+  behind: one scroll spacer rather than one per `initMenu` run, a tab bar
+  rebuilt rather than appended to, Build Your Own still present, and the
+  expandable row still opening on one click. Every one of those failures is
+  silent — none of them throws, they surface much later as a menu that scrolls
+  oddly or a button that does nothing.
+
+  **The stub answers after 300ms, and that delay is load-bearing.** An
+  immediately-resolved promise settles in the microtask checkpoint *between*
+  the `render.js` and `script.js` tags, so the board is already fresh before
+  `script.js` registers its listener — `initMenu` then runs once against the
+  new board and every check passes without the replay path ever executing.
+  Harmless in production, useless in a test. Mutation-tested: disabling the
+  teardown gives two spacers, and dropping the rebind stops the row opening.
 - `tools/check-csp.mjs` (`npm run check:csp`) — the Content-Security-Policy in
   `_headers`, checked against the site it protects. A CSP is the one control
   whose failure mode is the *site* breaking, quietly, and only in production:
@@ -764,8 +780,11 @@ it is exactly what happens if the database is ever unpaid or deleted.
 
 **Done when:** the site renders correctly with the network killed, with
 `localStorage` cleared, and with a deliberately broken Supabase URL. All three
-are covered by `npm run test:live`; the replay itself still needs the browser
-pass, since jsdom cannot run the choreography.
+are covered by `npm run test:live`, and the replay itself by
+`npm run test:replay`, which drives real Chrome. What is still **not** covered
+is whether the replayed cascade *looks* right — that it does not double-animate
+and does not lose scroll position. Chrome can prove nothing leaked; it cannot
+say the motion reads well. That stays on the browser pass.
 
 **Item 2 of *What's still open* is now the live risk** — from here the database
 is the source of truth, and nothing yet writes values back into the markup.
