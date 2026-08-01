@@ -6,6 +6,24 @@
   "use strict";
   var prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+  /* ── one block failing must not take the rest down ──
+     Everything below shares one closure, so an exception anywhere used to kill
+     every block after it: a bad hours value would silently cost the visitor the
+     mobile menu and the back-to-top button, with nothing on screen to say why.
+
+     From Phase 4 the content arrives from a database and can be malformed in
+     ways no amount of care here prevents, which is what makes this worth the
+     indirection. Same shape as render.js's step().
+
+     Only the self-contained blocks are wrapped — the ones that were already
+     IIFEs. The rest declare names their neighbours close over (splitWords,
+     lockNav, isInnerPage, MENU_T), and a try/catch cannot be put around a
+     declaration without hiding it from everything that reads it. */
+  function boot(name, fn) {
+    try { fn(); }
+    catch (err) { if (window.console) console.error("script: " + name + " failed", err); }
+  }
+
   /* ── smooth scrolling ────────────────────────── */
   var lenis = null;
   if (!prefersReduced) {
@@ -85,7 +103,7 @@
      it to the observer would fire it in the first frame and break the run. */
   var MENU_T = { eyebrow: 0, title: 110, lede: 250, switcher: 380, tabs: 510, board: 640 };
 
-  (function playEntrance() {
+  boot("entrance", function () {
     var n = document.getElementById("nav");
     var stage = document.querySelector(".hero") || document.querySelector(".mhead");
     var t = document.querySelector(".hero__title") || (stage && stage.querySelector("[data-split]"));
@@ -123,7 +141,7 @@
     // on the home page the title's last letter finishes rising at ~.32s + 1.1s
     // menu pages: the bar is already there, see .page-menu .nav
     if (n && !isInnerPage) setTimeout(function () { n.classList.add("in"); }, prefersReduced ? 0 : 420);
-  })();
+  });
 
   /* ── nav: scrolled state + hide on scroll down ── */
   // A block opening or closing lower down the page changes the document height,
@@ -214,7 +232,7 @@
      Hover is a convenience for pointers; click and keyboard are the real
      controls, so the panel is reachable on touch and by tabbing. It closes on
      Escape, on an outside click, and whenever the nav hides itself on scroll. */
-  (function menusDropdown() {
+  boot("menus dropdown", function () {
     var drop = document.getElementById("navdrop");
     var btn = document.getElementById("menusBtn");
     if (!drop || !btn) return;
@@ -247,7 +265,7 @@
     window.addEventListener("scroll", function () {
       if (drop.classList.contains("is-open") && nav.classList.contains("hidden")) open(false);
     }, { passive: true });
-  })();
+  });
 
   /* ── intersection reveals ───────────────────── */
   var io = new IntersectionObserver(function (entries) {
@@ -365,7 +383,7 @@
   /* ═══════════ KITCHEN ═══════════ */
 
   /* ── plates in the reel uncover left-to-right as the reel arrives ── */
-  (function revealReel() {
+  boot("reel", function () {
     var reel = document.querySelector("[data-reel]");
     if (!reel) return;
     var plates = Array.prototype.slice.call(reel.querySelectorAll(".plate"));
@@ -382,7 +400,7 @@
       });
     }, { threshold: 0.12 });
     reelIO.observe(reel);
-  })();
+  });
 
   /* ── menus: courses cascade in, tabs re-cascade what's left ──
      The food carte and the wine list are the same machine twice over, so
@@ -628,7 +646,7 @@
   });
 
   /* ── build your own breakfast ── */
-  (function buildYourOwn() {
+  boot("build your own", function () {
     var build = document.getElementById("build");
     if (!build) return;
     var linesEl = document.getElementById("buildLines");
@@ -726,12 +744,12 @@
     }
 
     render(false);
-  })();
+  });
 
   /* ── book a table: placeholder until reservations are wired up ──
      The button is deliberately inert. This is a demo build, so the note says
      so plainly rather than pretending to be real copy. */
-  (function () {
+  boot("book a table", function () {
     var btn = document.getElementById("bookBtn");
     var note = document.getElementById("bookNote");
     if (!btn || !note) return;
@@ -741,12 +759,12 @@
       note.textContent = "Placeholder. The booking form would open here.";
       note.classList.add("is-on");
     });
-  })();
+  });
 
   /* ── hours: open / closed, in New York time ───
      The café keeps New York hours no matter where the page is read from,
      so the clock is read in that timezone rather than the visitor's. */
-  (function () {
+  boot("hours", function () {
     var status = document.getElementById("hoursStatus");
     var list = document.getElementById("hoursList");
     if (!status && !list) return;
@@ -837,7 +855,7 @@
 
     render();
     setInterval(render, 60000);
-  })();
+  });
 
   /* ── back to top ────────────────────────────
      Appears once the opening stage — the hero here, a masthead on the inner
@@ -848,7 +866,7 @@
      The scroll goes through Lenis where Lenis is running: a native smooth
      scrollTo would race the rAF loop, and the two would fight over the same
      scrollTop the whole way up. */
-  (function setupToTop() {
+  boot("back to top", function () {
     var btn = document.getElementById("toTop");
     var top = document.querySelector(".hero, .mhead");
     if (!btn || !top) return;
@@ -886,7 +904,7 @@
     new IntersectionObserver(function (entries) {
       show(!entries[entries.length - 1].isIntersecting);
     }, { threshold: 0 }).observe(top);
-  })();
+  });
 
   /* ── footer year ────────────────────────────── */
   var yr = document.getElementById("year");
