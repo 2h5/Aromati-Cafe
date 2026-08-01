@@ -223,6 +223,14 @@ Phase 4** — see *What's still open*, item 2.
 entrance cascade, the tab filter's height-lock and scroll correction, and
 Build Your Own.
 
+Chrome *is* available on this machine and `npm run check:layout` drives it, so
+"needs a browser" no longer means "needs a person". It measures — it can prove
+nothing moved between two paints. It cannot tell whether a layout looks right,
+whether an animation reads well, or whether a column break landed somewhere
+sensible. Everything below needs eyes, not measurements; if something below
+turns out to be measurable, move it into that harness rather than re-checking
+it by hand every time.
+
 One choreography bug is fixed but unverified: a course still on screen when a
 filter ran kept its `.in`, so removing the class started it fading *out* and
 re-adding it two frames later caught it before it had moved — the cascade
