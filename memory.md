@@ -185,6 +185,22 @@ the `.is-swapping` cover) in `commit()`. It predates the phases — the block is
 unchanged since the initial commit. Nothing automated covers it; the browser
 pass is the test.
 
+**The boards are a two-column flow, not a two-column grid** (`columns:2` on
+`.carte__body`). A grid gives every row the height of its tallest course, so a
+short course beside a long one left the difference as dead space — visible on
+the wine list, where a four-item course sat beside a ten-item one. That is what
+a grid does, and it was only going to get worse: once the owner is editing,
+course lengths vary far more than the ones written here, and no amount of
+reordering fixes a layout that pairs courses by row. The browser now balances
+the columns itself. `.course` carries `break-inside:avoid` (a heading in one
+column and its lines in the next is worse than any gap) and a `margin-bottom`
+where the grid had a `row-gap`. Build Your Own uses `column-span:all`, which
+also splits the flow so the courses above and below it balance separately —
+the same runs the old `balance()` computed by hand. `balance()` now only
+handles the one case the browser cannot: a single course, which would sit in
+column one with column two empty, so the board goes `.is-single` and takes the
+full width. `.course.is-alone` is gone. Also unverified — same browser pass.
+
 Remaining in Phase 1: the nav/mobile-menu/footer **markup** dedupe — deferred
 because the chrome is more per-page bespoke than assumed (index has four footer
 columns, faq five, the menu pages a `footer--menu` variant), and the *values*
@@ -230,7 +246,7 @@ today, and it must keep working if the database is down, deleted or unpaid.
 
 ### Explicitly out of scope — do not build, do not break
 
-- **Build Your Own Breakfast** (`#build`, [script.js:663](script.js#L663)).
+- **Build Your Own Breakfast** (`#build`, [script.js:656](script.js#L656)).
   Stays hardcoded exactly as it is. Its chips carry `data-price` / `data-name`
   and it has its own bagel sub-field and hint map; making it editable is a
   content type of its own and the owner has not asked for it. **The Phase 1
@@ -238,7 +254,7 @@ today, and it must keep working if the database is down, deleted or unpaid.
 - **The crêpe options row** (`.mi--opts`, `#crepeOpts`) — see Constraints. It
   is modelled in the schema so it survives the conversion, but the editor does
   not expose it in the first pass.
-- **Reservations.** [script.js:764](script.js#L764) is a deliberate placeholder.
+- **Reservations.** [script.js:757](script.js#L757) is a deliberate placeholder.
   Leave it.
 - **The `MARKS`-style annotation system** — Aromati has no equivalent. N/A.
 - **Studio credit strip.** Hardcoded, ours, not the owner's to edit.
@@ -304,7 +320,7 @@ today, and it must keep working if the database is down, deleted or unpaid.
   reveal observers, the parallax and the menu tab cascade all need real DOM to
   exist before they run.
 - **The menu tab cascade must be replayable.** [script.js:405](script.js#L405)
-  through [script.js:646](script.js#L646) handles filtering, height-locking and
+  through [script.js:639](script.js#L639) handles filtering, height-locking and
   scroll-position correction, and it is written around a masthead that is
   mid-entrance. When fresh data replaces the rendered menu, the cascade has to
   re-run against the new DOM without double-animating or losing scroll
@@ -342,7 +358,7 @@ was taken at plan time and the site may have moved.
 ### Hours — 5 places, not 3
 
 1. **The live open/closed pill** — ~~`script.js:755–756`~~ **done**, now
-   [script.js:792](script.js#L792) reading `SEED_HOURS`. What was there:
+   [script.js:785](script.js#L785) reading `SEED_HOURS`. What was there:
    ```js
    var OPEN  = 7 * 60;                          // 7:00 am, every day
    var CLOSE = [22, 22, 22, 23, 23, 23, 23];    // by day, Sun → Sat
@@ -476,7 +492,7 @@ from them.
 5. Dedupe the nav / mobile menu / footer chrome while it is being generated
    anyway — this is where the 11-edits-to-change-the-hours problem dies.
 6. Re-run every consumer of the old hardcoded values: the hours logic
-   ([script.js:792](script.js#L792)) reads `SEED_HOURS` and learns to handle
+   ([script.js:785](script.js#L785)) reads `SEED_HOURS` and learns to handle
    closed days; the JSON-LD is generated; both prose formats are generated.
 7. Error-guard every init block.
 

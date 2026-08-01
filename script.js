@@ -493,24 +493,17 @@
       }
     }
 
-    /* A course that ends up alone on its row spans the full width and centers,
-       so a filter down to one course doesn't leave a dead right column.
-       Full-width blocks (the builder) break the pairing, so courses either
-       side of one are counted as separate runs — which is what the grid does. */
+    /* The board is a two-column flow, so the browser does the balancing — the
+       only case it cannot help with is one course, which would sit in the first
+       column with the second left empty. Full-width blocks (the builder) are
+       not a column's worth of content and don't count towards the pair. */
     function balance() {
-      var run = [];
-      function flush() {
-        run.forEach(function (c, i) {
-          c.classList.toggle("is-alone", run.length % 2 === 1 && i === run.length - 1);
-        });
-        run = [];
-      }
+      var n = 0;
       courses.forEach(function (c) {
-        if (c.classList.contains("is-hidden")) return;
-        if (c.hasAttribute("data-full")) { c.classList.remove("is-alone"); flush(); return; }
-        run.push(c);
+        if (c.classList.contains("is-hidden") || c.hasAttribute("data-full")) return;
+        n++;
       });
-      flush();
+      menuBody.classList.toggle("is-single", n <= 1);
     }
 
     /* On a menu page the board sits under a masthead that is mid-entrance, and

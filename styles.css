@@ -836,11 +836,16 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
 .ctab.is-on::before{ transform:scale(1); opacity:1; }
 .ctab:focus-visible{ outline:2px solid var(--gold); outline-offset:3px; }
 
-/* the courses themselves */
+/* the courses themselves — two balanced columns, not a two-column grid.
+   A grid gives every row the height of its tallest course, so a six-item
+   course beside a three-item one leaves the difference as dead space. That is
+   not a tuning problem, it is what a grid does, and it gets worse the moment
+   the owner starts editing: course lengths will vary far more than the ones
+   written here. Multi-column flows the courses instead and the browser splits
+   them so both columns end at roughly the same height, whatever is in them. */
 .carte__body{
-  display:grid; grid-template-columns:repeat(2,1fr);
-  column-gap:clamp(34px,5vw,88px); row-gap:clamp(44px,5.5vw,76px);
-  align-items:start;
+  columns:2;
+  column-gap:clamp(34px,5vw,88px);
   padding-top:clamp(40px,5vw,66px);
   /* a floor under the shortest course, so filtering barely moves the page */
   min-height:52vh;
@@ -852,16 +857,20 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
    see the swap in script.js */
 .menu-spacer{ height:0; }
 .menu-spacer.is-collapsing{ transition:height .66s var(--ease-exp); }
-.course{ min-width:0; }
-.course--build{ grid-column:1 / -1; }
+/* A course is never split down the column break — its heading in one column
+   and half its lines in the other reads as two broken courses, which is worse
+   than any gap. The gap between courses is a margin here rather than a
+   row-gap, because in a flow there are no rows to space out. */
+.course{ min-width:0; break-inside:avoid; margin-bottom:clamp(44px,5.5vw,76px); }
+/* Build Your Own runs the full width and splits the flow in two: the courses
+   above it balance between themselves, and so do the ones below. */
+.course--build{ column-span:all; }
 .course.is-hidden{ display:none; }
-/* a course with no partner on its row takes the full row and centers, so
-   filtering down to one never leaves a dead column beside it */
-.course.is-alone{
-  grid-column:1 / -1;
-  width:min(100%, 640px); margin-inline:auto;
-}
-.course.is-alone .mi__desc{ padding-right:0; }
+/* One course has nothing to balance against, so it would sit in the first
+   column with the second left empty. Give it the whole width instead —
+   set by the filter, see balance() in script.js. */
+.carte__body.is-single{ columns:1; width:min(100%, 640px); margin-inline:auto; }
+.carte__body.is-single .mi__desc{ padding-right:0; }
 .course__head{
   display:flex; align-items:baseline; gap:16px;
   padding-bottom:14px; margin-bottom:clamp(18px,2vw,26px);
@@ -1753,8 +1762,8 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
   .visit__inner{ max-width:640px; }
   .kitchen__intro h2{ grid-column:1/-1; max-width:none; }
   .kitchen__lede{ grid-column:1/-1; padding-bottom:0; max-width:62ch; }
-  .carte__body{ grid-template-columns:1fr; }
-  .course.is-alone{ width:auto; margin-inline:0; } /* single column already */
+  .carte__body{ columns:1; }
+  .carte__body.is-single{ width:auto; margin-inline:0; } /* single column already */
   .taste__list{ grid-template-columns:repeat(2,1fr); }
   .mhead__title{ max-width:none; }
   .build{ grid-template-columns:1fr; }
