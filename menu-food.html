@@ -137,6 +137,18 @@
         <a href="menu-drinks.html">Drinks</a>
         <a href="menu-wine.html">Wine</a>
       </nav>
+      <!-- Delivery, on the pages where someone is already reading a menu.
+           Same contract as the Visit row on the home page: the hrefs come from
+           seed-settings.js, they are written out here so the links work with no
+           JavaScript, and emptying a URL in the data removes the link. The
+           "reveal" class needs a matching entry in MENU_T in script.js — the
+           masthead runs on its own clock and the observer deliberately skips
+           it, so an unregistered .reveal in here never becomes visible. -->
+      <p class="morder reveal" data-order-group>
+        <span class="morder__label">Order delivery</span>
+        <a class="morder__link" data-order="doordash" href="https://www.doordash.com/store/aromati-caf%C3%A9-&amp;-wine-bar-103-e-34th-st-new-york-40842579/97188347/" target="_blank" rel="noopener">DoorDash <span class="order__go" aria-hidden="true">↗</span></a>
+        <a class="morder__link" data-order="grubhub" href="https://www.grubhub.com/restaurant/aromati-103-east-34th-street-new-york/13363936" target="_blank" rel="noopener">Grubhub <span class="order__go" aria-hidden="true">↗</span></a>
+      </p>
     </div>
   </header>
 

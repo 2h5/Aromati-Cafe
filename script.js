@@ -101,7 +101,8 @@
      FAQ — and last the courses already on screen. Nothing here is on the
      observer's clock: every one of these is visible at load, so leaving any of
      it to the observer would fire it in the first frame and break the run. */
-  var MENU_T = { eyebrow: 0, title: 110, lede: 250, switcher: 380, tabs: 510, board: 640 };
+  var MENU_T = { eyebrow: 0, title: 110, lede: 250, switcher: 380, order: 450,
+                 tabs: 510, board: 640 };
 
   boot("entrance", function () {
     var n = document.getElementById("nav");
@@ -114,6 +115,10 @@
       [[".mhead .section-head", MENU_T.eyebrow],
        [".mhead__lede", MENU_T.lede],
        [".mswitch", MENU_T.switcher],
+       /* Anything .reveal inside .mhead has to be listed here — the masthead
+          is skipped by the intersection observer on purpose, so a piece that
+          is not on this clock is a piece that never appears. */
+       [".morder", MENU_T.order],
        [".carte__masthead", MENU_T.tabs],
        [".notice", MENU_T.tabs]].forEach(function (pair) {
         var el = document.querySelector(pair[0]);

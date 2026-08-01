@@ -400,7 +400,46 @@
       target.address.addressCountry = addr.country;
     }
     if (target.email) target.email = settings.email;
+    /* sameAs is every other page that is unmistakably this business: the
+       Instagram profile and the delivery listings. Written here rather than
+       left in the markup so it cannot outlive a changed handle or a dropped
+       service — which the hand-written copy already could. */
+    if (target.sameAs) target.sameAs = [igUrl].concat(orderingUrls(settings));
     ld.textContent = JSON.stringify(data, null, 2);
+  }
+
+  /* ── ordering ─────────────────────────────────
+     The delivery links are in the markup already, so a reader with no
+     JavaScript still gets them; this only replaces the href. An empty URL is
+     how the owner says the café has left that service, and the link is taken
+     out of the page — a dead link is worse than no link, and an "Order" label
+     with nothing under it is worse than no label. */
+
+  /* An href is a code sink the way innerHTML is: "javascript:…" in this field
+     would run on click, and from Phase 4 the value arrives from a database an
+     owner can type into. The database refuses to store anything that is not
+     https, and this refuses to render it — neither one is allowed to be the
+     only check, for the same reason the site never trusts a string with
+     markup. Anything else is treated as absent, so the link is removed rather
+     than rendered pointing somewhere unexpected. */
+  var SAFE_URL = /^https:\/\/[^\s]+$/i;
+
+  function orderingUrls(settings) {
+    var links = settings.orderingLinks || {};
+    return Object.keys(links)
+      .map(function (k) { return links[k]; })
+      .filter(function (u) { return SAFE_URL.test(u || ""); });
+  }
+
+  function renderOrdering(settings) {
+    var links = settings.orderingLinks || {};
+    Array.prototype.forEach.call(document.querySelectorAll("[data-order]"), function (a) {
+      var url = links[a.getAttribute("data-order")];
+      if (SAFE_URL.test(url || "")) { a.setAttribute("href", url); return; }
+      var group = a.closest("[data-order-group]");
+      a.parentNode.removeChild(a);
+      if (group && !group.querySelector("[data-order]")) group.parentNode.removeChild(group);
+    });
   }
 
   /* ── section copy ─────────────────────────────
@@ -464,6 +503,7 @@
 
   if (typeof SEED_SETTINGS === "object" && SEED_SETTINGS) {
     step("contact", function () { renderContact(SEED_SETTINGS); });
+    step("ordering", function () { renderOrdering(SEED_SETTINGS); });
   }
 
   if (typeof SEED_HOURS === "object" && SEED_HOURS) {

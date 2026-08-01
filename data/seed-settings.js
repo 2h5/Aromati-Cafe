@@ -18,6 +18,22 @@ var SEED_SETTINGS = {
 
   instagramHandle: "aromatinyc",      // the URL and the "@handle" both derive
 
+  /* Delivery. Whole URLs, not store ids: neither service documents its URL
+     shape, and both of these were copied out of a working address bar, which
+     is a thing the owner can also do. Deriving them would be guessing.
+
+     An empty string means the café is not on that service, and the link is
+     removed from the page rather than left pointing nowhere — the owner will
+     not always be on both, and dropping one should not need a developer.
+
+     The DoorDash link is the one Google handed over, minus its `srsltid`
+     tracking parameter. Its "&" is a literal character in the path, so it is
+     written "&amp;" wherever it appears in markup. */
+  orderingLinks: {
+    doordash: "https://www.doordash.com/store/aromati-caf%C3%A9-&-wine-bar-103-e-34th-st-new-york-40842579/97188347/",
+    grubhub:  "https://www.grubhub.com/restaurant/aromati-103-east-34th-street-new-york/13363936"
+  },
+
   address: {
     street:   "103 E 34th Street",
     locality: "New York",

@@ -25,7 +25,11 @@
   "telephone": "+1-332-207-3847",
   "email": "info@aromatiNY.com",
   "servesCuisine": "Georgian",
-  "sameAs": ["https://www.instagram.com/aromatinyc"],
+  "sameAs": [
+    "https://www.instagram.com/aromatinyc",
+    "https://www.doordash.com/store/aromati-caf%C3%A9-&-wine-bar-103-e-34th-st-new-york-40842579/97188347/",
+    "https://www.grubhub.com/restaurant/aromati-103-east-34th-street-new-york/13363936"
+  ],
   "openingHoursSpecification": [
     { "@type": "OpeningHoursSpecification", "dayOfWeek": ["Sunday","Monday","Tuesday"], "opens": "07:00", "closes": "22:00" },
     { "@type": "OpeningHoursSpecification", "dayOfWeek": ["Wednesday","Thursday","Friday","Saturday"], "opens": "07:00", "closes": "23:00" }
@@ -421,6 +425,19 @@
               <span class="ig__handle">@aromatinyc</span>
               <span class="ig__go" aria-hidden="true">↗</span>
             </a>
+          </li>
+          <!-- Delivery. The hrefs are replaced from seed-settings.js; they are
+               written out here as well so the links work with no JavaScript.
+               Dropping a service is done by emptying its URL in the data, and
+               render.js removes the link — and this row with it if it empties.
+               The "&" in the DoorDash path is a literal character, hence the
+               &amp; here. -->
+          <li class="visit__row visit__row--wide" data-order-group>
+            <span>Order Delivery</span>
+            <div class="order">
+              <a class="order__link" data-order="doordash" href="https://www.doordash.com/store/aromati-caf%C3%A9-&amp;-wine-bar-103-e-34th-st-new-york-40842579/97188347/" target="_blank" rel="noopener">DoorDash <span class="order__go" aria-hidden="true">↗</span></a>
+              <a class="order__link" data-order="grubhub" href="https://www.grubhub.com/restaurant/aromati-103-east-34th-street-new-york/13363936" target="_blank" rel="noopener">Grubhub <span class="order__go" aria-hidden="true">↗</span></a>
+            </div>
           </li>
         </ul>
 

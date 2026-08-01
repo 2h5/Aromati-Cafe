@@ -1349,6 +1349,31 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
   display:flex; flex-wrap:wrap; gap:8px;
   margin-top:clamp(28px,3.6vw,44px);
 }
+
+/* ── delivery, under the menu switcher ───────
+   Deliberately quieter than .mswitch: the switcher moves you around this
+   site, these send you off it. Same row, plain text, no pill. */
+.morder{
+  display:flex; flex-wrap:wrap; align-items:baseline; gap:6px 18px;
+  margin-top:clamp(16px,2vw,22px);
+  font-size:14px; font-weight:300;
+}
+.morder__label{
+  font-size:10px; letter-spacing:.3em; text-transform:uppercase; font-weight:700;
+  color:var(--gold); opacity:.85;
+}
+.morder__link{
+  border-bottom:1px solid rgba(244,237,225,.22); padding-bottom:2px;
+  transition:color .3s var(--ease), border-color .3s var(--ease);
+}
+.morder__link:hover{ color:var(--gold); border-bottom-color:var(--gold); }
+.morder__link:focus-visible{ outline:2px solid var(--gold); outline-offset:3px; }
+
+/* the same pair in the Visit table on the home page, where the row's own
+   label does the work the .morder__label does here */
+.order{ display:flex; flex-wrap:wrap; gap:4px 22px; }
+.order__link{ line-height:1.55; }
+.order__go{ font-size:.82em; opacity:.55; }
 .mswitch a{
   position:relative; isolation:isolate;
   border:1px solid var(--hairline-lt); border-radius:99px;

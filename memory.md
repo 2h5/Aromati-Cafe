@@ -105,7 +105,7 @@ producing a one-page site with no JavaScript at all. See *Deviations*.
 
 Also done — **Phase 2: the schema and its policies, written and checkable**:
 - `supabase/migrations/20260801000000_init_cms.sql` — 12 tables, 34 policies.
-  Seeds the hours and the twelve settings; the menus, copy and photos are left
+  Seeds the hours and the fourteen settings; the menus, copy and photos are left
   for a *generated* migration in Phase 3, because hand-copying 84 items at the
   last moment would reintroduce exactly the risk Phase 1 removed.
 - `supabase/POLICIES.md` — what the SQL allows, in the owner's language. Phase
@@ -140,18 +140,25 @@ string is a bug waiting for them to disagree. What was left after removing them
 was a slug and a sort order, which is a column on `menu_courses`. Same
 reasoning that dropped `faq.footButton` from the copy set in Phase 1.
 
-### The eight harnesses, and what each is for
+### The nine harnesses, and what each is for
 
-`npm test` runs all eight.
+`npm test` runs all nine.
 
 - `tools/verify-phase1.mjs` — all five pages, whole-body, running the real
   renderer, diffed against `53b3d5e` (pre-conversion). Proves nothing changed.
-  `PHASE1_BASE` overrides the comparison commit.
+  `PHASE1_BASE` overrides the comparison commit. Two escape hatches, both of
+  which fail if they stop matching: `INTENDED` for wording deliberately changed
+  since the baseline, `ADDED` for blocks that did not exist then — a text diff
+  compares by position, so an insertion otherwise reports the whole rest of the
+  page as changed. Anchors are compared on their `href` as well as their text.
 - `tools/test-hours.mjs` — run grouping, closed days, the JSON-LD output, and
   the pill at its boundaries.
 - `tools/test-copy.mjs` — the inline vocabulary, what happens to a field the
   data omits, and the property the whole design exists for: owner input is
   text, never markup.
+- `tools/test-ordering.mjs` — the delivery links: clearing a URL removes the
+  link and, when the last one goes, the row around it; and an href that is not
+  `https://` is refused rather than rendered.
 - `tools/test-guards.mjs` — breaks each guarded block in turn and checks the
   last statement in `script.js` still runs.
 - `tools/check-policies.mjs` — the RLS invariants, over the migration text.
@@ -161,6 +168,34 @@ reasoning that dropped `faq.footButton` from the copy set in Phase 1.
   the site saying one thing and the database seeding another.
 - `tools/check-memory.mjs` — this file still points at reality. See *Keeping it
   honest* at the top.
+
+### Delivery links (DoorDash, Grubhub)
+
+Added 2026-08-01, after the owner's listings turned up late. They do **not**
+replace the menu pages — the menus are the reason the site exists — they sit
+beside them: a row in the Visit table on the home page and a quiet line under
+the menu switcher on all three menu pages, which is where someone is already
+reading a menu when the thought occurs.
+
+- **Whole URLs, not store ids.** Neither service documents its URL shape.
+  Both of these were copied out of a working address bar, which the owner can
+  also do; deriving them would be guessing. The DoorDash one is what Google
+  handed over, minus its `srsltid` tracking parameter. Its `&` is a literal
+  character in the path, so it is `&amp;` in markup.
+- **Neither URL has been fetched.** DoorDash returns 403 to everything that is
+  not a browser — including a deliberately wrong slug — so nothing here can
+  tell a good link from a bad one. Click both once.
+- **Empty means gone.** Clearing a URL is how the owner leaves a service:
+  `render.js` removes the link, and the row with it if it empties. The site
+  will outlive at least one of these listings. The `site_settings` empty-value
+  check exempts `order_*_url` for exactly this.
+- **An href is a code sink.** `javascript:…` in that field would run on click,
+  and from Phase 4 the value comes from a database the owner types into. The
+  trigger refuses to store anything but `https://` and `render.js` refuses to
+  render it — deliberately both, the same way nothing is trusted with markup.
+- The delivery pages are also the JSON-LD `sameAs`, written by `renderContact`
+  rather than left in the markup, so it cannot outlive a changed handle or a
+  dropped service. The hand-written copy already could.
 
 The middle three exist because verify-phase1 asserts the output is *unchanged*,
 which is exactly the wrong test for a code path that never existed. The last

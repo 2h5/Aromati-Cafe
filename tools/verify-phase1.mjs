@@ -45,6 +45,25 @@ const INTENDED = [
     why: "renamed on request, 2026-08-01" }
 ];
 
+/* Content added since the baseline, named by selector rather than by the words
+   in it. A text diff compares two lists by position, so an insertion shifts
+   everything after it and reports the whole rest of the page as changed —
+   true, and useless.
+
+   The subtree is cut out of the rendered page before the comparison, which
+   means this check says nothing about it. That is the right split: this check
+   asks "did the conversion change what was already here", and new content was
+   not here. What covers the block instead is KEPT_IN_MARKUP below — the served
+   markup has to already say what the renderer would make it say.
+
+   Like INTENDED, an entry that matches nothing fails. */
+const ADDED = [
+  { page: "index.html",        sel: "[data-order-group]", why: "delivery links, 2026-08-01" },
+  { page: "menu-food.html",    sel: "[data-order-group]", why: "delivery links, 2026-08-01" },
+  { page: "menu-drinks.html",  sel: "[data-order-group]", why: "delivery links, 2026-08-01" },
+  { page: "menu-wine.html",    sel: "[data-order-group]", why: "delivery links, 2026-08-01" }
+];
+
 /* Every readable string inside the board, in order. Currency symbols dropped:
    they are the one thing that legitimately moved from markup to stylesheet. */
 function visibleText(root) {
@@ -89,6 +108,7 @@ function boardOf(html, { render }) {
 
 let failures = 0;
 const usedIntent = new Set();
+const usedAdded = new Set();
 
 for (const page of PAGES) {
   const before = boardOf(
@@ -106,7 +126,15 @@ for (const page of PAGES) {
     usedIntent.add(hit);
     return hit.now;
   });
-  const b = visibleText(after);
+  /* Cut the added blocks out of a copy, so the live tree is left whole for the
+     markup-drift check further down. */
+  const trimmed = after.cloneNode(true);
+  for (const add of ADDED.filter((x) => x.page === page)) {
+    const hits = [...trimmed.querySelectorAll(add.sel)];
+    if (hits.length) usedAdded.add(add);
+    for (const n of hits) n.parentNode.removeChild(n);
+  }
+  const b = visibleText(trimmed);
 
   const diffs = [];
   for (let i = 0; i < Math.max(a.length, b.length); i++) {
@@ -157,15 +185,26 @@ for (const page of PAGES) {
     /* Every section-copy field, for the same reason: the headline in the
        source is what a crawler indexes and what a reader with no JavaScript
        gets, so it has to already say what seed-copy.js says. */
-    "[data-copy]"
+    "[data-copy]",
+    /* The delivery links. Here the href is the whole point — the text says
+       "DoorDash" either way, so comparing only what is readable would prove
+       nothing about the link. See below: anchors are compared on href too. */
+    "[data-order]"
   ];
+
+  /* For a link, the address is as much a fact about the page as the words. A
+     stale tel: or ordering href is invisible on screen and broken to a
+     crawler, which is precisely the drift this section exists to catch. */
+  const factsOf = (n) =>
+    (n.tagName === "A" ? (n.getAttribute("href") || "") + " | " : "") +
+    visibleText(n).join(" ");
 
   const stale = [];
   {
     const raw = boardOf(readFileSync(page, "utf8"), { render: false });
     for (const sel of KEPT_IN_MARKUP) {
-      const was = [...raw.querySelectorAll(sel)].map((n) => visibleText(n).join(" "));
-      const now = [...after.querySelectorAll(sel)].map((n) => visibleText(n).join(" "));
+      const was = [...raw.querySelectorAll(sel)].map(factsOf);
+      const now = [...after.querySelectorAll(sel)].map(factsOf);
       for (let i = 0; i < Math.max(was.length, now.length); i++) {
         if (was[i] !== now[i]) stale.push({ i: sel, markup: was[i], data: now[i] });
       }
@@ -197,6 +236,16 @@ if (dead.length) {
   for (const r of dead) {
     console.log(`        ${r.page}: ${JSON.stringify(r.was)} — ${r.why}`);
     console.log("        the baseline no longer says this; drop the entry");
+  }
+}
+
+const deadAdds = ADDED.filter((r) => !usedAdded.has(r));
+if (deadAdds.length) {
+  failures++;
+  console.log("\nFAIL  an added-content entry matched nothing on the page");
+  for (const r of deadAdds) {
+    console.log(`        ${r.page}: ${r.sel} — ${r.why}`);
+    console.log("        the block is gone; drop the entry, or it hides the next one");
   }
 }
 

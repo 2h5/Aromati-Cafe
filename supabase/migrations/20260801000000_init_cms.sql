@@ -179,6 +179,12 @@ begin
     end if;
   end if;
 
+  -- Delivery links. Loose on purpose: these are whole URLs pasted out of a
+  -- browser, and the only thing worth insisting on is that it is a link.
+  if new.key ~ '^order_[a-z0-9]+_url$' and length(v) > 0 and v !~ '^https://' then
+    raise exception 'An ordering link has to be the whole web address, starting with https:// — paste it from the address bar. To remove the service from the site, clear this field instead.';
+  end if;
+
   if new.key = 'address_region' and v !~ '^[A-Z]{2}$' then
     raise exception 'The state should be its two-letter abbreviation in capitals, for example NY.';
   end if;
@@ -187,7 +193,10 @@ begin
     raise exception 'The ZIP code should be 5 digits, for example 10016.';
   end if;
 
-  if new.is_editable and length(v) = 0 then
+  -- Every editable field appears on a page, so blank means a page with a hole
+  -- in it. The one exception is an ordering link: blank is how the owner says
+  -- the café has left that service, and the site removes the link.
+  if new.is_editable and length(v) = 0 and new.key !~ '^order_[a-z0-9]+_url$' then
     raise exception 'The field "%" cannot be left empty — it appears on every page.', new.label;
   end if;
 
@@ -884,6 +893,9 @@ insert into public.site_settings (key, label, help, value, is_editable, sort_ord
   ('phone_country',    'Country code',      'Digits only. 1 for the United States.',                         '1',                    true,  11),
   ('email',            'Email address',     'Shown in the footer and given to Google.',                      'info@aromatiNY.com',   true,  12),
   ('instagram_handle', 'Instagram handle',  'Without the @. The site builds both the @name and the link.',   'aromatinyc',           true,  13),
+
+  ('order_doordash_url', 'DoorDash link',   'The whole web address of the DoorDash page, pasted from the address bar. Clear this field to take DoorDash off the site.', 'https://www.doordash.com/store/aromati-caf%C3%A9-&-wine-bar-103-e-34th-st-new-york-40842579/97188347/', true, 14),
+  ('order_grubhub_url',  'Grubhub link',    'The whole web address of the Grubhub page, pasted from the address bar. Clear this field to take Grubhub off the site.',   'https://www.grubhub.com/restaurant/aromati-103-east-34th-street-new-york/13363936', true, 15),
 
   ('address_street',   'Street address',    null,                                                            '103 E 34th Street',    true,  20),
   ('address_locality', 'City',              null,                                                            'New York',             true,  21),
