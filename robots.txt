@@ -1,0 +1,16 @@
+# Aromati Café & Wine Bar
+#
+# The menu pages are the reason the site exists — they should be indexed, and
+# their JSON-LD is written for exactly that.
+#
+# admin.html is excluded, and it is worth being clear that this is not a
+# security control. Anyone can read this file, and a crawler that ignores it is
+# not breaking anything. The page is protected by Supabase auth and by row
+# level security; those are what actually hold the door. This line only keeps a
+# client's login form out of search results, where it would attract attention
+# for no benefit. The <meta name="robots"> tag on the page itself is the half
+# that well-behaved crawlers honour more reliably.
+
+User-agent: *
+Allow: /
+Disallow: /admin.html

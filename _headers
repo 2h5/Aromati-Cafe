@@ -1,0 +1,67 @@
+# Cloudflare Pages reads this file and turns it into response headers.
+# It is a plain-text file at the root of what gets uploaded — if the deploy is
+# a drag-and-drop of the site files, THIS FILE HAS TO BE IN THE DRAG. There is
+# no error if it is missing; the headers simply do not appear, and nothing on
+# the site looks any different. Check for it after a deploy.
+#
+# Why a CSP at all: the whole CMS rests on "owner-typed text goes onto the page
+# as text, never as markup" — createElement and textContent, never innerHTML.
+# That rule is enforced by discipline and by tools/test-copy.mjs. This file is
+# the second line: if the rule is ever broken, a CSP turns a stored-XSS breach
+# into a blocked request in the console.
+#
+# It is strict because it can be. The site has no inline scripts, no inline
+# style attributes and no third-party origins — the fonts were the last one and
+# they are self-hosted now. Verified by tools/check-csp.mjs, which fails the
+# build if anything is added that this policy would silently block.
+
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https://yofoiqgknsqzsuwtlqvh.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: geolocation=(), microphone=(), camera=(), payment=(), interest-cohort=()
+
+# Notes on the individual directives, because the next person to change one
+# will want to know what it is holding up:
+#
+#   script-src 'self'      No 'unsafe-inline'. The JSON-LD blocks are
+#                          type="application/ld+json", which browsers never
+#                          execute and CSP therefore does not gate — render.js
+#                          fills them with textContent, which is DOM work and
+#                          not script evaluation. Adding one inline <script>
+#                          anywhere breaks the whole site under this policy.
+#
+#   style-src 'self'       No 'unsafe-inline', which is only safe because
+#                          there are zero style="…" attributes in the markup.
+#                          script.js sets custom properties through
+#                          el.style.setProperty — that is CSSOM and is not
+#                          gated. A style attribute added to any page would be
+#                          silently dropped, which is exactly the kind of
+#                          breakage that gets blamed on CSS.
+#
+#   font-src 'self' data:  The two critical faces are inlined in styles.css as
+#                          data: URIs. Without data: here the site loads in
+#                          Georgia and the nav shifts on every navigation —
+#                          see the section at the top of memory.md.
+#
+#   connect-src            'self' plus exactly one Supabase project. data.js
+#                          talks to /rest/v1/ there and nowhere else. If the
+#                          project ref in config.js ever changes, it has to
+#                          change here too or the site silently stops seeing
+#                          live content and falls back to the seeds — which
+#                          looks like everything working.
+#
+#   frame-ancestors 'none' Nobody may put this site in an iframe.
+
+# The editor page. It holds the owner's session token in localStorage, so an
+# injected script there is worth more to an attacker than one on a menu page.
+# Same policy, minus data: everywhere it is not needed, and no framing at all.
+/admin.html
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob: https://yofoiqgknsqzsuwtlqvh.supabase.co; font-src 'self' data:; connect-src 'self' https://yofoiqgknsqzsuwtlqvh.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'
+  X-Robots-Tag: noindex, nofollow
+  Referrer-Policy: no-referrer
+
+# img-src on the admin page also allows blob: and the Supabase origin, because
+# Phase 6 previews an upload from a blob URL before it exists on the server and
+# shows the stored photo afterwards. Stated here rather than added in a hurry
+# later, when the symptom will be a blank thumbnail and no obvious cause.

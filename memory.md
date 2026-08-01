@@ -58,6 +58,13 @@ Two harnesses guard it, and both run in `npm test`:
 If `check:fonts` fails, read the header of `tools/check-fonts.mjs` before
 changing anything. It lists all four real breaks and what each looked like.
 
+There is now a **third**, independent guard on the same regression, arrived at
+from a different direction: `npm run check:csp` refuses any origin the pages or
+`styles.css` fetch that the Content-Security-Policy does not allow. A Google
+Fonts `<link>` pasted back into a `<head>` fails there too, as a policy
+violation rather than as a font problem — and it fails even if someone has
+"fixed" `check-fonts.mjs` to stop complaining.
+
 ---
 
 **Keeping it honest.** Update this file **in the same commit as the work it
@@ -197,9 +204,9 @@ string is a bug waiting for them to disagree. What was left after removing them
 was a slug and a sort order, which is a column on `menu_courses`. Same
 reasoning that dropped `faq.footButton` from the copy set in Phase 1.
 
-### The sixteen harnesses, and what each is for
+### The seventeen harnesses, and what each is for
 
-`npm test` runs all sixteen. The two font ones run **first**: they are the
+`npm test` runs all seventeen. The two font ones run **first**: they are the
 fastest, and they guard the thing that has broken most often.
 
 - `tools/check-fonts.mjs` — the font-loading invariants, statically. Cannot
@@ -245,6 +252,17 @@ fastest, and they guard the thing that has broken most often.
 - `gen-seed-sql.mjs --check` — the committed seed migration still matches the
   seed data. Editing `seed-copy.js` and forgetting to regenerate would leave
   the site saying one thing and the database seeding another.
+- `tools/check-csp.mjs` (`npm run check:csp`) — the Content-Security-Policy in
+  `_headers`, checked against the site it protects. A CSP is the one control
+  whose failure mode is the *site* breaking, quietly, and only in production:
+  `_headers` has no effect over `file://` or under `vite dev`. It refuses an
+  inline `<script>` or `style=` attribute (which the policy would silently
+  drop), any origin the pages or `styles.css` fetch that the policy does not
+  allow, a `font-src` without `data:` while the faces are inlined, and — the
+  quiet one — a `connect-src` that does not match the project in `config.js`.
+  That last mismatch does not error: `data.js` falls back to the seeds and
+  serves a complete, correct-looking site that silently stopped updating.
+  Mutation-tested on all six rules.
 - `tools/test-live.mjs` (`npm run test:live`) — **the Phase 4 round trip.**
   Applies the seed migration to a real Postgres, serves those rows to `data.js`
   through a stub shaped like PostgREST, and requires what comes back out to
