@@ -44,32 +44,61 @@ pages**:
   grouping, closed days, the JSON-LD output, and the pill at its boundaries
   (opening minute, closing minute, last hour, closed-today rollover).
 
-### The two harnesses, and what each is for
+Also done — **all 62 section-copy fields come from one place**:
+- `data/seed-copy.js` — every headline, lede, label, note and button word
+  across the five pages, keyed `section.field`
+- `tools/extract-copy.mjs` — reads the copy out of the markup *and* stamps the
+  matching `data-copy="…"` onto the element it read from, in one pass, so the
+  two sides cannot disagree. Idempotent; re-run it after editing the markup.
+- `render.js` — `renderCopy()` / `writeCopy()`. Inline vocabulary is exactly
+  two constructs: `"\n"` is a line break, `*word*` is emphasis. Both built with
+  `createElement`.
+- `tools/test-copy.mjs` — the vocabulary, the omitted-field fallback, and the
+  XSS property
 
-- `node tools/verify-phase1.mjs` — all five pages, whole-body, running the real
+Also done — **a failure in one `script.js` block no longer kills the rest**.
+Seven self-contained blocks run through `boot()`, the same shape as
+`render.js`'s `step()`. Partial by design: see *Deviations*.
+
+Also done — **`vite.config.js`**, which did not exist. `npm run build` was
+producing a one-page site with no JavaScript at all. See *Deviations*.
+
+### The four harnesses, and what each is for
+
+`npm test` runs all four.
+
+- `tools/verify-phase1.mjs` — all five pages, whole-body, running the real
   renderer, diffed against `53b3d5e` (pre-conversion). Proves nothing changed.
   `PHASE1_BASE` overrides the comparison commit.
-- `node tools/test-hours.mjs` — proves the *new* behaviour is right. Necessary
-  because verify-phase1 asserts the output is unchanged, which is exactly the
-  wrong test for a code path that never existed.
+- `tools/test-hours.mjs` — run grouping, closed days, the JSON-LD output, and
+  the pill at its boundaries.
+- `tools/test-copy.mjs` — the inline vocabulary, what happens to a field the
+  data omits, and the property the whole design exists for: owner input is
+  text, never markup.
+- `tools/test-guards.mjs` — breaks each guarded block in turn and checks the
+  last statement in `script.js` still runs.
 
-**Drift check.** The hours, phone, address and Instagram handle are still
-written in the markup as well as generated, on purpose: a crawler or a reader
-with no JavaScript must still get them from the served HTML. The cost is that
-those copies can drift from the seed data with nothing looking wrong — the site
-right, the source lying. verify-phase1 therefore also asserts that the page *as
-served* already says what the renderer would make it say. Confirmed to fail when
-the two are made to disagree.
+The last three exist because verify-phase1 asserts the output is *unchanged*,
+which is exactly the wrong test for a code path that never existed.
+
+**Drift check.** The hours, phone, address, Instagram handle and all 62 copy
+fields are still written in the markup as well as generated, on purpose: a
+crawler or a reader with no JavaScript must still get them from the served
+HTML. The cost is that those copies can drift from the seed data with nothing
+looking wrong — the site right, the source lying. verify-phase1 therefore also
+asserts that the page *as served* already says what the renderer would make it
+say. Confirmed to fail when the two are made to disagree. **This reverses in
+Phase 4** — see *What's still open*, item 2.
 
 **Still to check in a real browser** (jsdom does not run the choreography): the
 entrance cascade, the tab filter's height-lock and scroll correction, and
 Build Your Own.
 
-Next: `seed-copy.js` and the section copy, then the nav/mobile-menu/footer
-markup dedupe — deferred because the chrome is more per-page bespoke than
-assumed (index has four footer columns, faq five, the menu pages a
-`footer--menu` variant), and the *values* problem is now solved without it.
-`seed-faq.js` is held back — see *What's still open*, item 1.
+Remaining in Phase 1: the nav/mobile-menu/footer **markup** dedupe — deferred
+because the chrome is more per-page bespoke than assumed (index has four footer
+columns, faq five, the menu pages a `footer--menu` variant), and the *values*
+problem is now solved without it. `seed-faq.js` is held back — see *What's
+still open*, item 1. Everything else in Phase 1 is done.
 
 No Supabase project exists yet. Phases 1 and 2 are deliberately ordered so that
 all of the hard, high-value work happens *before* a database is needed.
@@ -789,15 +818,25 @@ bucket, and it must run *after* a successful save, never speculatively.
 
    Nothing else in Phase 1 depends on this. The menus are the bulk of the work
    and are unaffected.
-2. **Hosting.** Where does this run once it needs an HTTP origin? Affects the
+2. **Phase 4 needs a write-back tool, and it does not exist yet.** The hours,
+   contact details and all 62 copy fields are kept in the markup as well as in
+   the data — on purpose, for crawlers and readers with no JavaScript — and
+   `verify-phase1.mjs` asserts the two agree. Today the markup is the source of
+   truth and `extract-copy.mjs` reads from it. From Phase 4 the database is the
+   source of truth, and the arrow reverses: something has to write the current
+   values *back into* the markup and the seed files, or the drift check starts
+   failing the moment the owner edits anything. Design it as part of Phase 4,
+   not as an afterthought. The menus do not have this problem — their markup was
+   removed rather than kept.
+3. **Hosting.** Where does this run once it needs an HTTP origin? Affects the
    CSP work and the fonts decision on `admin.html`.
-3. **Does the owner need per-day opening times**, or is 7:00 am every day
+4. **Does the owner need per-day opening times**, or is 7:00 am every day
    permanent? The schema supports it either way; it changes how much the Hours
    panel shows.
-4. **Wine attributes.** The wine list currently encodes vintage in `.mi__tag`
+5. **Wine attributes.** The wine list currently encodes vintage in `.mi__tag`
    and region inside the description prose. Does the owner want those as real
    fields (filterable, consistently formatted), or is free text fine?
-5. **Multiple editors, ever?** The allowlist table supports it. Worth knowing
+6. **Multiple editors, ever?** The allowlist table supports it. Worth knowing
    now, because "the owner" vs "staff" changes whether an audit trail matters.
 
 ---
@@ -827,3 +866,34 @@ bucket, and it must run *after* a successful save, never speculatively.
   The Phase 1 diff harness still gets built. Extraction protects against
   mis-copied *data*; the harness protects against a renderer that puts correct
   data on the page wrongly. Different failure, still needed.
+
+- **2026-08-01 — the copy hooks are generated, not hand-written.**
+  `tools/extract-copy.mjs` writes `data/seed-copy.js` *and* stamps the matching
+  `data-copy="…"` onto the element it read from, in one pass. Doing those
+  separately is how you get `cafe.lede` in one file and `cafe.lead` in the
+  other, and the symptom is invisible: the field renders its stale markup and
+  the page looks fine.
+
+- **2026-08-01 — section copy has an inline vocabulary, and it is two
+  constructs.** `"\n"` is a line break, `*word*` is emphasis. Nothing else, and
+  no path to `innerHTML` — both are built with `createElement`, so an owner who
+  types `<script>` gets those seven characters rendered as text. The one place
+  the site needed emphasis is `story.lead` ("the Georgian word for *aroma*").
+  Extending this later means adding a case to `writeCopy`, never relaxing the
+  rule.
+
+- **2026-08-01 — Phase 1 step 7 is partial, and deliberately so.** The seven
+  self-contained blocks in `script.js` run through `boot()`. The rest declare
+  names their neighbours close over (`splitWords`, `lockNav`, `isInnerPage`,
+  `MENU_T`) and cannot be wrapped without hiding those declarations from the
+  code that reads them. Restructuring the file to guard them too is not worth
+  the regression risk against a choreography that has no automated coverage.
+
+- **2026-08-01 — the build was shipping a site with no JavaScript at all.**
+  Worse than the recorded "drops 4 pages": there was no `vite.config.js`, so
+  Vite built one entry *and* copied no scripts, because it only processes
+  `<script type="module">` and ours are classic on purpose. Every `src` in
+  `dist/` pointed at a file that was never written. The build printed
+  "✓ built" throughout. Now fixed, and the copy step asserts every referenced
+  script reached `dist/` — this failed silently for the whole life of the
+  project, so it needed to become loud rather than merely correct.
