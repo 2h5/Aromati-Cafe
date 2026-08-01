@@ -6,7 +6,15 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+
+    "test": "npm run test:pages && npm run test:hours && npm run test:copy && npm run test:guards",
+    "test:pages": "node tools/verify-phase1.mjs",
+    "test:hours": "node tools/test-hours.mjs",
+    "test:copy": "node tools/test-copy.mjs",
+    "test:guards": "node tools/test-guards.mjs",
+
+    "extract": "node tools/extract-menus.mjs && node tools/extract-copy.mjs"
   },
   "devDependencies": {
     "jsdom": "^29.1.1",
