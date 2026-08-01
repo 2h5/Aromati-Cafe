@@ -174,6 +174,11 @@ Also done — **Phase 2: the schema and its policies, written and checkable**:
   pours, 7 options, 62 copy fields. Deterministic, so it reviews as a diff.
   Ends with a block that asserts the row counts, because a partial apply
   otherwise leaves a menu quietly missing its last section.
+- `supabase/migrations/20260801000200_allowlist_owner.sql` — the owner's UUID
+  into `admin_users`, Phase 3 step 5 as a committed file rather than a snippet
+  pasted into the SQL editor. Idempotent, and it raises if the allowlist is
+  still empty afterwards — a typo in the UUID is otherwise a silent no-op that
+  surfaces much later as "the save button does nothing".
 - `tools/copy-labels.mjs` — the one hand-written file in the copy pipeline. A
   key is not a name, and the generator refuses to run if the labels and the
   data disagree by even one field.
@@ -192,9 +197,9 @@ string is a bug waiting for them to disagree. What was left after removing them
 was a slug and a sort order, which is a column on `menu_courses`. Same
 reasoning that dropped `faq.footButton` from the copy set in Phase 1.
 
-### The twelve harnesses, and what each is for
+### The fifteen harnesses, and what each is for
 
-`npm test` runs all twelve. The two font ones run **first**: they are the
+`npm test` runs all fifteen. The two font ones run **first**: they are the
 fastest, and they guard the thing that has broken most often.
 
 - `tools/check-fonts.mjs` — the font-loading invariants, statically. Cannot
@@ -221,6 +226,22 @@ fastest, and they guard the thing that has broken most often.
   last statement in `script.js` still runs.
 - `tools/check-policies.mjs` — the RLS invariants, over the migration text.
 - `tools/test-policies.mjs` — proves the checker above can fail.
+- `tools/test-sql.mjs` — **applies every migration to a real Postgres** (PGlite,
+  Postgres compiled to WebAssembly — no Docker, no server) on the shim in
+  `tools/supabase-shim.mjs`, then checks the row counts, reads RLS off
+  `pg_class` rather than off the text claiming to enable it, inserts all six
+  price shapes, and confirms the six malformed ones are refused.
+- `tools/test-rls.mjs` — asks the database who can do what. Every write is run
+  three times with the *same* statement — as the owner, as a signed-in stranger
+  and logged out — because a statement only the owner can execute is the only
+  thing that proves the other two were refused by policy rather than by a
+  constraint. 44 checks; the Security rows of the Phase 7 checklist bar the two
+  that are not SQL.
+- `tools/test-db-guards.mjs` (`npm run test:dbguards`) — puts five silent
+  database mistakes back (RLS off
+  a table, `using (true)` where `is_owner()` was meant, the allowlist opened,
+  `is_owner()` granted to `anon`, the price-shape constraint relaxed) and
+  requires the two harnesses above to fail *and name which one*.
 - `gen-seed-sql.mjs --check` — the committed seed migration still matches the
   seed data. Editing `seed-copy.js` and forgetting to regenerate would leave
   the site saying one thing and the database seeding another.
@@ -321,11 +342,31 @@ columns, faq five, the menu pages a `footer--menu` variant), and the *values*
 problem is now solved without it. `seed-faq.js` is held back — see *What's
 still open*, item 1. Everything else in Phase 1 is done.
 
-No Supabase project exists yet, and Phase 2 needed none — that was the point.
-**Next is Phase 3**, the first phase that cannot be done alone: create the
-project, turn off signups, apply, allowlist the owner, seed, run the advisor.
-Before that, two things worth doing in either order — read `POLICIES.md` and
-say whether it describes what you meant, and do the browser pass.
+**Phase 3 is half done.** The project exists (`yofoiqgknsqzsuwtlqvh`), public
+signups are off and the owner account is created — all three by hand in the
+dashboard on 2026-08-01. What remains needs the dashboard or the Supabase MCP
+server, which is configured in `.mcp.json` but was added mid-session and so
+supplied no tools; a restart picks it up.
+
+| Phase 3 step | state |
+|---|---|
+| 1 create the project | ✅ done |
+| 2 disable public signup | ✅ done |
+| 3 create the owner account | ✅ done — `a69c4370-3872-4b61-aba2-4049e34f9549` |
+| 4 apply the migrations | **proven locally, not yet applied to the project** |
+| 5 allowlist the owner | written as `20260801000200_allowlist_owner.sql`; applies with step 4 |
+| 6 seed the content tables | generated already; applies with step 4 |
+| 7 run the security advisor | ⛔ needs the dashboard — nothing local substitutes |
+
+The SQL has now actually run. That matters, because this file used to warn that
+it never had and that the first apply should be expected to fail. It does not
+fail: all three migrations apply clean, seed the right number of rows, and
+enforce every shape rule. What that does **not** retire is step 7 — see the
+"WHAT THIS IS NOT" note at the top of `tools/supabase-shim.mjs` for the four
+ways a local Postgres differs from a Supabase project.
+
+Still worth doing in either order — read `POLICIES.md` and say whether it
+describes what you meant, and do the browser pass.
 
 ---
 
@@ -1013,6 +1054,24 @@ bucket, and it must run *after* a successful save, never speculatively.
   beside the files. `npm run check:layout` fails if anything moves again, and
   was confirmed to fail by putting one page back on Google.
 
+- **2026-08-01** — **The SQL is executed locally, against Postgres compiled to
+  WebAssembly** (`@electric-sql/pglite`, a dev dependency). There is no Docker
+  and no `psql` on this machine, so the alternative was to keep shipping SQL
+  that had never run — which this file had already flagged as the riskiest
+  thing about Phase 3.
+
+  What it buys: `check-policies.mjs` reads the migration as *text*, so it is
+  good at "every table has RLS enabled" and structurally blind to a missing
+  comma, a constraint that cannot be satisfied, or a policy that grants more
+  than it reads like it does. All three are now caught before the SQL reaches
+  the project.
+
+  What it costs, and it is not nothing: the shim is not Supabase. No PostgREST,
+  no signature verification, no `storage` schema. `tools/supabase-shim.mjs`
+  states all four differences at the top. **Green here does not retire the
+  security advisor**, which is why Phase 3 step 7 is still marked ⛔ and not
+  quietly folded into a passing test.
+
 - **2026-08-01** — Build Your Own Breakfast stays hardcoded. The owner has not
   asked for it, and it is a bespoke content type whose editor would cost as
   much as a menu page.
@@ -1165,6 +1224,28 @@ bucket, and it must run *after* a successful save, never speculatively.
   `MENU_T`) and cannot be wrapped without hiding those declarations from the
   code that reads them. Restructuring the file to guard them too is not worth
   the regression risk against a choreography that has no automated coverage.
+
+- **2026-08-01 — the first RLS suite was green and proved nothing, twice over.**
+  Worth writing down because both mistakes look like passing tests.
+
+  *One.* It asserted a stranger could not run
+  `update menu_items set price = '999'` — with no `where`. Nobody can run that:
+  setting a flat price on all 84 rows gives the priced-by-size items two shapes
+  at once and trips `menu_items_one_price_shape`. The refusal had nothing to do
+  with RLS, and the test would have kept passing with every policy deleted.
+  Fixed structurally rather than by patching the statement: every write is now
+  run three times, same SQL, as owner / stranger / logged-out. The owner column
+  is what proves the statement is executable, so the other two mean something.
+
+  *Two.* The shim's `auth.uid()` did `''::json` when no JWT was set, which
+  **raises** rather than returning null. A raising `auth.uid()` makes every
+  policy calling it error out, and an error is indistinguishable from a
+  refusal — so *every* logged-out check passed for the wrong reason. It was
+  caught only by `test-db-guards.mjs` putting a real hole in and nothing
+  noticing. Auth shims must fail closed, not fail loud.
+
+  The lesson is the one the font work already taught: a checker that has never
+  been seen to fail is not evidence. Both harnesses have a mutation test now.
 
 - **2026-08-01 — the build was shipping a site with no JavaScript at all.**
   Worse than the recorded "drops 4 pages": there was no `vite.config.js`, so
