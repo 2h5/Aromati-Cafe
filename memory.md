@@ -8,6 +8,58 @@ the running status. When a decision gets made, write it into *Decisions made*
 below. When the plan changes, write it into *Deviations from the plan* — do not
 silently edit a phase to match what actually happened.
 
+---
+
+## ⛔ Do not break this again: the nav must not shift on navigation
+
+**This has been fixed three times and broken twice, and neither break was font
+work.** The second one came from adding delivery links — a change with nothing
+to do with typography, which pushed the masthead past the point where an
+existing font reflow became visible. It cost most of a session to diagnose the
+second time. Read this before touching `styles.css`, any `<head>`, or anything
+in the nav or a masthead.
+
+The rule: **text must be measured once and never re-measured.** If a page paints
+text in one font and re-paints it in another, the nav wordmark shifts on every
+navigation and the masthead's bottom edge — a hard colour seam across the whole
+page — jumps with it.
+
+What holds it, none of which is optional:
+
+| | why |
+|---|---|
+| Fraunces and Manrope roman-latin are **inlined in `styles.css` as `data:` URIs** | a linked font cannot be there for the first paint; a `preload` fixes that over https but is **ignored over `file://`**, and this site is opened both ways |
+| those inlined faces carry **no `font-display`** | `optional` commits before the font pipeline finishes *even for a `data:` URI*, and renders the fallback for the whole page load |
+| the other four faces are linked with **`font-display: optional`** | they must never swap; which face they land on matters less, they are italics and rare characters |
+| **no `ch` units above the fold** — use `em` | `ch` is the width of the font's own `0` and is *not* equalised by the metric-matched fallbacks. `max-width:58ch` on the lede was 8% narrower before the swap, wrapped an extra line, moved the seam 31.5px. **This is the one that will happen again, because it does not look font-related.** |
+| no page fetches from `fonts.googleapis.com` / `fonts.gstatic.com` | third-party fonts arrive after the first paint by definition |
+
+Two harnesses guard it, and both run in `npm test`:
+
+- **`npm run check:fonts`** — static, cannot skip, runs anywhere. It enforces
+  every row of that table. `npm run test:fonts` puts all five historical breaks
+  back and requires the checker to catch each one *and name which rule fired*.
+- **`npm run check:layout`** — drives real Chrome and checks that every page
+  *settles* in the real fonts, against the committed baseline in
+  `tools/font-metrics.json`, on five pages, including with deliberately long
+  copy standing in for what the owner will type. It catches the whole page
+  rendering in Georgia for a load. It **skips silently when Chrome is not
+  installed**, which is exactly when a regression ships — so it is the second
+  guard, not the first.
+
+  It deliberately does *not* assert "measured before the fonts, measured after,
+  they match". That was the first version, and it failed 1, 2 and 0 times across
+  three runs of an unchanged tree: with no `font-display` the browser never
+  paints the fallback, so the pre-font measurement describes a layout that was
+  never on screen. A guard that fails at random is one people learn to ignore.
+  If the design genuinely changes, re-record with
+  `npm run check:layout -- --record` and read the diff.
+
+If `check:fonts` fails, read the header of `tools/check-fonts.mjs` before
+changing anything. It lists all four real breaks and what each looked like.
+
+---
+
 **Keeping it honest.** Update this file **in the same commit as the work it
 describes** — not afterwards, not at the end of a phase. A session can be
 compacted or interrupted at any point, and the difference between resuming and
@@ -140,10 +192,16 @@ string is a bug waiting for them to disagree. What was left after removing them
 was a slug and a sort order, which is a column on `menu_courses`. Same
 reasoning that dropped `faq.footButton` from the copy set in Phase 1.
 
-### The ten harnesses, and what each is for
+### The twelve harnesses, and what each is for
 
-`npm test` runs all ten.
+`npm test` runs all twelve. The two font ones run **first**: they are the
+fastest, and they guard the thing that has broken most often.
 
+- `tools/check-fonts.mjs` — the font-loading invariants, statically. Cannot
+  skip, runs anywhere, and is the only guard when Chrome is missing. See the ⛔
+  section at the top of this file.
+- `tools/test-fonts.mjs` — puts all five historical font breaks back and
+  requires the checker to catch each one *and name which rule fired*.
 - `tools/verify-phase1.mjs` — all five pages, whole-body, running the real
   renderer, diffed against `53b3d5e` (pre-conversion). Proves nothing changed.
   `PHASE1_BASE` overrides the comparison commit. Two escape hatches, both of
@@ -346,8 +404,8 @@ today, and it must keep working if the database is down, deleted or unpaid.
   ordering without it. The menu's printed order is meaningful.
 - **Prices are `text`, never `numeric`.** `7.50` must not render as `7.5`, and
   `21` must not render as `21.00`. The live menu mixes both forms deliberately.
-- **Prices are stored bare, without the `$`.** [styles.css:904](styles.css#L904)
-  and [styles.css:944](styles.css#L944) add the `$` via `::before`. Today
+- **Prices are stored bare, without the `$`.** [styles.css:968](styles.css#L968)
+  and [styles.css:1008](styles.css#L1008) add the `$` via `::before`. Today
   `.mi__pours` and `.mi__opts` contradict this and carry a literal `$` in the
   markup — **normalise those to bare numbers during Phase 1** so there is one
   rule, and let CSS render the symbol everywhere.
@@ -902,8 +960,33 @@ bucket, and it must run *after* a successful save, never speculatively.
 
 *(Append here as decisions land. Format: date — decision — why.)*
 
+- **2026-08-01** — **The two faces that carry every word above the fold are
+  inside `styles.css` as `data:` URIs**; the other four stay linked files with
+  `font-display: optional`. Self-hosting alone was not enough, and the three
+  intermediate attempts are worth knowing because each looked correct:
+
+  | how the font was loaded | result |
+  |---|---|
+  | Google + `display=swap` | fallback paints, real font replaces it → the nav moved 2.83px on every navigation |
+  | self-hosted, no `font-display` | browser hides the text until the font loads → a blink on every page |
+  | self-hosted + `font-display: optional` | commits at the first paint, before the font pipeline finishes — **even for a `data:` URI** — so it rendered the fallback and stayed there, 121.91px instead of 119.08px, for the whole page load |
+  | two faces inlined, no `font-display` | 119.08px at first parse and unchanged at load: real font, no wait, no swap |
+
+  A `preload` closes the gap over https but is **ignored over `file://`**, where
+  a `crossorigin` fetch has no origin to check — and this site is opened both
+  ways, by double-clicking the HTML and from Cloudflare Pages. In a
+  render-blocking stylesheet there is no gap to close in either.
+
+  Costs ~120 kB of base64 in `styles.css` (68 kB → 213 kB), which is why it is
+  two faces and not six. The other four are italics and extended characters,
+  rarely on screen, and keep `optional` — never swapping matters more for them
+  than which face they land on. Watch that the faces stay collapsed to one per
+  file: Google emits one `@font-face` per weight and they all point at the same
+  variable font, so emitting them separately writes the same 88 kB five times.
+  That produced a 626 kB stylesheet before it was caught.
+
 - **2026-08-01** — **The webfonts are self-hosted** (`assets/fonts/`, fetched by
-  `tools/fetch-fonts.mjs`, preloaded in every page's head). Loaded from Google
+  `tools/fetch-fonts.mjs`). Loaded from Google
   they arrive *after* the first paint, so every page was laid out twice: the nav
   wordmark measured 121.91px in the fallback and 119.08px after, and on the menu
   pages a re-wrapped lede moved the masthead's bottom edge — a hard colour seam

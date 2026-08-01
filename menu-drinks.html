@@ -8,17 +8,14 @@
 <meta property="og:title" content="Drinks Menu — Aromati Café &amp; Wine Bar" />
 <meta property="og:description" content="Espresso, matcha, smoothies and cold drinks from the ground-floor coffee bar on East 34th Street." />
 <meta property="og:type" content="website" />
-<!-- The fonts are in this repo, not on Google. Loaded from another origin
-     they arrive after the first paint and the page re-lays-out under the
-     visitor -- the nav wordmark moved 2.83px on every navigation and a
-     re-wrapped lede moved the masthead seam 31.5px. Same origin and
-     preloaded, they are there for the first paint and nothing swaps.
-     Only the two latin faces are preloaded; they are what is painted above
-     the fold on every page. crossorigin is required even same-origin --
-     fonts are always fetched in CORS mode, and without it the preload is
-     ignored and fetched a second time. See tools/fetch-fonts.mjs. -->
-<link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/fraunces-roman-latin.woff2" />
-<link rel="preload" as="font" type="font/woff2" crossorigin href="assets/fonts/manrope-roman-latin.woff2" />
+<!-- The fonts are in this repo, not on Google. The two faces that carry every
+     word above the fold are inside styles.css as data: URIs, so they are
+     there for the first paint with nothing to wait for and nothing to swap.
+     A linked font cannot manage that: block hides the text and reveals it,
+     swap paints a fallback and replaces it, and optional was measured
+     committing to the fallback for the whole page load. A preload closes the
+     gap over https but is ignored over file://, and this site is opened both
+     ways. See tools/fetch-fonts.mjs. -->
 <link rel="stylesheet" href="styles.css" />
 <script type="application/ld+json">
 {

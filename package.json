@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "npm run test:pages && npm run test:hours && npm run test:copy && npm run test:ordering && npm run test:guards && npm run test:policies && npm run check:policies && npm run check:seed && npm run check:memory && npm run check:layout",
+    "test": "npm run check:fonts && npm run test:fonts && npm run test:pages && npm run test:hours && npm run test:copy && npm run test:ordering && npm run test:guards && npm run test:policies && npm run check:policies && npm run check:seed && npm run check:memory && npm run check:layout",
     "test:pages": "node tools/verify-phase1.mjs",
     "test:hours": "node tools/test-hours.mjs",
     "test:copy": "node tools/test-copy.mjs",
@@ -20,7 +20,9 @@
     "extract": "node tools/extract-menus.mjs && node tools/extract-copy.mjs",
     "gen:seed": "node tools/gen-seed-sql.mjs",
     "check:layout": "node tools/measure-font-shift.mjs",
-    "fetch:fonts": "node tools/fetch-fonts.mjs"
+    "fetch:fonts": "node tools/fetch-fonts.mjs",
+    "check:fonts": "node tools/check-fonts.mjs",
+    "test:fonts": "node tools/test-fonts.mjs"
   },
   "devDependencies": {
     "jsdom": "^29.1.1",

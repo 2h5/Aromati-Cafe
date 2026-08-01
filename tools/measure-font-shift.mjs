@@ -124,11 +124,40 @@ function measure(page, stress) {
   return JSON.parse(m[1].replace(/&quot;/g, '"').replace(/&amp;/g, "&"));
 }
 
+/* What is asserted, and why it is not the obvious thing.
+
+   The obvious test is "measure before the fonts are ready, measure after, they
+   must match". That is what this did first, and it is unreliable — it failed 1,
+   2 and 0 times across three consecutive runs of an unchanged tree.
+
+   The reason is not flakiness in the browser, it is that the "before" state is
+   not a real one. The critical faces carry no font-display, so the browser does
+   not paint text in a fallback and replace it; it waits, then paints once.
+   getBoundingClientRect still answers before the font object has finished
+   parsing, so it reports fallback metrics for a layout that was never on
+   screen. Asserting on that is asserting on noise, and a guard that fails at
+   random is a guard people learn to ignore.
+
+   So the assertion is on the settled layout: it must match a committed baseline
+   of the real fonts' metrics. That is what catches the failure that actually
+   ships — the page rendering in Georgia instead of Fraunces for a whole load,
+   which is exactly what font-display: optional did here. The complementary
+   half, "no face is able to swap in the first place", is structural and lives
+   in check-fonts.mjs where it can be checked exactly.
+
+   The before/after delta is still printed, because it is useful when something
+   is wrong. It is not failed on. */
+const BASELINE = "tools/font-metrics.json";
+const recorded = existsSync(BASELINE) ? JSON.parse(readFileSync(BASELINE, "utf8")) : {};
+const fresh = {};
+const writing = process.argv.includes("--record");
+
 let failures = 0;
-console.log("\nwhat moves when the webfonts arrive\n");
+console.log(`\nthe settled layout, against ${writing ? "a new baseline" : BASELINE}\n`);
 
 for (const page of PAGES) {
   for (const [label, stress] of [["as shipped", false], ["owner-length copy", true]]) {
+    const key = `${page} ${label}`;
     const r = measure(page, stress);
     if (!r) {
       failures++;
@@ -136,30 +165,48 @@ for (const page of PAGES) {
       continue;
     }
 
-    const moved = [];
-    for (const w of WATCH) {
-      if (!(w.sel in r.before)) continue;
-      const d = Math.abs(r.after[w.sel] - r.before[w.sel]);
-      /* Under half a pixel is rounding in the measurement, not a jump. */
-      if (d >= 0.5) {
-        moved.push(`${w.why} (${w.sel}) ${r.before[w.sel]} → ${r.after[w.sel]}, ${d.toFixed(2)}px`);
-      }
-    }
-
-    const watched = Object.keys(r.before).length;
+    const watched = Object.keys(r.after).length;
     if (!watched) {
       failures++;
       console.log(`  FAIL ${page.padEnd(17)} ${label.padEnd(18)} nothing matched — has the markup moved?`);
       continue;
     }
-    if (moved.length) failures++;
-    console.log(`  ${moved.length ? "FAIL" : "ok  "} ${page.padEnd(17)} ${label.padEnd(18)} ` +
-                `${watched} watched, ${moved.length} moved`);
-    for (const line of moved) console.log(`         ${line}`);
+    fresh[key] = r.after;
+
+    /* Printed, never failed on — see the note above. */
+    const drift = WATCH
+      .filter((w) => w.sel in r.before && Math.abs(r.after[w.sel] - r.before[w.sel]) >= 0.5)
+      .map((w) => `${w.why} settled at ${r.after[w.sel]}, was reading ${r.before[w.sel]} pre-parse`);
+
+    if (writing || !recorded[key]) {
+      console.log(`  rec  ${page.padEnd(17)} ${label.padEnd(18)} ${watched} recorded`);
+      continue;
+    }
+
+    const wrong = WATCH
+      .filter((w) => w.sel in r.after && w.sel in recorded[key])
+      .filter((w) => Math.abs(r.after[w.sel] - recorded[key][w.sel]) >= 0.5)
+      .map((w) => `${w.why} (${w.sel}) is ${r.after[w.sel]}, baseline says ${recorded[key][w.sel]}`);
+
+    if (wrong.length) failures++;
+    console.log(`  ${wrong.length ? "FAIL" : "ok  "} ${page.padEnd(17)} ${label.padEnd(18)} ` +
+                `${watched} watched`);
+    for (const line of wrong) console.log(`         ${line}`);
+    if (wrong.length) {
+      console.log("         the page is not settling in the fonts it is supposed to.");
+      console.log("         If the design genuinely changed, re-record: npm run check:layout -- --record");
+    }
+    for (const line of drift) console.log(`         note: ${line}`);
   }
 }
 
+if (writing || Object.keys(recorded).length === 0) {
+  writeFileSync(BASELINE, JSON.stringify(fresh, null, 2) + "\n");
+  console.log(`\nbaseline written to ${BASELINE} — commit it, and read the diff`);
+  process.exit(0);
+}
+
 console.log(failures
-  ? `\n${failures} measurement(s) moved — something is being laid out twice`
-  : "\nnothing moves: the fonts are there for the first paint, on every page");
+  ? `\n${failures} page(s) do not settle where they should`
+  : "\nevery page settles in the real fonts, with the shipped copy and with longer copy");
 process.exit(failures ? 1 : 0);
