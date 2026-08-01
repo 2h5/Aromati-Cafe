@@ -17,7 +17,10 @@ the decision, don't re-derive it.
 
 ## Current phase / status
 
-**Phase 1 — in progress**, on branch `phase1-content-as-data`.
+**Phase 1 done bar two parked items; Phase 2 done.** Branch
+`phase1-content-as-data`, not merged — hold the merge until the browser pass on
+the choreography, since jsdom cannot run it and it is the likeliest thing to
+have broken.
 
 Done — **the three menu pages now render from data, verified identical**:
 - `tools/extract-menus.mjs` — strict markup→data extractor
@@ -63,9 +66,24 @@ Seven self-contained blocks run through `boot()`, the same shape as
 Also done — **`vite.config.js`**, which did not exist. `npm run build` was
 producing a one-page site with no JavaScript at all. See *Deviations*.
 
-### The four harnesses, and what each is for
+Also done — **Phase 2: the schema and its policies, written and checkable**:
+- `supabase/migrations/20260801000000_init_cms.sql` — 12 tables, 34 policies.
+  Seeds the hours and the twelve settings; the menus, copy and photos are left
+  for a *generated* migration in Phase 3, because hand-copying 84 items at the
+  last moment would reintroduce exactly the risk Phase 1 removed.
+- `supabase/POLICIES.md` — what the SQL allows, in the owner's language. Phase
+  2's real deliverable: the SQL is agreed by reading this, not by reading SQL.
+- `tools/check-policies.mjs` — seven structural properties, read off the SQL as
+  text. **Not a syntax check** — there is no Postgres here and the SQL has never
+  run. It catches the mistakes that are silent when made, chiefly a table left
+  without RLS, which reads and writes perfectly from every account including
+  none.
+- `tools/test-policies.mjs` — breaks each of the seven rules on purpose and
+  requires the checker to catch it *and name which rule fired*.
 
-`npm test` runs all four.
+### The six harnesses, and what each is for
+
+`npm test` runs all six.
 
 - `tools/verify-phase1.mjs` — all five pages, whole-body, running the real
   renderer, diffed against `53b3d5e` (pre-conversion). Proves nothing changed.
@@ -77,9 +95,14 @@ producing a one-page site with no JavaScript at all. See *Deviations*.
   text, never markup.
 - `tools/test-guards.mjs` — breaks each guarded block in turn and checks the
   last statement in `script.js` still runs.
+- `tools/check-policies.mjs` — the RLS invariants, over the migration text.
+- `tools/test-policies.mjs` — proves the checker above can fail.
 
-The last three exist because verify-phase1 asserts the output is *unchanged*,
-which is exactly the wrong test for a code path that never existed.
+The middle three exist because verify-phase1 asserts the output is *unchanged*,
+which is exactly the wrong test for a code path that never existed. The last
+one exists because `check-policies` passed all seven rules on its first run
+against SQL written the same afternoon — which is also what a checker whose
+rules match nothing does.
 
 **Drift check.** The hours, phone, address, Instagram handle and all 62 copy
 fields are still written in the markup as well as generated, on purpose: a
@@ -100,8 +123,11 @@ columns, faq five, the menu pages a `footer--menu` variant), and the *values*
 problem is now solved without it. `seed-faq.js` is held back — see *What's
 still open*, item 1. Everything else in Phase 1 is done.
 
-No Supabase project exists yet. Phases 1 and 2 are deliberately ordered so that
-all of the hard, high-value work happens *before* a database is needed.
+No Supabase project exists yet, and Phase 2 needed none — that was the point.
+**Next is Phase 3**, the first phase that cannot be done alone: create the
+project, turn off signups, apply, allowlist the owner, seed, run the advisor.
+Before that, two things worth doing in either order — read `POLICIES.md` and
+say whether it describes what you meant, and do the browser pass.
 
 ---
 
@@ -867,15 +893,16 @@ bucket, and it must run *after* a successful save, never speculatively.
    front of previews (free tier covers it) or accept it. Either way the RLS in
    Phase 2 has to be right on its own merits, because it is what is actually
    holding the door.
-5. **Does Cloudflare Pages run a build, or serve the repo root?** It matters
-   more than it sounds: until this session `npm run build` produced a `dist/`
-   that loaded no JavaScript at all while printing `✓ built`. If Pages is
-   configured with a build command and `dist` as the output directory, the
-   deployed site has been broken. If it serves the root, it has been fine —
-   the source tree *is* the site. Check the Pages project settings. The
-   recommendation is no build command and root as the output: this site needs
-   no build step, and removing it removes the whole class of silent failure.
-   `vite.config.js` then exists only for local preview.
+5. **Deployment is a direct upload — files are dropped into Cloudflare Pages
+   as-is, with no build command and no `dist/`.** Confirmed 2026-08-01. This is
+   the right setup and should stay: the source tree *is* the site, which is the
+   same property that makes `file://` work. Two things follow.
+   - `vite.config.js` and `npm run build` are local preview only. Nothing
+     deployed depends on them. Keep the build honest anyway — a broken build
+     that nobody notices is how the last one stayed broken.
+   - **Upload the site files, not the repo.** `node_modules/`, `tools/`,
+     `memory.md` and `.git/` have no business on a public host. Whatever is
+     dragged in gets served — there is no ignore file protecting this.
 
 ---
 
