@@ -403,6 +403,52 @@
     ld.textContent = JSON.stringify(data, null, 2);
   }
 
+  /* ── section copy ─────────────────────────────
+     Every headline, lede, label and button word on the site, keyed by the
+     data-copy attribute the element already carries. tools/extract-copy.mjs
+     writes both sides from one pass, so a key here always has an element and
+     an element here always has a key.
+
+     A field the data does not mention keeps its markup untouched. That is the
+     no-JavaScript and mid-Phase-4 story: the page is already correct as
+     served, and this only ever overwrites what it can improve on. */
+
+  /* The whole inline vocabulary: "\n" is a line break, *word* is emphasis.
+     Both are built node by node — the string is never handed to a parser, so
+     an owner who types "<b>" gets the four characters "<b>" on the page and
+     nothing else. Extending this later means adding a case here, never
+     reaching for innerHTML. */
+  function writeCopy(node, text) {
+    while (node.firstChild) node.removeChild(node.firstChild);
+
+    text.split("\n").forEach(function (line, i) {
+      if (i) node.appendChild(document.createElement("br"));
+      /* Odd indices are the insides of a * pair. An unmatched * leaves an even
+         number of pieces, and then the line goes down whole — split() has
+         already eaten the asterisk, so the pieces cannot be appended one by
+         one without losing it. A note reading "*subject to change" keeps its
+         asterisk, which is the only sane answer for a character that has an
+         ordinary meaning in prose. */
+      var pieces = line.split("*");
+      if (pieces.length % 2 === 0) {
+        node.appendChild(document.createTextNode(line));
+        return;
+      }
+      pieces.forEach(function (piece, n) {
+        if (!piece) return;
+        if (n % 2) node.appendChild(el("em", null, piece));
+        else node.appendChild(document.createTextNode(piece));
+      });
+    });
+  }
+
+  function renderCopy(copy) {
+    Array.prototype.forEach.call(document.querySelectorAll("[data-copy]"), function (node) {
+      var text = copy[node.getAttribute("data-copy")];
+      if (typeof text === "string" && text) writeCopy(node, text);
+    });
+  }
+
   /* ── go ──────────────────────────────────────
      Each step guarded on its own: a failure in one must not stop the rest, and
      must not stop script.js initialising after it. */
@@ -410,6 +456,10 @@
   function step(name, fn) {
     try { fn(); }
     catch (err) { if (window.console) console.error("render: " + name + " failed", err); }
+  }
+
+  if (typeof SEED_COPY === "object" && SEED_COPY) {
+    step("copy", function () { renderCopy(SEED_COPY); });
   }
 
   if (typeof SEED_SETTINGS === "object" && SEED_SETTINGS) {

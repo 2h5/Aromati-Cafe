@@ -131,7 +131,11 @@ for (const page of PAGES) {
   const KEPT_IN_MARKUP = [
     '[data-hours="footer"]', ".mmenu__hours", "#hoursList",
     '[data-contact="address"]', ".mmenu__addr",
-    'a[href^="tel:"]', 'a[href^="mailto:"]', ".ig__handle"
+    'a[href^="tel:"]', 'a[href^="mailto:"]', ".ig__handle",
+    /* Every section-copy field, for the same reason: the headline in the
+       source is what a crawler indexes and what a reader with no JavaScript
+       gets, so it has to already say what seed-copy.js says. */
+    "[data-copy]"
   ];
 
   const stale = [];
