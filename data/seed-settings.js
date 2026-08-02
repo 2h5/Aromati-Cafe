@@ -14,7 +14,7 @@ var SEED_SETTINGS = {
   phoneDigits: "3322073847",          // 10 digits, no country code
   phoneCountry: "1",
 
-  email: "info@aromatiNY.com",        // mixed case is deliberate — keep it
+  email: "info@aromatinyc.com",
 
   instagramHandle: "aromatinyc",      // the URL and the "@handle" both derive
 

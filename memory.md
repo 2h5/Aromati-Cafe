@@ -771,7 +771,7 @@ coffee, evenings for wine.") — editable copy, not hours data.
 | Value | Occurrences | Notes |
 |---|---|---|
 | `+1 (332) 207-3847` / `tel:+13322073847` | 24 | display and `tel:` forms differ — store digits, generate both |
-| `info@aromatiNY.com` | footer + JSON-LD | mixed case is intentional |
+| `info@aromatinyc.com` | footer + JSON-LD | |
 | `instagram.com/aromatinyc` | 17 | URL and `@aromatinyc` handle |
 | Instagram SVG | 16 inline copies | markup, not content — dedupe in Phase 1 |
 | `103 E 34th Street, New York, NY 10016` | footer, mobile menu, JSON-LD, Visit | |

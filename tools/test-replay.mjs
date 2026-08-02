@@ -94,7 +94,7 @@ function probe() {
     if (table === "site_settings") {
       body = [{ key: "phone_digits", value: "3322073847" },
               { key: "phone_country", value: "1" },
-              { key: "email", value: "info@aromatiNY.com" },
+              { key: "email", value: "info@aromatinyc.com" },
               { key: "instagram_handle", value: "aromatinyc" }];
     } else if (table === "business_hours") {
       body = SEED_HOURS.map(function (h, d) {

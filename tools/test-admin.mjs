@@ -64,7 +64,7 @@ function fixture() {
       { id: "s1", key: "phone_digits", label: "Phone number", help: null,
         value: "3322073847", is_editable: true, sort_order: 10 },
       { id: "s2", key: "email", label: "Email address", help: null,
-        value: "info@aromatiNY.com", is_editable: true, sort_order: 12 },
+        value: "info@aromatinyc.com", is_editable: true, sort_order: 12 },
       { id: "s3", key: "order_doordash_url", label: "DoorDash link", help: null,
         value: "https://example.com/store", is_editable: true, sort_order: 14 },
       { id: "s4", key: "schema_type", label: "Search listing type", help: null,

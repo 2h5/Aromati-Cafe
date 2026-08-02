@@ -224,7 +224,7 @@ var AROMATI_ADMIN = (function () {
       message: "The country code should be 1 to 3 digits. For the United States enter 1." },
 
     { key: /^email$/, ok: /^[^@\s]+@[^@\s]+\.[^@\s]+$/,
-      message: "That does not look like an email address. It needs an @ and a dot after it, for example info@aromatiNY.com." },
+      message: "That does not look like an email address. It needs an @ and a dot after it, for example info@aromatinyc.com." },
 
     { key: /^instagram_handle$/, bad: /^@/,
       message: "Leave the @ off the Instagram handle — enter aromatinyc, not @aromatinyc. The site adds the @ where it shows one." },

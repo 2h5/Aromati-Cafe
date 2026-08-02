@@ -167,7 +167,7 @@ begin
 
   -- Deliberately loose. Strict email regexes reject addresses that work.
   if new.key = 'email' and v !~ '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$' then
-    raise exception 'That does not look like an email address. It needs an @ and a dot after it, for example info@aromatiNY.com.';
+    raise exception 'That does not look like an email address. It needs an @ and a dot after it, for example info@aromatinyc.com.';
   end if;
 
   if new.key = 'instagram_handle' then
@@ -891,7 +891,7 @@ insert into public.business_hours (day_of_week, is_closed, opens_at, closes_at, 
 insert into public.site_settings (key, label, help, value, is_editable, sort_order) values
   ('phone_digits',     'Phone number',      'Ten digits, no country code, no punctuation. The site formats it for display, for the tel: link and for Google.', '3322073847', true,  10),
   ('phone_country',    'Country code',      'Digits only. 1 for the United States.',                         '1',                    true,  11),
-  ('email',            'Email address',     'Shown in the footer and given to Google.',                      'info@aromatiNY.com',   true,  12),
+  ('email',            'Email address',     'Shown in the footer and given to Google.',                      'info@aromatinyc.com',  true,  12),
   ('instagram_handle', 'Instagram handle',  'Without the @. The site builds both the @name and the link.',   'aromatinyc',           true,  13),
 
   ('order_doordash_url', 'DoorDash link',   'The whole web address of the DoorDash page, pasted from the address bar. Clear this field to take DoorDash off the site.', 'https://www.doordash.com/store/aromati-caf%C3%A9-&-wine-bar-103-e-34th-st-new-york-40842579/97188347/', true, 14),
