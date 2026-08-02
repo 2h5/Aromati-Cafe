@@ -2251,6 +2251,33 @@ job — but it is the reason the bucket will never be provably tidy.
   motion" exactly, and which no amount of filter removal could ever have helped.
   One look at the live DOM decides it.
 
+  **Addendum, same day.** A second agent then attempted the same three bugs and
+  also failed. Its changes were already in the working tree when `git add -A`
+  ran, so they are inside a commit whose message describes only the first
+  agent's work — the history is misleading on that point and this is the
+  correction. What it added: `position:absolute; inset:0` on `.wine__bg img`, a
+  `100vh` fallback before `100svh`, `!important` on animation, transform and
+  will-change to beat the inline styles `script.js` writes, the wine media query
+  widened to cover iPad portrait, and a force-reveal of `.wine__board`.
+
+  That last line is the one worth reading. Force-revealing a `[data-reveal-img]`
+  element means the element was not revealing on device — and revealing is not a
+  compositing problem, it is `script.js` adding `.in`. Nearly everything on this
+  page starts at `opacity:0` and waits for one of four IntersectionObservers.
+  When an observer does not fire, its targets are invisible forever, which reads
+  exactly as "the images disappeared", and for the reel as "the animation is
+  broken" because the drift runs on elements nobody can see. Both agents spent
+  their effort on compositing while the evidence for a reveal failure was sitting
+  in the other's diff.
+
+  One arithmetic detail nobody checked: the shared observer uses
+  `threshold: 0.18`, and a threshold is the fraction of *the target* that must be
+  visible. An element taller than about five and a half viewports can never show
+  18% of itself at once, so the callback never fires. The iPhone has the shortest
+  viewport and the tallest stacked layout of any device in play, which is a
+  mechanism for iPhone-only failure that has nothing to do with WebKit at all.
+  Unverified, but it is cheap to test and it would explain the iPhone/iPad split.
+
   `HANDOFF-ios.md` carries the detail for whoever picks this up on a Mac. A
   temporary on-device readout was built and then deleted the same day, unused:
   it existed only because the machine doing the work could not see the machine

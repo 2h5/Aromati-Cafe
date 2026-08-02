@@ -1,143 +1,147 @@
 # Handoff — iOS-only rendering bugs
 
-Working notes for continuing this on a Mac. Written 2026-08-02.
-Branch: `phase1-content-as-data`. **All work below is uncommitted** — commit and push
-before switching machines, or none of it travels.
+Working notes for continuing this on a Mac. Updated 2026-08-02.
+Branch: `phase1-content-as-data`.
 
 ---
 
 ## The situation in one line
 
-Three iOS-only bugs. Three fixes attempted, reasoned from source code alone.
-**None of them worked.** All three are still in the tree, unproven, and should be
-treated as suspect rather than as progress.
+Three iOS-only bugs. Two agents have now attempted fixes — six changes between
+them, all reasoned from source code, **none verified to work.** Everything below
+is still broken on device.
 
-## Why the diagnoses kept failing
+## The bugs
 
-Every fix so far was inferred from reading CSS, never from observing the device.
-The work was done on Windows, where:
+| # | Symptom | iPhone | iPad | Android |
+|---|---------|--------|------|---------|
+| 1 | Hero parallax stutters | broken | — | fine |
+| 2 | Kitchen reel: no plates, no drift | broken | broken | fine |
+| 3 | Wine (04) backdrop absent | broken | fine | fine |
 
-- Safari's Web Inspector is unavailable — it requires a Mac.
-- Every browser on iOS is forced to use WebKit, so iPhone/iPad bugs cannot be
-  reproduced in any Windows browser. Chrome DevTools device emulation renders
-  with Blink, the engine that already works correctly here, so it shows nothing.
-
-**This is the single most important thing to change.** On a Mac: plug the iPhone
-in, Safari → Develop → iPhone, and use the **Layers panel**. Every theory below is
-about compositing layers failing to rasterise, and the Layers panel confirms or
-kills each one in seconds. Do that before writing any more code.
+Every browser on iOS is WebKit, so none of this reproduces on Windows. Chrome
+DevTools device emulation renders with Blink — the engine that already works —
+and will never show any of it.
 
 ---
 
-## The three bugs
+## THE LEAD — check this before writing any code
 
-### 1. Hero parallax — laggy on iPhone, fine on Android
-Status: **partially improved, core issue unresolved.**
+**Almost everything on this page is invisible until JavaScript adds `.in` to it.**
 
-The rAF loop in `script.js` had four genuine defects, all fixed and all worth
-keeping regardless of what else is wrong:
-- reads and writes were interleaved, forcing ~11 synchronous reflows per frame
-- `window.innerHeight` was read per frame; on iOS Safari it changes as the URL
-  bar collapses *during* the scroll, so offsets lurched mid-gesture
-- the loop ran forever at up to 120Hz whether or not anything had moved
-- `will-change:transform` was pinned on ~10 images permanently
+CSS starts these elements at `opacity:0`, and four separate IntersectionObservers
+in `script.js` add `.in` when they scroll into view:
 
-Then the hero and wine backdrops were moved to a CSS `view()` scroll timeline
-(`styles.css`, "the same drift, run on the compositor") so the animation runs on
-the compositor thread instead of racing it from JS. `script.js` stands down when
-`CSS.supports("animation-timeline","view()")` is true.
+| Observer | Line | Targets | Threshold |
+|---|---|---|---|
+| `io` | `script.js:276` | `[data-split]`, `[data-reveal-img]`, `.reveal`, `.footer` | 0.18, rootMargin `0px 0px -4% 0px` |
+| `staggerIO` | `script.js:330` | story copy, fact row | — |
+| `reelIO` | `script.js:466` | `.plate` (the kitchen reel) | 0.12 |
+| `courseIO` | `script.js:613` | menu courses | — |
 
-**Unverified:** whether the scroll timeline actually engages on the device, and
-whether it helped. Check `animation-name` on `.hero__media` in the inspector.
+If an observer does not fire, its targets stay at `opacity:0` forever. **That
+presents as "the images disappeared" and, for the reel, as "the animation is
+broken" — because the drift is running on elements nobody can see.** It matches
+every reported symptom, and no amount of compositing work will ever fix it.
 
-### 2. Kitchen reel (sliding plates) — blank on iPhone AND iPad, perfect on Android
-Status: **not fixed. Highest priority — this is total failure, not degradation.**
+Two concrete reasons this could fail on iOS and not Android:
 
-Reported symptom: images absent *and* the drift animation not running. Whole
-component dead.
+1. **`threshold: 0.18` on an element taller than the viewport.** The threshold is
+   the fraction of *the target* that is visible. An element 5.5× the viewport
+   height can never have 18% of itself on screen, so the callback never fires. An
+   iPhone has the shortest viewport and the most stacked (therefore tallest)
+   layout of any device here, so elements can cross that line on iPhone while
+   staying under it on iPad and desktop. **This is a real arithmetic bug, not a
+   WebKit quirk** — it would fail on a short-enough Android too. Worth checking
+   first because it is cheap and it explains the iPhone/iPad split in bug 3.
+2. **Lenis smooth scroll** (`script.js:28`) runs with `syncTouch:false`, so touch
+   scrolling is native while Lenis still runs its own rAF loop. Worth ruling out
+   as an interaction with observer root calculation.
 
-Attempted fix: removed `filter:saturate(.94) brightness(.92)` from `.plate img`,
-replaced with a flat `::before` overlay, and gated the hover filters behind
-`@media (hover:hover)`. Reasoning was that a filter inside `.reel__track` — which
-is `width:max-content` (~5000px) and permanently transform-animated, inside an
-`overflow:hidden` viewport — forces an offscreen compositing pass that WebKit
-flattens at full track width, failing the raster.
+**Corroborating evidence:** the other agent independently patched
+`.wine__board[data-reveal-img]{ clip-path:inset(0 round 6px); opacity:1; }` —
+i.e. it force-revealed a `[data-reveal-img]` element because it was not
+revealing on device. That is the same failure, treated as a symptom rather than
+traced to the observer.
 
-That reasoning has precedent: **this same failure mode is documented twice already
-in `styles.css`** — the mask on `.reel__viewport` (~line 858) and the filter on
-`.wine__bg` (~line 1319), both fixed by removal. That is why it looked right.
-It still didn't work.
-
-**Untested alternatives, in rough order of promise:**
-- `.plate` starts at `opacity:0` and only becomes visible when `script.js` adds
-  `.in` from an IntersectionObserver (`script.js`, `boot("reel", …)`). If that
-  observer never fires on WebKit, every plate stays invisible and the drift is
-  running unseen — which matches the reported symptom exactly. **Check whether
-  `.in` is present on the plates on-device before anything else.**
-- `.plate img` has `aspect-ratio:4/3.2; height:auto` while the global rule is
-  `img{width:100%;height:100%;object-fit:cover}`. If aspect-ratio fails to
-  resolve inside a `flex:0 0 <width>` item on WebKit, the plates collapse to zero
-  height and there is nothing to see.
-- `loading="lazy"` on all 18 plate images. They sit outside the visible area of an
-  `overflow:hidden` container and are moved in by transform; WebKit may never
-  consider them intersecting, so they may never load.
-- The ~5000px track genuinely exceeding a texture limit, independent of filters.
-
-### 3. Wine section (04) backdrop — absent on iPhone, fine on iPad
-Status: **not fixed.**
-
-Attempted fix: a `@media (max-width:760px)` block bounding `.wine__bg` to
-`height:100svh` with a gradient carrying its bottom edge into the section
-background, plus `animation:none`.
-
-Reasoning: stacked to one column the section runs past 2000px; `object-fit:cover`
-then scales the 1088×1445 source to roughly 2300×3000 to fill it — a ~7 megapixel
-raster for a photo `.wine__scrim` already hides at 90–96% opacity. iPad has the
-memory, iPhone drops the layer. Plausible, unconfirmed, didn't help.
-
-Note the iPad/iPhone split here is the opposite of bug 2 (which fails on both).
-That difference is a real clue and hasn't been explained.
+**First thing to do on the Mac:** open the page on the iPhone with the inspector
+attached and look at whether `.plate`, `.wine__board`, and `.story__img` have
+`.in`. One reading decides whether this whole family of bugs is one bug.
 
 ---
 
-## Diagnostic harness — built, then removed
+## What is currently in the tree, and who wrote it
 
-A temporary on-device readout (`diag.js` plus a `<script>` tag in `index.html`)
-was written to print computed styles off the phone, then deleted unused once this
-moved to a Mac. Nothing remains in the tree; `index.html` is back to normal.
+All of it is unverified. None of it is known to help.
 
-It is not needed with Safari's Web Inspector attached — real DevTools give
-everything it printed and far more. Noted only so its absence is not mistaken for
-an oversight.
+### Written by Claude (commit `1d98bb6`)
+
+**`script.js` — rAF parallax loop rework.** Batched reads and writes (was ~11
+forced reflows per frame); `innerHeight` sampled on resize rather than per frame,
+because Safari changes it mid-scroll as the URL bar collapses; the loop sleeps
+when nothing has moved instead of running at 120Hz forever; `will-change` scoped
+to on-screen elements instead of pinned to ten images. **These four are correct
+on their own merits regardless of the iOS bugs and should be kept.**
+
+**`styles.css` — CSS `view()` scroll timeline** for the hero and wine backdrops,
+so the compositor drives them instead of JS racing it. `script.js` stands down
+when `CSS.supports("animation-timeline","view()")`.
+
+**`styles.css` — `filter` removed from `.plate img`**, replaced with a flat
+`::before` overlay, hover filters gated behind `@media (hover:hover)`.
+Reasoning was that a filter inside the ~5000px transform-animated `.reel__track`
+forces an offscreen pass WebKit cannot rasterise. This pattern-matched two
+instances `memory.md` already documents — the mask on `.reel__viewport` and the
+filter on `.wine__bg`, both fixed by removal. Same shape, same reasoning, **wrong
+answer.**
+
+### Written by the other agent (swept into `1d98bb6` unreviewed, plus `HEAD`)
+
+This work was already in the working tree when `git add -A` ran, so it is inside
+a commit whose message describes only Claude's changes. Flagged here because the
+history is misleading on that point.
+
+- `.wine__bg img{ position:absolute; inset:0; }` added to the base rule
+- The wine media query widened from `max-width:760px` to also cover
+  `(max-width:1100px) and (orientation:portrait)` — aimed at iPad portrait,
+  raised from 1020px in a second pass
+- `height:100vh` before `height:100svh` as a fallback
+- `animation:none !important; transform:none !important; will-change:auto !important`
+  to beat `script.js`'s inline styles
+- `.wine__board[data-reveal-img]{ clip-path:inset(0 round 6px); opacity:1; }` —
+  **see THE LEAD above; this is the most informative line in the diff**
 
 ---
 
-## Environment notes that cost time
+## Environment notes that cost real time
 
 - **Live Server serves the project root**, not `dist/`. It uses `styles.css` and
-  `script.js` directly. `dist/` is only touched by `npm run build` / `npm run
-  preview` / deploys.
+  `script.js` directly. `dist/` only matters for `npm run build` / `preview` /
+  deploys.
 - **Safari caches `styles.css` hard.** The HTML links it with no version string,
-  so edits appear to do nothing. Test in a **private tab**, or clear website data.
-  A stale cache masked one round of testing entirely.
+  so edits appear to do nothing. Test in a **private tab**. A stale cache masked
+  one full round of testing.
 - **Cloudflare Pages:** deploy `dist`, build command `npm run build`. Not the
-  root — root filenames are unhashed and will reproduce the cache problem at CDN
-  scale. `dist/` filenames carry content hashes, which makes stale caching
-  impossible.
-- **Tests:** `npm test` runs everything. The fast relevant subset is
-  `npm run check:fonts && npm run check:layout && npm run check:csp && npm run test:pages`.
-  `check:layout` guards against nav shift, which this repo has a history of
-  breaking. All of these pass on the current tree.
+  root — root filenames are unhashed and reproduce the cache problem at CDN
+  scale.
+- **Tests:** `npm test` runs all 26. Fast relevant subset:
+  `npm run check:fonts && npm run check:layout && npm run check:csp && npm run test:pages && npm run check:memory`.
+  `check:layout` guards nav shift, which this repo has a history of breaking.
+  `check:memory` fails if `memory.md`'s `file:line` links drift — editing
+  `script.js` will do that, and the fix is to update `memory.md`, not the check.
+- A temporary on-device readout was built and deleted unused once this moved to
+  a Mac. Rebuild it only if you end up back on Windows.
 
-## Suggested first moves on the Mac
+## Suggested order of work
 
-1. Commit and push this branch from Windows first.
-2. Attach the iPhone, open the site, go to the **Layers panel**. Look at the reel:
-   is there a layer at all, what size, what is its memory cost.
-3. In Elements, check whether `.plate` has `.in` and what its computed `opacity`
-   and height are. That one observation separates "invisible" from "not rendered"
-   and decides which of the bug-2 theories to pursue.
+1. Attach the iPhone. Check whether `.plate` / `.wine__board` / `.story__img`
+   have `.in`. This is one observation and it may collapse three bugs into one.
+2. If they do not: fix the observers, not the CSS. Revert the speculative CSS
+   below before adding more.
+3. If they do: open the **Layers panel** and look at the reel — is there a layer,
+   what size, what memory cost. Every compositing theory lives or dies there.
 4. Check the console for iOS-only errors. Nothing has ever seen them.
-5. Only then decide which of the three attempted fixes to keep. Each is defensible
-   in isolation and each is currently unproven; the parallax loop repairs in
-   `script.js` are the most likely to be worth keeping on their own merits.
+5. Then decide what to keep. The `script.js` loop repairs stand on their own; the
+   `view()` timeline, the `.plate` filter removal, and the whole wine media block
+   are all speculative and should be reverted freely if the evidence points
+   elsewhere.
