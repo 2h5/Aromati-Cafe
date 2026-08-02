@@ -95,8 +95,21 @@ behind.
 The cautionary example is not hypothetical. Uptown's README still says *"Status:
 this is the demo build — pre-CMS"* and *"no schema, migrations, or storage
 buckets exist yet"*, seventeen commits and eight migrations later. **This repo's
-own `README.md` is currently that stale** — it still describes the pre-CMS site.
-Phase 8 rewrites it; until then, do not trust it.
+own `README.md` was exactly that stale until Phase 8** — it described the
+pre-CMS site, said the fonts came from Google, and told the reader that content
+changes needed a developer. Rewritten 2026-08-02.
+
+Three files now describe this project and they are for three different readers,
+which is the only reason there are three:
+
+| | for | says |
+|---|---|---|
+| `README.md` | the next developer | what the site is, how the data flows, what must not be broken |
+| `client-notes.md` | the owner | how to edit the site, in the owner's language, with no jargon in it |
+| `memory.md` | whoever is building | the plan, the reasoning, the phase history, every decision and why |
+
+`check-memory.mjs` guards this file. Nothing guards the other two, so when a
+fact moves, ask which of the three readers it was true for.
 
 Modelled directly on the Uptown Coffee Co. CMS build (`Z:\cs lock\uptown
 coffee - kimi`), which is the reference implementation for this project. Where
@@ -107,13 +120,17 @@ the decision, don't re-derive it.
 
 ## Current phase / status
 
-**Phases 1–6 done bar two parked items.** Branch `phase1-content-as-data`, not
-merged — hold the merge until the browser pass on the choreography, since jsdom
-cannot run it and it is the likeliest thing to have broken. The editor's live
-line-count warning is on that pass too: nothing in `npm test` has layout in it,
-so no harness can say whether the number it reports is the right one. Phase 6
-adds one more to that pass, and it is the same kind of thing: whether a
-photograph the owner uploads looks right in the space it lands in.
+**Phases 1–8 done bar two parked items — the build is finished.** What is left
+is Phase 9, and every row of it needs a person, a browser or the owner's
+password. Branch `phase1-content-as-data`, not merged: hold the merge until the
+browser pass on the choreography, since jsdom cannot run it and it is the
+likeliest thing to have broken. The editor's live line-count warning is on that
+pass too — nothing in `npm test` has layout in it, so no harness can say whether
+the number it reports is the right one. Phase 6 adds one more of the same kind:
+whether a photograph the owner uploads looks right in the space it lands in.
+
+The two documents a reader outside this file needs are current as of
+2026-08-02: `README.md` for the next developer, `client-notes.md` for the owner.
 
 Done — **the three menu pages now render from data, verified identical**:
 - `tools/extract-menus.mjs` — strict markup→data extractor
@@ -299,9 +316,9 @@ string is a bug waiting for them to disagree. What was left after removing them
 was a slug and a sort order, which is a column on `menu_courses`. Same
 reasoning that dropped `faq.footButton` from the copy set in Phase 1.
 
-### The twenty-two harnesses, and what each is for
+### The twenty-six harnesses, and what each is for
 
-`npm test` runs all twenty-two. The two font ones run **first**: they are the
+`npm test` runs all twenty-six. The two font ones run **first**: they are the
 fastest, and they guard the thing that has broken most often.
 
 - `tools/check-fonts.mjs` — the font-loading invariants, statically. Cannot
@@ -1239,16 +1256,72 @@ upload, the renamed `.exe`). Each is marked in the checklist with why.
 
 ---
 
-### Phase 8 — Handoff. ← *next*
-
-Rewrite `README.md` to describe what the project *is* at that point — not what
-it was. Write `client-notes.md`: an owner-facing guide in the owner's language.
-Refresh the seed arrays from live data.
+### Phase 8 — Handoff. ✅ done 2026-08-02
 
 > ⚠️ Uptown's README still says *"Status: this is the demo build — pre-CMS"* and
 > *"no schema, migrations, or storage buckets exist yet"* — seventeen commits
 > and eight migrations later. That is the exact failure this phase exists to
 > prevent. Doc drift is the thing that makes a handoff dangerous.
+
+**`README.md`, rewritten.** It described a site where the menus lived in the
+markup, the fonts came from Google over https, `dist/` was a stale artifact to
+be deleted, and "editing any of the following needs a developer today". Every
+one of those is now false, and the font line was worse than stale: it named as
+normal practice the exact thing the ⛔ section at the top of this file exists to
+prevent. What it says now: the `network → localStorage → seed` order and why
+nothing waits on the network, where each kind of content lives and which table
+and seed file it is in, the six price shapes, the editor, the database rules,
+the four harnesses that are deliberately *not* in `npm test`, the deploy (a
+direct upload — upload the site files, not the repo, and `_headers` has to be in
+the drag), and the invariants, with the nav-shift table first.
+
+**`client-notes.md`, written.** The owner's guide, in the owner's language:
+signing in, the one thing to know about saving, a section per panel, and the
+three things that are easy to get wrong — prices without a `$`, the phone as ten
+bare digits, a tall photograph in a wide space. It says plainly what is *not*
+editable and that this is deliberate, and it carries the FAQ question the owner
+still owes an answer to. It deliberately does not duplicate the editor's own
+help text, which is already written in the same voice.
+
+Two things in it are there because they are true and nobody would otherwise
+know: the site keeps working with the database gone, and **an uploaded
+photograph is the only thing that is not also in git** (open item 2). The second
+is the "Phase 8 handoff note, not a tool" that item asks for, and it is now in
+both documents.
+
+**The seeds were checked against live and needed no refresh.**
+`check-live-project.mjs`, 2026-08-02: all five comparisons identical. The owner
+has not edited anything yet, which is the only reason this is a no-op — the
+mechanism to do it when it is not a no-op still does not exist, and that is
+open item 2, not this phase.
+
+**Doc drift found in this file while rewriting the other two**: the heading
+*"The twenty-two harnesses"* had been sitting over a list of twenty-six for a
+whole phase. Nothing was missing and no name was wrong — only the first four
+words, which are what someone skimming reads. `check-memory.mjs` grew an eighth
+check for it, counted from `package.json`'s own `test` script and holding
+`README.md` to the same number in digits; mutation-tested three ways (the wrong
+word here, the wrong digits there, a twenty-seventh harness added with neither
+document updated).
+
+---
+
+### Phase 9 — The owner's pass, and the merge. ← *next*
+
+Everything left needs a person, a browser or the owner's password. Nothing here
+is blocked on code.
+
+- **The browser pass** — the four rows the Phase 7 checklist marks ⚠️, plus the
+  seven photograph rows and the editor's live line-count warning. jsdom has no
+  layout; this is the part no harness in the project can reach.
+- **The three live-project rows** — `signUp()` from a console, a 10 MB file and
+  a `.exe` renamed `.jpg` posted at the bucket with the owner's token.
+- **The FAQ answer** (open item 1). Everything else is built and waiting on it.
+- **Read `supabase/POLICIES.md`** and confirm it matches intent.
+- **Merge `phase1-content-as-data` to `main`** — held on the browser pass, which
+  is the only reason it is still held.
+- Then re-run `check-live-project.mjs` once a photograph has been uploaded, so
+  the bucket-listing check stops reporting `skip`.
 
 ---
 
@@ -1526,9 +1599,12 @@ definition of done for any phase that adds a table.
 
 **10. Backups.**
 Free-tier point-in-time recovery is limited. The seed arrays in git are a real
-backup and should be refreshed at each release (Phase 8). Beyond that, a
-periodic `pg_dump` — or accept that the git seeds are the recovery floor and
-write that down so nobody is surprised.
+backup and should be refreshed at each release. Beyond that, a periodic
+`pg_dump` — or accept that the git seeds are the recovery floor and write that
+down so nobody is surprised. **Written down, Phase 8**: both `README.md` and
+`client-notes.md` say the git seeds are the floor, and that the one thing they
+do not cover is an uploaded photograph. Refreshing them still has no tool —
+open item 2.
 
 **11. Orphaned storage objects.**
 Deleting an item does not delete its photo. Needs a cleanup pass scoped to one
@@ -1761,7 +1837,26 @@ job — but it is the reason the bucket will never be provably tidy.
    in the bucket. If the project is lost, the site falls back to the
    photographs it shipped with, which is a correct site — but it is not the
    site the owner had. Anything better means downloading the bucket, which is a
-   Phase 8 handoff note, not a tool.
+   Phase 8 handoff note, not a tool. **Written, 2026-08-02** — `README.md`
+   ("Backing up") and `client-notes.md` both say it, the second in the owner's
+   language and next to the advice to keep the originals.
+
+   **The rest of this item is still open after Phase 8, and it is worth being
+   exact about why.** Phase 8's brief was "refresh the seed arrays from live
+   data", and on 2026-08-02 that was a no-op: `check-live-project.mjs` reports
+   all five comparisons identical, because the owner has not edited anything
+   yet. So nothing forced the mechanism into existence and none was built. The
+   shape of the problem has not changed: the arrow runs database → markup →
+   extractors → seeds, and it is the *first* step that does not exist. Two
+   things a future session should know before starting it. The seed files are
+   not uniformly generated — `seed-menu.js`, `seed-copy.js` and `seed-photos.js`
+   come from the extractors, while `seed-hours.js` and `seed-settings.js` are
+   hand-authored around prose that explains them, so a regenerator that rewrites
+   all five destroys the second pair. And a refresh that touches `seed-copy.js`
+   without touching the markup will fail `verify-phase1.mjs`, correctly: a
+   deliberate wording change is supposed to require an `INTENDED` entry. That is
+   the design working, and it means the write-back tool has to produce those
+   entries too, or hand the person a list to paste.
 3. **Staff logins would need an audit trail.** Settled for now as one shared
    account (see *Decisions*), which is why no `changed_by` column exists. If
    that changes, add the columns before the second account is created, not
@@ -2069,3 +2164,22 @@ job — but it is the reason the bucket will never be provably tidy.
   the harness, not only the code.** A green suite tells you nothing about the
   paths the harness never reached, and the only way to find those is to break
   something and be surprised that nobody noticed.
+
+- **2026-08-02 — a Phase 9 was added, because Phase 8 was not the end of the
+  work, only the end of the work a machine can do.** The plan had eight phases
+  and the position marker had nowhere to go once the eighth was ticked. The
+  alternative was to delete the marker, which is one of the four kinds of rot
+  this file names at the top. What is in Phase 9 is not new scope — it is the
+  browser rows the Phase 7 checklist already marks ⚠️, the three live-project
+  rows that need the owner's password, the FAQ answer, the POLICIES.md read and
+  the held merge. Collected in one place so the marker points at something true.
+
+- **2026-08-02 — Phase 8's "refresh the seed arrays from live data" was a
+  no-op, and the tool it implies was not built.** The seeds and the project
+  agree exactly, checked on the day; the owner has not edited anything yet.
+  Building a write-back on the strength of a comparison that is currently
+  identical would mean writing a tool with nothing real to test it against, and
+  the honest half of the job — writing down what it has to handle when someone
+  does build it — is in open item 2 instead. Recorded here rather than left to
+  be discovered as a missing script, because "refresh the seeds" reads like
+  something that happened.

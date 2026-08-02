@@ -149,6 +149,53 @@ console.log(`\nauditing ${DOC} (${lines.length} lines)\n`);
   }
 }
 
+/* ── 8. the number of harnesses it claims is the number there are ──────────
+   Check 6 catches a script nobody wrote down. It does not catch a *count*: the
+   heading said "the twenty-two harnesses" for the whole of Phase 7, over a
+   list that had grown to twenty-six and mentioned every one of them by name.
+   Nothing was missing, nothing was wrong except the first four words, and the
+   first four words are what someone skimming reads.
+
+   Counted from package.json's own `test` script rather than from the list
+   below the heading, because the question is how many `npm test` runs — the
+   list is what is being audited, so it cannot also be the authority.
+
+   README.md is held to the same number in digits. It is the file the next
+   developer opens first and the one with no other guard on it at all. */
+{
+  const pkg = JSON.parse(readFileSync("package.json", "utf8"));
+  const n = new Set([...(pkg.scripts.test || "").matchAll(/npm run ([\w:]+)/g)]
+    .map((m) => m[1])).size;
+
+  const UNITS = ["zero", "one", "two", "three", "four", "five", "six", "seven",
+                 "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen",
+                 "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"];
+  const TENS = ["", "", "twenty", "thirty", "forty", "fifty", "sixty",
+                "seventy", "eighty", "ninety"];
+  const word = (v) => v < 20 ? UNITS[v]
+    : TENS[Math.floor(v / 10)] + (v % 10 ? "-" + UNITS[v % 10] : "");
+
+  const spelled = word(n);
+  const heading = text.match(/^### The ([\w-]+) harnesses/m);
+  if (!heading) {
+    fail("no heading naming how many harnesses there are",
+         `expected "### The ${spelled} harnesses, and what each is for"`);
+  } else if (heading[1] !== spelled) {
+    fail("it claims the wrong number of harnesses",
+         `${DOC} says ${heading[1]}, npm test runs ${n} (${spelled})`);
+  } else {
+    pass(`the ${spelled} harnesses it names are the ${spelled} npm test runs`);
+  }
+
+  const readme = readFileSync("README.md", "utf8");
+  if (!new RegExp(`\\b${n} harnesses\\b`).test(readme)) {
+    fail("README.md does not say how many harnesses there are, or says the wrong number",
+         `npm test runs ${n}; README.md should say "${n} harnesses"`);
+  } else {
+    pass(`README.md agrees there are ${n}`);
+  }
+}
+
 console.log(failures
   ? `\n${failures} thing(s) in ${DOC} have drifted — fix the file, not this check`
   : `\n${DOC} still points at reality`);
