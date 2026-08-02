@@ -607,6 +607,52 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
   justify-content:flex-end; color:var(--cream); overflow:hidden;
 }
 .hero__media{ position:absolute; inset:-12% 0; z-index:0; }
+
+/* ── the same drift, run on the compositor ─────────────────────────────────
+   script.js drives this backdrop and the wine one from a rAF loop, which on iOS
+   can never be smooth: Safari scrolls on the compositor thread, so a transform
+   computed in JS is always measured against a scroll position that has already
+   moved on, and the photo trails the page by a frame. A view() timeline is
+   evaluated on that same compositor thread, against the same scroll position it
+   is using to move the page, so the two travel together. Where this is supported
+   script.js stands down — it tests for the same feature — and these rules take
+   over; where it is not, the loop runs exactly as it did.
+
+   The percentages are the JS clamp restated. Each backdrop is inset by -P% of
+   its section, so it overhangs by P% of the section at each end and its own
+   height is (100 + 2P)% of the section — which makes the travel allowance
+   P/(100+2P) of the element's own height, and a translate % resolves against
+   the element's own height. Hero: 12/124 = 9.68%. Wine: 8/116 = 6.9%.
+
+   Both reach that allowance well before their section leaves frame, exactly as
+   the clamp does, so each list holds at its limit and ramps through the middle
+   rather than spreading the travel across the whole range. Keep these in step
+   with the insets above and on .wine__bg: the percentages are derived from them,
+   and nothing will fail loudly if they drift apart — the photo will just start
+   sliding inside its own frame.
+
+   No animation-duration anywhere on purpose. Its initial value is auto, which a
+   progress-based timeline resolves to the whole range; setting it to a time (or
+   using the `animation` shorthand, which sets 0s) breaks that. The shorthand
+   also resets animation-timeline, so these have to stay longhand. */
+@supports (animation-timeline: view()) {
+  .hero{ view-timeline-name:--hero-pan; }
+  .wine{ view-timeline-name:--wine-pan; }
+  .hero__media, .wine__bg{
+    animation-fill-mode:both; animation-timing-function:linear;
+    animation-range: cover 0% cover 100%;
+  }
+  .hero__media{ animation-name:hero-pan; animation-timeline:--hero-pan; }
+  .wine__bg{ animation-name:wine-pan; animation-timeline:--wine-pan; }
+}
+@keyframes hero-pan{
+  0%,26%   { transform:translate3d(0,9.68%,0); }
+  74%,100% { transform:translate3d(0,-9.68%,0); }
+}
+@keyframes wine-pan{
+  0%,24%   { transform:translate3d(0,6.9%,0); }
+  76%,100% { transform:translate3d(0,-6.9%,0); }
+}
 .hero__scrim{
   position:absolute; inset:0; z-index:1;
   background:linear-gradient(180deg, rgba(29,13,15,.42) 0%, rgba(29,13,15,.08) 38%, rgba(29,13,15,.66) 100%);
@@ -841,10 +887,27 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
   flex:0 0 clamp(220px,22vw,320px);
   position:relative; border-radius:6px; overflow:hidden;
 }
+/* No filter on a resting plate, and this is the third place in this file that
+   rule has had to be learned: the mask on .reel__viewport above, the saturate on
+   .wine__bg below, and this. Each plate sits inside .reel__track, which is
+   width:max-content — around five thousand pixels — and carries a permanently
+   running transform animation, inside an overflow:hidden viewport, and animates
+   its own opacity and transform on arrival besides. A filter puts its subtree
+   through an offscreen compositing pass; WebKit then flattens that pass into the
+   animated ancestor's surface at the full width of the track, the raster fails,
+   and the layer comes back empty — no plates and no drift, on every iPhone and
+   iPad, while Blink tiles the same layer without complaining and Android looks
+   perfect. The brightness(.92) is now the flat overlay below; the saturate(.94)
+   is gone, a 6% shift under a gradient that already covers the bottom half. */
 .plate img{
   aspect-ratio:4/3.2; height:auto;
   transition:transform 1.1s var(--ease), filter .6s var(--ease);
-  filter:saturate(.94) brightness(.92);
+}
+/* the 8% darkening filter:brightness used to do, composited for free */
+.plate::before{
+  content:""; position:absolute; inset:0;
+  background:rgba(20,7,8,.08); pointer-events:none;
+  transition:background .6s var(--ease);
 }
 .plate::after{
   content:""; position:absolute; inset:auto 0 0 0; height:56%;
@@ -856,9 +919,16 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
   font-size:10.5px; letter-spacing:.22em; text-transform:uppercase; font-weight:600;
   opacity:.82; transition:opacity .4s var(--ease), transform .5s var(--ease);
 }
-.reel:hover .plate:not(:hover) img{ filter:saturate(.7) brightness(.62); }
-.plate:hover img{ transform:scale(1.06); filter:saturate(1) brightness(1); }
-.plate:hover figcaption{ opacity:1; transform:translateY(-2px); }
+/* The dimming of the other plates is still a filter, and still fine, because it
+   only exists while a pointer is resting on the reel — which is to say never on
+   the devices that cannot take it. Gating on hover:hover keeps the declaration
+   out of iOS's stylesheet entirely rather than trusting it to go unmatched. */
+@media (hover:hover){
+  .reel:hover .plate:not(:hover) img{ filter:saturate(.7) brightness(.62); }
+  .plate:hover img{ transform:scale(1.06); }
+  .plate:hover::before{ background:transparent; }  /* the old brightness(1) */
+  .plate:hover figcaption{ opacity:1; transform:translateY(-2px); }
+}
 
 /* ── the carte ─────────────────────────────── */
 .carte{
@@ -1253,7 +1323,42 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
    this; .mhead__bg keeps its filter because nothing animates it. Nothing takes
    its place because .wine__scrim already sits at 90–96% opacity over this photo,
    where a 15% desaturation is not a difference anyone can see. */
-.wine__bg img{ object-position:center 30%; }
+.wine__bg img{ position:absolute; inset:0; object-position:center 30%; }
+/* On a narrow portrait viewport this section stacks to one column and the
+   backdrop grows with the whole section. Bounding it to the viewport keeps
+   iOS from dropping the image layer while it holds a tall raster behind a
+   near-opaque scrim. Landscape keeps the original overhanging treatment.
+
+   Bounding it to one viewport asks for a raster around 700×930 instead — a
+   twentieth of the pixels — and the parallax goes with it, since a backdrop that
+   no longer overhangs its section has no slack to travel in. That costs nothing
+   visible: this photo is a texture behind a near-opaque scrim, not an image
+   anyone reads. The gradient carries its bottom edge into the section's own
+   background so the cut does not show. Both paths are covered — script.js clamps
+   travel to the overscan an element actually has, which is now none, and
+   animation:none takes out the compositor timeline for the browsers that have it.
+   The explicit transform and will-change reset below also beats script.js's
+   inline fallback on WebKit builds that do not support view timelines.
+
+   A mask would fade that edge more cleanly and must not be used here; see the
+   note on .reel__viewport for what masks do to this section on iOS. */
+@media (max-width:760px), (max-width:1020px) and (orientation:portrait){
+  .wine__bg{
+    inset:0 0 auto 0;
+    height:100vh;
+    height:100svh;
+    animation:none !important;
+    transform:none !important;
+    will-change:auto !important;
+  }
+  .wine__bg img{ position:absolute; inset:0; }
+  .wine__bg::after{
+    content:""; position:absolute; inset:auto 0 0 0; height:38%;
+    background:linear-gradient(to bottom, rgba(24,8,9,0), var(--oxblood-deep));
+    pointer-events:none;
+  }
+  .wine__board[data-reveal-img]{ clip-path:inset(0 round 6px); opacity:1; }
+}
 .wine__scrim{
   position:absolute; inset:0; z-index:1;
   background:

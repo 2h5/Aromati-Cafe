@@ -755,7 +755,7 @@ today, and it must keep working if the database is down, deleted or unpaid.
 
 ### Explicitly out of scope — do not build, do not break
 
-- **Build Your Own Breakfast** (`#build`, [script.js:656](script.js#L656)).
+- **Build Your Own Breakfast** (`#build`, [script.js:787](script.js#L787)).
   Stays hardcoded exactly as it is. Its chips carry `data-price` / `data-name`
   and it has its own bagel sub-field and hint map; making it editable is a
   content type of its own and the owner has not asked for it. **The Phase 1
@@ -867,7 +867,7 @@ was taken at plan time and the site may have moved.
 ### Hours — 5 places, not 3
 
 1. **The live open/closed pill** — ~~`script.js:755–756`~~ **done**, now
-   [script.js:785](script.js#L785) reading `SEED_HOURS`. What was there:
+   [script.js:925](script.js#L925) reading `SEED_HOURS`. What was there:
    ```js
    var OPEN  = 7 * 60;                          // 7:00 am, every day
    var CLOSE = [22, 22, 22, 23, 23, 23, 23];    // by day, Sun → Sat
@@ -1008,7 +1008,7 @@ from them.
 5. Dedupe the nav / mobile menu / footer chrome while it is being generated
    anyway — this is where the 11-edits-to-change-the-hours problem dies.
 6. Re-run every consumer of the old hardcoded values: the hours logic
-   ([script.js:785](script.js#L785)) reads `SEED_HOURS` and learns to handle
+   ([script.js:925](script.js#L925)) reads `SEED_HOURS` and learns to handle
    closed days; the JSON-LD is generated; both prose formats are generated.
 7. Error-guard every init block.
 
@@ -2213,3 +2213,48 @@ job — but it is the reason the bucket will never be provably tidy.
   does build it — is in open item 2 instead. Recorded here rather than left to
   be discovered as a missing script, because "refresh the seeds" reads like
   something that happened.
+
+- **2026-08-02 — three iOS-only rendering bugs, three fixes, none of them
+  verified to work.** Recorded as a failure rather than as progress, because the
+  tree now contains four changes that look like fixes and are not known to be.
+
+  The bugs: the hero parallax stutters on iPhone; the kitchen reel renders no
+  plates and no drift on iPhone *and* iPad; the wine backdrop is absent on iPhone
+  but fine on iPad. Android is perfect in all three, which is the whole shape of
+  the problem — every browser on iOS is WebKit, so these reproduce nowhere else.
+
+  What went in: the rAF parallax loop in `script.js` was reworked (batched reads
+  and writes instead of ~11 forced reflows a frame, `innerHeight` sampled on
+  resize instead of per frame because Safari changes it mid-scroll as the URL bar
+  moves, the loop sleeping when nothing moves, `will-change` scoped to on-screen
+  elements). The hero and wine backdrops were moved to a CSS `view()` scroll
+  timeline so the compositor drives them. `filter` came off `.plate img`. A
+  `max-width:760px` block bounded `.wine__bg` to one viewport. Each is defensible;
+  the loop repairs are worth keeping on their own merits. **None of them fixed the
+  reported symptom.**
+
+  The lesson is the same one this file already learned twice about harnesses,
+  moved to a new place: **inference is not observation.** All four changes were
+  reasoned from reading CSS on a Windows machine with no way to attach an
+  inspector to an iPhone, and no Windows browser can render WebKit — Chrome's
+  device emulation uses the engine that already works. The reel fix in particular
+  felt certain because it pattern-matched the two instances this file already
+  documents (the mask on `.reel__viewport`, the `filter` on `.wine__bg`, both
+  fixed by removal). Same shape, same reasoning, wrong answer. A third instance of
+  a known pattern is evidence, not proof, and the cost of treating it as proof was
+  three rounds of confident non-fixes.
+
+  The leading untested theory, which should have been checked first and was not:
+  `.plate` starts at `opacity:0` and only becomes visible when the reel's
+  IntersectionObserver adds `.in`. If that observer does not fire on WebKit, every
+  plate is invisible while the drift runs unseen — which matches "no images and no
+  motion" exactly, and which no amount of filter removal could ever have helped.
+  One look at the live DOM decides it.
+
+  `HANDOFF-ios.md` carries the detail for whoever picks this up on a Mac. A
+  temporary on-device readout was built and then deleted the same day, unused:
+  it existed only because the machine doing the work could not see the machine
+  with the bug, and a Mac with Safari's Web Inspector attached to the phone
+  replaces it completely. Nothing of it remains in the tree. If the next attempt
+  is ever made from Windows again, rebuild it rather than guessing — the Layers
+  panel is what this needed, and inference is what it got.

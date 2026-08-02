@@ -352,38 +352,109 @@
   /* ── parallax (rAF, transform-only) ─────────── */
   var pxEls = Array.prototype.slice.call(document.querySelectorAll("[data-parallax]"));
   var pxImgs = Array.prototype.slice.call(document.querySelectorAll("[data-parallax-img]"));
-  pxImgs.forEach(function (img) {
-    img.style.willChange = "transform";
-    img.style.transform = "scale(1.12)";
-  });
-  function parallax() {
-    var vh = window.innerHeight;
-    pxEls.forEach(function (el) {
-      var parent = el.parentElement;
-      var r = parent.getBoundingClientRect();
-      if (r.bottom < 0 || r.top > vh) return;
-      var speed = parseFloat(el.getAttribute("data-parallax")) || 0.2;
-      var off = (r.top + r.height / 2 - vh / 2) * speed;
+  /* Where the compositor can run the backdrops itself, let it: see styles.css,
+     "the same drift, run on the compositor". A view() timeline is evaluated on
+     the thread that moves the page, which is the one thing this loop cannot be
+     on iOS. The CSS covers every [data-parallax] backdrop, so when it applies
+     there is nothing left here to do for them — but the figure images have no
+     CSS equivalent yet and stay on the loop either way. */
+  if (window.CSS && CSS.supports && CSS.supports("animation-timeline", "view()")) pxEls = [];
+  /* will-change is a standing request for a compositor layer, so setting it here
+     on every parallax image pinned ten layers in video memory for the whole
+     session. iOS has the tightest layer budget of anything we run on: it starts
+     evicting and re-rasterising them mid-scroll, and that re-raster is a large
+     part of what read as lag. The flag is now raised per element, only while it
+     is actually on screen — see pxPaint. */
+  pxImgs.forEach(function (img) { img.style.transform = "scale(1.12)"; });
+
+  /* window.innerHeight is not a constant on a phone. Safari grows and shrinks it
+     as the URL bar collapses and expands, and it does that DURING the very
+     scroll this reads it from. Sampling it per frame fed a moving viewport
+     height into every offset below, so the backdrop lurched at exactly the
+     moment the visitor was scrolling fastest. Sample it on resize instead and
+     let the photo travel against a viewport that holds still. */
+  var pxVH = window.innerHeight;
+
+  /* Measure and paint are separate passes. Interleaved — as they were, one
+     element at a time — each transform write invalidated layout for the next
+     getBoundingClientRect(), forcing a synchronous reflow: eleven per frame, at
+     up to 120Hz on a ProMotion phone. Read everything, then write everything. */
+  var pxOut = [], imgOut = [];
+  function pxMeasure() {
+    var i, n, el, parent, fig, r, speed, off, slack;
+    for (i = 0, n = pxEls.length; i < n; i++) {
+      el = pxEls[i]; parent = el.parentElement;
+      r = parent.getBoundingClientRect();
+      if (r.bottom < 0 || r.top > pxVH) { pxOut[i] = null; continue; }
+      speed = parseFloat(el.getAttribute("data-parallax")) || 0.2;
+      off = (r.top + r.height / 2 - pxVH / 2) * speed;
       /* Travel is a fraction of the SECTION's height, so a tall section asks the
          backdrop to move further than its own overscan allows and the photo
          slides out of frame — and any change in that height (a filter, an
          accordion) lands as a jump. Clamp to the slack the element actually has
          and neither can happen, whatever the section grows into. */
-      var slack = Math.max(0, (el.offsetHeight - parent.clientHeight) / 2);
+      slack = Math.max(0, (el.offsetHeight - parent.clientHeight) / 2);
       if (off > slack) off = slack;
       else if (off < -slack) off = -slack;
-      el.style.transform = "translateY(" + off.toFixed(1) + "px)";
-    });
-    pxImgs.forEach(function (img) {
-      var fig = img.closest("figure") || img.parentElement;
-      var r = fig.getBoundingClientRect();
-      if (r.bottom < 0 || r.top > vh) return;
-      var p = (r.top + r.height / 2 - vh / 2) / vh; // -0.5 .. 0.5
-      img.style.transform = "scale(1.14) translateY(" + (p * -7).toFixed(2) + "%)";
-    });
+      pxOut[i] = off;
+    }
+    for (i = 0, n = pxImgs.length; i < n; i++) {
+      fig = pxImgs[i].closest("figure") || pxImgs[i].parentElement;
+      r = fig.getBoundingClientRect();
+      if (r.bottom < 0 || r.top > pxVH) { imgOut[i] = null; continue; }
+      imgOut[i] = ((r.top + r.height / 2 - pxVH / 2) / pxVH) * -7; // -0.5..0.5 → %
+    }
+  }
+  function pxLayer(el, on) {
+    var want = on ? "transform" : "";
+    if (el.style.willChange !== want) el.style.willChange = want;
+  }
+  function pxPaint() {
+    var i, n;
+    for (i = 0, n = pxEls.length; i < n; i++) {
+      if (pxOut[i] === null) { pxLayer(pxEls[i], false); continue; }
+      pxLayer(pxEls[i], true);
+      /* translate3d, not translateY: the 3D form is what gets this promoted to
+         its own compositor layer on WebKit, so the scroll moves a texture the
+         GPU already holds instead of repainting the photo each frame. */
+      pxEls[i].style.transform = "translate3d(0," + pxOut[i].toFixed(1) + "px,0)";
+    }
+    for (i = 0, n = pxImgs.length; i < n; i++) {
+      if (imgOut[i] === null) { pxLayer(pxImgs[i], false); continue; }
+      pxLayer(pxImgs[i], true);
+      pxImgs[i].style.transform = "scale(1.14) translate3d(0," + imgOut[i].toFixed(2) + "%,0)";
+    }
+  }
+
+  /* The loop used to run forever whether or not anything had moved: 120 wakeups
+     a second on a ProMotion phone, each doing the full measure, holding the CPU
+     out of idle and warming it toward the thermal throttle that then made the
+     scroll it was decorating worse. It now sleeps once the page has been still
+     for a moment, and anything that can move it wakes it again. */
+  var pxRunning = false, pxStill = 0, pxLastY = -1;
+  function parallax() {
+    var y = window.scrollY;
+    if (y !== pxLastY) { pxLastY = y; pxStill = 0; }
+    else if (++pxStill > 30) { pxRunning = false; return; }
+    pxMeasure();
+    pxPaint();
     requestAnimationFrame(parallax);
   }
-  if (!prefersReduced) requestAnimationFrame(parallax);
+  function pxWake() {
+    if (pxRunning) return;
+    pxRunning = true; pxStill = 0; pxLastY = -1;
+    requestAnimationFrame(parallax);
+  }
+  if (!prefersReduced) {
+    window.addEventListener("resize", function () { pxVH = window.innerHeight; pxWake(); }, { passive: true });
+    window.addEventListener("scroll", pxWake, { passive: true });
+    /* Sleeping means a layout change that moves a section without scrolling —
+       an accordion, a reveal settling — would otherwise leave the backdrop on a
+       stale offset until the next scrolled pixel. These two cover that. */
+    window.addEventListener("transitionend", pxWake, true);
+    document.addEventListener("click", pxWake, true);
+    pxWake();
+  }
 
   /* ═══════════ KITCHEN ═══════════ */
 
