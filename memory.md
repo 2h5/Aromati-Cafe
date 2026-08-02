@@ -435,6 +435,26 @@ fastest, and they guard the thing that has broken most often.
   earlier draft compared arrays with `===`, so every "nothing threw" check was
   unfailable — found by the sabotage run, and the reason the comparison now goes
   through `JSON.stringify`.
+- `tools/page-boot.mjs` — **not a test.** The jsdom rig `test-resilience.mjs` and
+  `test-hours-live.mjs` share: a real page, real `render.js`, real `script.js`,
+  `fetch` under the harness's control and the clock stopped at a fixed
+  Wednesday. Built once because two copies would drift and the drifted one would
+  go on passing. It deliberately asserts *nothing* — a shared helper with
+  opinions about what a good page looks like ends up deciding what its callers
+  are allowed to ask.
+- `tools/test-hours-live.mjs` (`npm run test:hourslive`) — the Phase 7 Hours
+  rows. `test-hours.mjs` covers the *shapes* by injecting one week as
+  `SEED_HOURS` and rendering, which hands `render.js` and `script.js` the same
+  array by construction — so they can never be caught disagreeing. This serves a
+  week from the database that shares **no time at all** with
+  `data/seed-hours.js` (checked, as its first assertion: if a time matched, a
+  consumer that never updated would pass by coincidence) and requires all five
+  places the hours are printed to follow the rows.
+
+  **It found the one real bug of the Phase 7 pass** — see Deviations, "the pill
+  read the seed file". Also confirms the checklist's own note that "today's
+  model hardcodes one opening time" is stale: seven distinct opening times
+  render as seven table lines, seven footer lines and seven JSON-LD entries.
 - `tools/check-csp.mjs` (`npm run check:csp`) — the Content-Security-Policy in
   `_headers`, checked against the site it protects. A CSP is the one control
   whose failure mode is the *site* breaking, quietly, and only in production:
@@ -1879,3 +1899,42 @@ job — but it is the reason the bucket will never be provably tidy.
   reject the first correct thing that looks different** — and the direction that
   matters is which way it fails: this one would have failed loudly, but the
   schema-qualified match failed silently, which is why it lasted a phase.
+
+- **2026-08-01 — the open/closed pill read the seed file, not the database.**
+  Found by `tools/test-hours-live.mjs` on the first run of the Phase 7 Hours
+  rows, and it is the one real bug the pass turned up.
+
+  The hours are printed in five places. Four are `render.js`'s — the Visit
+  table, the footer prose, the mobile-menu prose and the JSON-LD listing — and
+  all four followed the database correctly. The fifth is the pill, which
+  `script.js` owns because it is the only one that needs to know the time, and
+  it opened with `var HOURS = SEED_HOURS`. So from Phase 4 onwards it was wired
+  to the *offline fallback*: the owner changes the hours, the table below the
+  pill rebuilds from the new week, and the pill goes on announcing the old one.
+  Both on the same screen. Nothing thrown, nothing logged, and the 60-second
+  tick re-rendered it from the stale array forever.
+
+  Two mistakes, and the second is the one worth remembering. Reading
+  `SEED_HOURS` was the obvious half. The other half is that the network answers
+  **after** `script.js` has run, so a value captured at boot is the old week no
+  matter which source it was read from — fixing only the source would have left
+  a bug that reproduces on every visit and looks fixed on a page you reload
+  after the cache is warm.
+
+  Fixed on both sides: `week()` reads `AROMATI_DATA.current().hours` on every
+  render and falls back to `SEED_HOURS`, and `render.js` now fires
+  `aromati:content-changed` on every second paint. That is a *second* event
+  beside `aromati:board-replaced`, deliberately — the existing one means "tear
+  the menu wiring down and rebuild it", which is far too heavy to fire for an
+  hours-only edit and would replay the entrance cascade over a settled board.
+  The new event also repairs a smaller thing nobody had noticed: `renderHours`
+  rebuilds the Visit table's list items, wiping the `is-today` highlight that
+  `script.js` had put there.
+
+  **Why no existing test caught it**: `tools/test-hours.mjs` injects one week as
+  `SEED_HOURS` and renders, so `render.js` and `script.js` are handed the same
+  array by construction and cannot be caught disagreeing. It was a thorough test
+  of the wrong question — the shapes, not the source. The new harness's first
+  assertion is that the week it serves shares no time with `data/seed-hours.js`,
+  because if one matched, a consumer that never updated would pass by
+  coincidence.

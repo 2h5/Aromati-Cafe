@@ -22,127 +22,11 @@
    really be in at some point — a café's wifi, an expired project, an owner who
    emptied a course to retype it and went to lunch. */
 
-import { readFileSync, existsSync } from "node:fs";
-import { JSDOM } from "jsdom";
+import { boot, settle, seedEnv, seedRows, serve, reporter } from "./page-boot.mjs";
 
-let failures = 0;
-const fail = (msg, detail) => {
-  failures++;
-  console.log(`  FAIL ${msg}`);
-  if (detail) console.log(String(detail).split("\n").slice(0, 10).map((l) => `         ${l}`).join("\n"));
-};
-const pass = (msg) => console.log(`  ok   ${msg}`);
-/* By value, not by identity. Half of what is compared here is a list of
-   messages that should be empty, and `[] === []` is false — a check that can
-   never pass is worse than no check, because it looks like coverage. */
-const check = (what, got, want) => {
-  const same = JSON.stringify(got) === JSON.stringify(want);
-  if (same) pass(what);
-  else fail(what, `want: ${JSON.stringify(want)}\n got: ${JSON.stringify(got)}`);
-};
+const { state, fail, pass, check } = reporter();
 
 const PAGES = ["index.html", "faq.html", "menu-food.html", "menu-drinks.html", "menu-wine.html"];
-
-/* ── booting a real page ──────────────────────────────────────────────────
-   The script tags are read off the page rather than listed here, for the same
-   reason verify-phase1.mjs does it: a page that starts loading a new file must
-   not keep passing a test that never loads it. lenis and config.js are the two
-   exceptions — the first is a third-party animation library with nothing to
-   say about resilience, and the second is replaced so no request can leave the
-   machine even if a stub is wrong.
-
-   `fetcher` is what makes each section different. It is installed before
-   data.js runs, because data.js reads `fetch` at refresh() time and refresh()
-   is called from render.js at the bottom of the page.
-
-   The clock is frozen for every boot. The open/closed pill is the one thing on
-   these pages that changes by itself, and a harness whose result depends on
-   when it was run is a harness people stop believing. */
-const FROZEN = "2026-08-05T15:30";        // a Wednesday, mid-afternoon, New York
-
-function boot(page, { fetcher, cache = null, key = "k".repeat(40), seedOnly = false } = {}) {
-  /* pretendToBeVisual buys requestAnimationFrame, which the tab filter needs:
-     it commits the new selection inside a rAF so the height lock and the
-     repaint land in the same frame. Without it a click schedules a callback
-     that throws in a timer, outside any try/catch on the page — which is how a
-     harness ends up killing itself instead of reporting. */
-  const dom = new JSDOM(readFileSync(page, "utf8"), {
-    runScripts: "dangerously",
-    pretendToBeVisual: true,
-    url: "https://aromatinyc.com/" + page
-  });
-  const { window } = dom;
-
-  const errors = [];       // console.error — the site's own report of a broken step
-  const warnings = [];     // console.warn  — expected, and not a failure
-  const thrown = [];       // an exception that escaped a <script> entirely
-  window.console = {
-    log() {}, info() {}, debug() {},
-    warn: (...a) => warnings.push(a.map(String).join(" ")),
-    error: (...a) => errors.push(a.map(String).join(" "))
-  };
-  window.addEventListener("error", (e) => thrown.push(String(e.error || e.message)));
-
-  const fixed = new Date(`${FROZEN}:00-04:00`).getTime();   // New York is UTC-4 in August
-  const RealDate = window.Date;
-  class FakeDate extends RealDate {
-    constructor(...args) { super(...(args.length ? args : [fixed])); }
-    static now() { return fixed; }
-  }
-  window.Date = FakeDate;
-
-  /* script.js expects a browser. Reporting reduced motion is the honest stub —
-     a real code path the site supports — and it keeps the choreography out of
-     a test that is about what survives, not about how it arrives. */
-  window.matchMedia = () => ({ matches: true, addListener() {}, addEventListener() {} });
-  window.IntersectionObserver = class { observe() {} unobserve() {} disconnect() {} };
-  window.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
-  window.scrollTo = () => {};
-
-  const store = new Map();
-  if (cache) store.set("aromati:content:v2", JSON.stringify(cache));
-  Object.defineProperty(window, "localStorage", {
-    configurable: true,
-    value: {
-      getItem: (k) => (store.has(k) ? store.get(k) : null),
-      setItem: (k, v) => store.set(k, String(v)),
-      removeItem: (k) => store.delete(k)
-    }
-  });
-
-  const requests = [];
-  window.fetch = (...a) => {
-    requests.push(String(a[0]));
-    if (!fetcher) return Promise.reject(new Error("no fetcher installed"));
-    return fetcher(...a);
-  };
-
-  const inject = (code) => {
-    const s = window.document.createElement("script");
-    s.textContent = code;
-    window.document.body.appendChild(s);
-  };
-
-  /* config.js is never the real one. seedOnly is the file:// case: no key at
-     all, which is what a page opened from a folder actually has once config.js
-     has not been filled in — and what data.js treats as "do not even ask". */
-  inject(`var AROMATI_CONFIG = { url: "https://stub.invalid", anonKey: ${
-    seedOnly ? '""' : JSON.stringify(key)} };`);
-
-  const srcs = [...window.document.querySelectorAll("script[src]")]
-    .map((s) => s.getAttribute("src"))
-    .filter((src) => !/lenis|config\.js/.test(src));
-  for (const src of srcs) {
-    if (!existsSync(src)) throw new Error(`${page} loads ${src}, which does not exist`);
-    inject(readFileSync(src, "utf8"));
-  }
-
-  return { window, doc: window.document, errors, warnings, thrown, requests, store };
-}
-
-/* Let refresh()'s promise chain settle. Two turns: one for the fetch, one for
-   the .then that paints. */
-const settle = () => new Promise((r) => setTimeout(r, 20));
 
 /* ── what a visitor can see ───────────────────────────────────────────────
    Named the way the checklist rows are worded, so a failure reads as the thing
@@ -170,87 +54,6 @@ function survey(doc) {
 function boardText(doc) {
   const host = doc.getElementById("carteBody");
   return host ? host.textContent.replace(/\s+/g, " ").trim() : "";
-}
-
-/* ── seed data, as rows ───────────────────────────────────────────────────
-   The stub serves the seeds back through the shape PostgREST would, so a
-   section that wants "the site, but with one course emptied" can say exactly
-   that instead of hand-writing a menu. Built by running the seed files. */
-const seedEnv = {};
-for (const f of ["data/seed-settings.js", "data/seed-hours.js", "data/seed-menu.js",
-                 "data/seed-copy.js", "data/seed-photos.js"]) {
-  new Function("g", `with (g) { ${readFileSync(f, "utf8")} }
-    g.SEED_MENU = typeof SEED_MENU !== "undefined" ? SEED_MENU : g.SEED_MENU;
-    g.SEED_HOURS = typeof SEED_HOURS !== "undefined" ? SEED_HOURS : g.SEED_HOURS;
-    g.SEED_HOURS_NOTE = typeof SEED_HOURS_NOTE !== "undefined" ? SEED_HOURS_NOTE : g.SEED_HOURS_NOTE;
-    g.SEED_SETTINGS = typeof SEED_SETTINGS !== "undefined" ? SEED_SETTINGS : g.SEED_SETTINGS;
-    g.SEED_COPY = typeof SEED_COPY !== "undefined" ? SEED_COPY : g.SEED_COPY;`)(seedEnv);
-}
-
-/* seed-menu.js → the rows menu_courses and menu_items would hold. `edit` gets
-   the course list for a page and may drop, empty or reorder it before the rows
-   are built, which is how the two "deleted" sections are written. */
-function menuRows(edit) {
-  const pages = JSON.parse(JSON.stringify(seedEnv.SEED_MENU));
-  if (edit) edit(pages);
-
-  const courses = [], items = [];
-  let cid = 0, iid = 0;
-  for (const page of Object.keys(pages)) {
-    pages[page].forEach((c, ci) => {
-      cid++;
-      courses.push({
-        id: "c" + cid, page, course_key: c.key, tab_label: c.tabLabel, heading: c.heading,
-        sizes: c.sizes || null, is_static: !!c.isStatic, static_id: c.staticId || null,
-        sort_order: ci
-      });
-      (c.items || []).forEach((it, ii) => {
-        iid++;
-        items.push({
-          id: "i" + iid, course_id: "c" + cid, name: it.name, tag: it.tag || null,
-          description: it.desc || null,
-          price: it.price != null ? it.price : null,
-          prices: it.prices != null ? it.prices : null,
-          price_all_sizes: it.priceAllSizes != null ? it.priceAllSizes : null,
-          no_price: !!it.noPrice, options_dom_id: it.optionsId || null, sort_order: ii,
-          menu_item_pours: (it.pours || []).map((p, pi) => ({
-            id: `p${iid}_${pi}`, label: p.label, price: p.price, sort_order: pi })),
-          menu_item_options: (it.options || []).map((o, oi) => ({
-            id: `o${iid}_${oi}`, name: o.name, price: o.price, sort_order: oi }))
-        });
-      });
-    });
-  }
-  return { courses, items };
-}
-
-function seedRows(edit) {
-  const { courses, items } = menuRows(edit);
-  return {
-    site_settings: Object.keys(seedEnv.SEED_SETTINGS).map((key) => ({
-      key, value: String(seedEnv.SEED_SETTINGS[key]) })),
-    business_hours: seedEnv.SEED_HOURS.map((h, i) => ({
-      day_of_week: i, is_closed: !!h.closed,
-      opens_at: h.closed ? null : mins(h.opens), closes_at: h.closed ? null : mins(h.closes) })),
-    site_copy: Object.keys(seedEnv.SEED_COPY).map((key) => ({ key, value: seedEnv.SEED_COPY[key] })),
-    menu_courses: courses,
-    menu_items: items,
-    photos: []
-  };
-}
-const mins = (m) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}:00`;
-
-/* A fetcher over a table→rows map. `shuffle` hands the rows back in a
-   different order every call, which is what PostgREST is entitled to do for
-   anything data.js does not explicitly sort. */
-function serve(rows, { shuffle = null } = {}) {
-  return async (url) => {
-    const table = String(url).split("/rest/v1/")[1].split("?")[0];
-    if (!(table in rows)) throw new Error(`the stub does not answer ${table}`);
-    let out = rows[table];
-    if (shuffle) out = shuffle(out.slice(), table);
-    return { ok: true, status: 200, json: async () => JSON.parse(JSON.stringify(out)) };
-  };
 }
 
 console.log("\nthe site with the data taken away\n");
@@ -338,7 +141,7 @@ console.log("\nthe site with the data taken away\n");
   const whole = boot("menu-food.html", { fetcher: serve(seedRows()) });
   await settle();
 
-  const p = boot("menu-food.html", { fetcher: serve(seedRows((pages) => { pages.food[0].items = []; })) });
+  const p = boot("menu-food.html", { fetcher: serve(seedRows({ menu: (pages) => { pages.food[0].items = []; } })) });
   await settle();
   const s = survey(p.doc);
 
@@ -368,7 +171,7 @@ console.log("\nthe site with the data taken away\n");
    locks the board height; both are arithmetic over a list that is now empty. */
 {
   console.log("\nevery course on the page is deleted");
-  const rows = seedRows((pages) => { pages.food = []; });
+  const rows = seedRows({ menu: (pages) => { pages.food = []; } });
 
   const p = boot("menu-food.html", { fetcher: serve(rows) });
   await settle();
@@ -490,7 +293,7 @@ console.log("\nthe site with the data taken away\n");
   }
 }
 
-console.log(failures
-  ? `\n${failures} resilience problem(s)`
+console.log(state.failures
+  ? `\n${state.failures} resilience problem(s)`
   : "\nthe site survives a dead network, a wrong URL, an emptied course and an empty page");
-process.exit(failures ? 1 : 0);
+process.exit(state.failures ? 1 : 0);

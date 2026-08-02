@@ -836,14 +836,28 @@
     var list = document.getElementById("hoursList");
     if (!status && !list) return;
 
-    /* The hours live in data/seed-hours.js, which render.js has already used to
-       write the table, the two prose formats and the Google listing block. This
-       reads the same array so the pill can never disagree with the page around
-       it. The old constants — one opening time, a per-day closing array — could
-       not express a closed day; this can. */
-    var HOURS = (typeof SEED_HOURS !== "undefined" && SEED_HOURS) || null;
+    /* The same hours render.js used for the table, the two prose formats and
+       the Google listing block, so the pill can never disagree with the page
+       around it. The old constants — one opening time, a per-day closing array
+       — could not express a closed day; this can.
+
+       Read through AROMATI_DATA rather than from SEED_HOURS, and read again on
+       every render rather than once at boot. Both halves matter. From Phase 4
+       the hours come from the database and the seed file is only the offline
+       floor, so a pill wired to SEED_HOURS is wired to the fallback; and the
+       network answers *after* this block has already run, so a value captured
+       at boot is the old week no matter where it was read from. `current()`
+       returns cache-or-seed and is written before refresh calls back, which is
+       what makes re-reading enough. */
     var DAY = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    if (!HOURS) return;                                 // no data, no claim
+
+    function week() {
+      var live = typeof AROMATI_DATA === "object" && AROMATI_DATA
+        ? (AROMATI_DATA.current() || {}).hours
+        : null;
+      return live || (typeof SEED_HOURS !== "undefined" && SEED_HOURS) || null;
+    }
+    if (!week()) return;                                // no data, no claim
     var fmt;
     try {
       fmt = new Intl.DateTimeFormat("en-US", {
@@ -874,18 +888,22 @@
        than assuming tomorrow, so a run of closed days reads correctly instead
        of promising a door that stays shut. Stops after a week: if every day is
        closed there is nothing truthful to say. */
-    function nextOpening(fromDay) {
+    function nextOpening(hours, fromDay) {
       for (var i = 1; i <= 7; i++) {
         var day = (fromDay + i) % 7;
-        var h = HOURS[day];
+        var h = hours[day];
         if (h && !h.closed) return { day: day, opens: h.opens, days: i };
       }
       return null;
     }
 
     function render() {
+      /* Read once per render and passed down, so a render cannot start on one
+         week and finish on another. */
+      var hours = week();
+      if (!hours) return;
       var now = nyNow();
-      var today = HOURS[now.day];
+      var today = hours[now.day];
       var open = !!today && !today.closed &&
         now.mins >= today.opens && now.mins < today.closes;
 
@@ -914,7 +932,7 @@
         status.textContent = "Closed · opens " + clock(today.opens);
         return;
       }
-      var next = nextOpening(now.day);
+      var next = nextOpening(hours, now.day);
       if (!next) { status.hidden = true; return; }
       status.textContent = "Closed · opens " + clock(next.opens) +
         (next.days === 1 ? " tomorrow" : " " + DAY[next.day]);
@@ -922,6 +940,15 @@
 
     render();
     setInterval(render, 60000);
+
+    /* The network answers after this block has run. render.js fires this on
+       every second paint; without it the pill would be up to a minute stale on
+       the tick, and permanently stale in the case that matters — the table
+       beside it rebuilt from the new hours while the pill kept the old ones.
+
+       It also repaints the `is-today` highlight, which renderHours wipes when
+       it rebuilds the Visit table's list items. */
+    document.addEventListener("aromati:content-changed", render);
   });
 
   /* ── back to top ────────────────────────────

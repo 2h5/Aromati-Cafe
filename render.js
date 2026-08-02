@@ -605,17 +605,38 @@
      board actually changed keeps a copy-only edit from replaying the cascade
      for no visible reason. */
 
+  function announce(name) {
+    try {
+      document.dispatchEvent(new CustomEvent(name));
+    } catch (err) {
+      /* CustomEvent is available everywhere this site runs; if it somehow is
+         not, the fresh content is on the page and static — worse than
+         animated, far better than absent. */
+      if (window.console) console.warn("render: could not announce " + name, err);
+    }
+  }
+
   source.refresh(function (fresh) {
     if (!fresh) return;
     var boardChanged = paint(fresh);
+
+    /* Two announcements, because they answer two different questions.
+
+       `content-changed` fires on every second paint. It is for the parts of
+       the page this file does not own — above all the open/closed pill, which
+       script.js writes because it is the only thing here that needs to know
+       the time. Without this the pill goes on reading the hours it was born
+       with, and a visitor sees last month's hours in the pill and this month's
+       in the table directly below it, on the same screen, with nothing logged
+       anywhere. That is not hypothetical; it is what tools/test-hours-live.mjs
+       caught, and the reason this event exists.
+
+       `board-replaced` fires only when the menu itself was rebuilt, and it
+       means something much heavier: tear the menu wiring down and set it up
+       again against the new nodes. Firing that for a copy-only or hours-only
+       edit would replay the entrance cascade over a board that had settled. */
+    announce("aromati:content-changed");
     if (!boardChanged) return;
-    try {
-      document.dispatchEvent(new CustomEvent("aromati:board-replaced"));
-    } catch (err) {
-      /* CustomEvent is available everywhere this site runs; if it somehow is
-         not, the fresh board is on the page and static — worse than animated,
-         far better than absent. */
-      if (window.console) console.warn("render: could not announce the new board", err);
-    }
+    announce("aromati:board-replaced");
   });
 })();
