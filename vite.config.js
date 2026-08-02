@@ -45,6 +45,16 @@ function classicScripts(root) {
   return [...found].sort();
 }
 
+/* Root files no page links to, so nothing above would ever pull them in, and
+   both fail *silently* when they are missing — which is how they went missing.
+   _headers is the entire security posture: Cloudflare Pages turns it into the
+   CSP, nosniff, and the noindex on admin.html. A deploy without it looks
+   identical and has none of them. robots.txt is the other half of keeping the
+   editor out of search results; the meta tag alone is the weaker half.
+   tools/check-csp.mjs reads these from the source tree, so it passes whether or
+   not they ever reached the build — it cannot catch this, and did not. */
+const ROOT_FILES = ["_headers", "robots.txt"];
+
 function copyClassicScripts() {
   let root = process.cwd();
   let outDir = "dist";
@@ -72,6 +82,25 @@ function copyClassicScripts() {
           "build: these scripts are referenced by a page but did not reach " +
           `${outDir}/ — the built site would load no JavaScript:\n  ` +
           missing.join("\n  ")
+        );
+      }
+
+      /* Same discipline as above: copy, then assert. A silent failure here is a
+         site that serves no CSP and an editor that search engines may index. */
+      const lost = [];
+      for (const name of ROOT_FILES) {
+        const from = resolve(root, name);
+        const to = resolve(root, outDir, name);
+        if (!existsSync(from)) { lost.push(`${name} (not in the source tree)`); continue; }
+        copyFileSync(from, to);
+        if (!existsSync(to)) lost.push(name);
+      }
+
+      if (lost.length) {
+        throw new Error(
+          `build: these root files did not reach ${outDir}/ — the deployed site ` +
+          "would have no CSP and no robots.txt, and would look completely " +
+          "normal:\n  " + lost.join("\n  ")
         );
       }
     }

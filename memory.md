@@ -2314,3 +2314,34 @@ job — but it is the reason the bucket will never be provably tidy.
   styling with `.navdrop.is-open .navdrop__btn` (`styles.css:329`), so the pill
   may stay gold after the panel is tapped shut. If it does, gate the `:hover`
   half of that selector and leave the `.is-open` half alone.
+
+- **2026-08-02 — every deploy so far shipped without `_headers` or
+  `robots.txt`.** Found while explaining why a Cloudflare Pages deploy did not
+  show the iOS fixes. The immediate cause of *that* was ordinary: `dist/` is
+  gitignored, so pulling the branch updated the source and left the build
+  untouched, and a build from before the fixes got uploaded. Opening
+  `index.html` locally reads the live source and so always looks correct, which
+  is what made the two disagree.
+
+  The real finding was underneath. `vite.config.js` copied the pages, the
+  classic scripts and the assets, and nothing copied root files that no page
+  links to. So `_headers` never reached `dist/` — and `_headers` *is* the
+  security posture on Pages: the CSP, `nosniff`, and the `X-Robots-Tag:
+  noindex` on `admin.html`, the one page holding the owner's session token. The
+  deployed site had none of them and looked exactly the same, which is the
+  failure mode the file's own opening comment warns about. `robots.txt` was
+  missing too, leaving the editor's meta tag as the only thing keeping it out
+  of search results.
+
+  `tools/check-csp.mjs` passed throughout and could not have caught this: it
+  reads `_headers` and `robots.txt` from the source tree, where they were
+  always present and always correct. Nothing audited the build output. That is
+  the general lesson — a check that reads the source proves nothing about what
+  ships.
+
+  Fixed by a `ROOT_FILES` list in the copy plugin, copied and then asserted the
+  same way the scripts already were, so a silent omission becomes a failed
+  build. Verified present in `dist/` after a rebuild. Still worth doing and not
+  done: point Cloudflare Pages at the GitHub repo with `npm run build` and an
+  output of `dist`, so a push deploys and nobody has to remember the build step
+  at all.
