@@ -253,8 +253,18 @@
       e.stopPropagation();
       open(!drop.classList.contains("is-open"));
     });
-    drop.addEventListener("mouseenter", function () { open(true); });
-    drop.addEventListener("mouseleave", function () {
+    /* Mouse only, and pointerType is the test rather than a hover:hover query:
+       an iPad with a trackpad attached reports hover:hover but still sends
+       pointerType "touch" for a finger, which is the case that broke. One tap
+       there synthesises enter *and* click, so the enter opened the panel and the
+       click toggled it straight back shut — the first tap only lit the pill up,
+       and it took a second one to open. Leaving hover to real pointers means
+       touch is carried by the click handler alone, which is one tap. */
+    drop.addEventListener("pointerenter", function (e) {
+      if (e.pointerType === "mouse") open(true);
+    });
+    drop.addEventListener("pointerleave", function (e) {
+      if (e.pointerType !== "mouse") return;
       // a beat of grace, so crossing the gap to the panel doesn't close it
       hoverTimer = setTimeout(function () { open(false); }, 160);
     });

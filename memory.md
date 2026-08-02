@@ -2285,3 +2285,32 @@ job — but it is the reason the bucket will never be provably tidy.
   replaces it completely. Nothing of it remains in the tree. If the next attempt
   is ever made from Windows again, rebuild it rather than guessing — the Layers
   panel is what this needed, and inference is what it got.
+
+- **2026-08-02 — the Menus dropdown took two taps on iPad, and the fix is
+  `pointerType`, not `hover:hover`.** Reported from the device: at a width wide
+  enough for the nav pill to show, the first tap only lit the pill up and the
+  second one opened the panel.
+
+  The dropdown listened for `mouseenter` and `click` both. One tap on iOS fires
+  both: the enter opened the panel, then the click handler toggled it — closing
+  it in the same tap. All that was left was Safari's synthesised `:hover` on the
+  pill, which reads as a highlight. The second tap worked because Safari does not
+  re-fire `mouseenter` on an element it still considers hovered, so only the
+  toggle ran. The panel opens purely on `.is-open` from `script.js`; no CSS
+  `:hover` rule opens it, so this was entirely the JS race.
+
+  Hover open/close now runs on `pointerenter`/`pointerleave` gated to
+  `e.pointerType === "mouse"` (`script.js:252`). Note that this is deliberately
+  *not* the `@media (hover:hover)` guard the reel pause above uses: an iPad with
+  a Magic Keyboard trackpad reports `hover:hover` true while still sending
+  `pointerType: "touch"` for a finger, so the media query would have left this
+  exact case broken. `hover:hover` is the right test for a CSS rule that has no
+  event to inspect; `pointerType` is the right test when there is one.
+
+  Verified only that the syntax parses and that `test:pages`, `test:guards` and
+  `check:csp` pass — the behaviour itself is unconfirmed on device, like the
+  entry above. One loose end, also unconfirmed: iOS holds the synthesised
+  `:hover` until you touch elsewhere, and `.navdrop__btn:hover` shares its
+  styling with `.navdrop.is-open .navdrop__btn` (`styles.css:329`), so the pill
+  may stay gold after the panel is tapped shut. If it does, gate the `:hover`
+  half of that selector and leave the `.is-open` half alone.
