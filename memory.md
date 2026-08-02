@@ -1209,13 +1209,37 @@ picture sits in a particular container is not, and it is on the browser pass.
 
 ---
 
-### Phase 7 — Full test pass. ← *next*
+### Phase 7 — Full test pass. **Done for everything a machine can answer.**
 
-Work the checklist below. **Report failures; do not silently work around them.**
+Worked the checklist below. Failures reported, not worked around — one real bug
+in the site, one in a harness, one in the suite itself.
+
+**What the pass found**
+
+1. **`npm test` had been failing since `ac4615e`** — the email change never
+   told `verify-phase1.mjs`, whose whole job is to notice a changed string.
+   Found on the first command. The argument for running the whole suite rather
+   than the part you touched.
+2. **The open/closed pill never followed the database** — four of the five
+   hours consumers did; the fifth read `SEED_HOURS`. See Deviations. The one
+   real bug in the site.
+3. **The Phase 7 rig was serving settings the site ignores** — three harnesses
+   green while `renderContact` had never run. See Deviations. Found by a
+   sabotage that should have broken something and did not.
+
+**What it added** — five harnesses, all in `npm test`, all mutation-tested:
+`test-resilience.mjs`, `test-hours-live.mjs`, `test-menu-shapes.mjs`,
+`test-hostile-content.mjs`, and `page-boot.mjs` under them. Plus three size
+refusals `test-sql.mjs` was missing. 26 harnesses now.
+
+**What is left**, and it is only what a machine cannot answer: four browser
+rows (height-lock and scroll across a filter, a lone course centring, long item
+names, the photograph rows), and three live-project rows (`signUp()`, the 10 MB
+upload, the renamed `.exe`). Each is marked in the checklist with why.
 
 ---
 
-### Phase 8 — Handoff.
+### Phase 8 — Handoff. ← *next*
 
 Rewrite `README.md` to describe what the project *is* at that point — not what
 it was. Write `client-notes.md`: an owner-facing guide in the owner's language.
@@ -1232,35 +1256,56 @@ Refresh the seed arrays from live data.
 
 Ported from Uptown's, plus the Aromati-specific rows.
 
-**Resilience**
-- [ ] Kill the network after load, reload — seed data renders, hours still tick
-- [ ] Break the Supabase URL — site renders, no console errors visible to a user
-- [ ] Delete every item in a course — course renders an empty state, no crash
-- [ ] Delete every course on a page — page renders, tabs do not throw
-- [ ] Reload 5× — course and item order is stable
-- [ ] Open every page from `file://` — complete site from seed
+A ticked row means **a harness answers it and is in `npm test`**, not that it
+was tried once. The rows that stay open are the ones a harness genuinely cannot
+answer: they need a browser's layout, a live project, or the owner's eyes. Each
+one says which.
 
-**Hours** (all five consumers must move together)
-- [ ] Change hours in the editor → live status, Visit table, footer prose,
-      mobile-menu prose and JSON-LD all update
-- [ ] Boundary: exactly at opening minute (closed → open), exactly at closing
+**Resilience** — all six: `tools/test-resilience.mjs`
+- [x] Kill the network after load, reload — seed data renders, hours still tick
+- [x] Break the Supabase URL — site renders, no console errors visible to a user
+- [x] Delete every item in a course — course renders an empty state, no crash
+- [x] Delete every course on a page — page renders, tabs do not throw
+- [x] Reload 5× — course and item order is stable *(the rows are shuffled
+      differently on each of the five loads; identical input would prove only
+      that a function is deterministic)*
+- [x] Open every page from `file://` — complete site from seed
+
+**Hours** (all five consumers must move together) — `tools/test-hours-live.mjs`
+- [x] Change hours in the editor → live status, Visit table, footer prose,
+      mobile-menu prose and JSON-LD all update — **this one failed.** The pill
+      read `SEED_HOURS`; see Deviations. Fixed, and mutation-tested four ways.
+- [x] Boundary: exactly at opening minute (closed → open), exactly at closing
       minute (open → closed — the logic is `>= open && < close`, so the closing
-      minute reads as closed)
-- [ ] A day marked **closed** — status text, the "opens tomorrow" rollover from
+      minute reads as closed) — asked again here against hours that came from
+      the *database*, which is a different path from `test-hours.mjs`'s
+- [x] A day marked **closed** — status text, the "opens tomorrow" rollover from
       the previous day, and the table row
-- [ ] Different opening times per day (today's model hardcodes one)
+- [x] Different opening times per day — ~~today's model hardcodes one~~ **the
+      note was stale**: seven distinct opening times render as seven table
+      lines, seven footer lines and seven JSON-LD entries
 
-**Menu**
-- [ ] Each of the six price shapes renders correctly after a round-trip
-- [ ] A sized item with a blank size renders as "not offered", not `$`
-- [ ] Three sizes on a course is **rejected** (CSS grid is 2 columns)
-- [ ] Tab filter, height-lock and scroll correction behave after a data refresh
-- [ ] A course alone on its row still spans and centres
-      ([script.js:478](script.js#L478))
-- [ ] Build-Your-Own and the crêpe row still work, untouched
+**Menu** — `tools/test-menu-shapes.mjs` except where noted
+- [x] Each of the six price shapes renders correctly after a round-trip
+- [x] A sized item with a blank size renders as "not offered", not `$` —
+      checked in both places it can go wrong: the class `render.js` picks, and
+      the rule in `styles.css` that acts on it
+- [x] Three sizes on a course is **rejected** (CSS grid is 2 columns) —
+      `test-sql.mjs`, together with the empty array and the unnamed column,
+      which were equally untested
+- [x] Tab filter behaves after a data refresh
+- [ ] Height-lock and scroll correction after a data refresh — ⚠️ **needs a
+      browser.** jsdom has no layout, so the numbers this is about do not exist
+      in it. `test-replay.mjs` drives real Chrome and covers the spacer count;
+      the scroll position across a filter is still eyes.
+- [ ] A course alone on its row still spans and centres — ⚠️ **needs a
+      browser** ([script.js:478](script.js#L478))
+- [x] Build-Your-Own and the crêpe row still work, untouched — clicked, after
+      a rebuild of the board around them
 
 **Design integrity**
-- [ ] An over-long `data-split` headline is refused with a plain message
+- [x] An over-long `data-split` headline is refused with a plain message —
+      `test-admin.mjs`
 - [ ] Long item names / descriptions on the public site — ⚠️ **owner's test**
 - [x] A photo with no alt text blocks the save — `test-admin.mjs`, and the
       database refuses it twice over (`test-sql.mjs`)
@@ -1277,11 +1322,20 @@ Ported from Uptown's, plus the Aromati-specific rows.
       listing check stops skipping and has something to prove
 
 **Security** — see the section below for the full list
-- [ ] Logged out, attempt to read admin data — blocked
-- [ ] Logged out, attempt to write any content table — blocked
-- [ ] `signUp()` from the browser console — rejected
-- [ ] A second, non-allowlisted account can log in but cannot write anything
-- [ ] `<script>alert(1)</script>` as an item name — renders as literal text
+- [x] Logged out, attempt to read admin data — blocked. `test-rls.mjs`, and
+      again over the real network in `check-live-project.mjs`
+- [x] Logged out, attempt to write any content table — blocked. Same two, and
+      the live one covers seven writes a defaced site would need
+- [ ] `signUp()` from the browser console — rejected. ⚠️ **live only**: it is a
+      dashboard setting, so nothing in the repo can prove it. Disabled on
+      2026-08-01; needs confirming from a browser console once.
+- [x] A second, non-allowlisted account can log in but cannot write anything —
+      `test-rls.mjs` runs every check as three actors, and "a signed-in
+      stranger" is exactly this account
+- [x] `<script>alert(1)</script>` as an item name — renders as literal text.
+      `tools/test-hostile-content.mjs`, which puts six payloads through every
+      owner-typed field on all five pages; `test-rls.mjs` covers the storage
+      half
 - [ ] Upload a 10 MB file — rejected at the bucket, not just in the client.
       **The only way to test this is live**: the editor resizes everything to
       2000px first, so it never sends one, and the shim in `test-sql.mjs` has no
