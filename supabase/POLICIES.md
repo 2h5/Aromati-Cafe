@@ -181,3 +181,34 @@ is also exactly what a checker whose rules match nothing would do.
 **Nothing here has been tested against a real logged-out request.** That is
 Phase 3: the acceptance test is a `curl` with no credentials that can read the
 menu and cannot write it.
+
+---
+
+## Since this was written
+
+All four caveats above have been answered, and the answers belong next to the
+claims rather than only in `memory.md`.
+
+**The SQL has run.** Every migration is applied to the live project, and
+`npm run test:sql` builds the whole schema in a real Postgres on every test
+run, so it is now syntax-checked continuously rather than not at all.
+
+**A logged-out request has been tried, over HTTP, against the real project.**
+`tools/check-live-project.mjs` reads the menu with the publishable key and then
+attempts six writes a defaced site would need — editing a headline, adding an
+item, deleting the menu, closing the café, reading the owner allowlist, and
+asking whether it is the owner. All six are refused. It opens with a read that
+must *succeed*, because six refusals look identical to six requests that never
+arrived.
+
+**The three-actor check is real.** `tools/test-rls.mjs` runs every write three
+times — as the allowlisted owner, as a signed-in stranger, and logged out. The
+owner column is what proves the statement is executable at all; without it a
+refusal proves nothing about the policy that refused.
+
+**What this document describes is now what the editor does.** `admin.html` is
+the only thing that writes, and it writes exactly what these rules allow: it
+updates `site_settings` and `site_copy` values and never their labels or keys,
+it never inserts or deletes a setting, a copy field or a weekday, and it has
+full run of the menu, the holidays and the FAQ. If a rule below reads wrong to
+you, the editor is wrong too — say so.

@@ -23,7 +23,13 @@ import { copyFileSync, mkdirSync, readFileSync, existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { defineConfig } from "vite";
 
-const PAGES = ["index.html", "faq.html", "menu-food.html", "menu-drinks.html", "menu-wine.html"];
+/* admin.html is built with the rest. It is not part of the site a visitor
+   sees — robots.txt and its own meta tag ask crawlers to leave it alone — but
+   it has to be *deployed*, or the owner cannot edit anything. Leaving it out
+   here is a build that works perfectly and ships no editor. It also drags in
+   vendor/supabase.js, which the copy step below then has to place. */
+const PAGES = ["index.html", "faq.html", "menu-food.html", "menu-drinks.html",
+               "menu-wine.html", "admin.html"];
 
 /* Every local script the pages reference, read off the pages themselves rather
    than listed here, so adding one to a page is enough and this file cannot

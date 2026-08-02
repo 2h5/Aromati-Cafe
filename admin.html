@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Aromati — Editor</title>
+
+<!--
+  The editor. One page, one owner, no framework.
+
+  This page is deliberately plain. It shares no stylesheet with the site: the
+  public pages carry an inlined-font arrangement that stops the nav shifting on
+  navigation (memory.md, the ⛔ section at the top), and the surest way not to
+  break it is not to touch it. admin.css is its own small file.
+
+  Three scripts, in this order and no others:
+
+    config.js       which project, and the publishable key
+    vendor/…        the Supabase SDK, checked into this repository
+    admin.js        everything else
+
+  vendor/ rather than a CDN because this is the page that holds the owner's
+  session token: a script tag pointing at someone else's server here is a
+  standing offer to read that token. The Content-Security-Policy for this path
+  in _headers says script-src 'self', so it is also enforced rather than merely
+  intended. See vendor/README.md.
+
+  There is no inline script and no style attribute anywhere below, for the same
+  reason — the policy would drop them, and tools/check-csp.mjs fails the build
+  if one appears.
+-->
+
+<link rel="stylesheet" href="admin.css">
+</head>
+
+<body>
+
+<noscript>
+  <p class="noscript">The editor needs JavaScript. The site itself does not —
+  if you are reading this on the live site, everything a visitor sees is
+  working.</p>
+</noscript>
+
+<!-- ── the gate ─────────────────────────────────────────────────────────── -->
+<div class="gate" id="gate" hidden>
+  <form class="gate__card" id="signInForm" autocomplete="on">
+    <h1 class="gate__title">Aromati</h1>
+    <p class="gate__sub">Sign in to edit the site.</p>
+
+    <label class="field">
+      <span class="field__label">Email</span>
+      <input class="field__input" type="email" id="email" name="email"
+             autocomplete="username" required>
+    </label>
+
+    <label class="field">
+      <span class="field__label">Password</span>
+      <input class="field__input" type="password" id="password" name="password"
+             autocomplete="current-password" required>
+    </label>
+
+    <button class="btn btn--primary btn--wide" type="submit" id="signInBtn">Sign in</button>
+
+    <p class="msg" id="gateMsg" role="alert" hidden></p>
+
+    <p class="gate__foot">There is one account, and it is yours. If the
+      password has been forgotten, it is reset from the Supabase dashboard —
+      there is no reset link here on purpose.</p>
+  </form>
+</div>
+
+<!-- ── the editor ───────────────────────────────────────────────────────── -->
+<div class="app" id="app" hidden>
+
+  <header class="topbar">
+    <span class="topbar__brand">Aromati</span>
+    <span class="topbar__who" id="who"></span>
+    <span class="topbar__spacer"></span>
+    <a class="topbar__link" id="viewSite" href="index.html" target="_blank" rel="noopener">View the site</a>
+    <button class="btn btn--quiet" type="button" id="signOut">Sign out</button>
+  </header>
+
+  <nav class="tabs" id="tabs" aria-label="Sections"></nav>
+
+  <main class="panels" id="panels"></main>
+
+  <!-- The savebar is the only thing that writes. Nothing above it is live
+       until it is used, and Discard puts everything back. -->
+  <div class="savebar" id="savebar" hidden>
+    <span class="savebar__count" id="saveCount"></span>
+    <span class="savebar__spacer"></span>
+    <button class="btn btn--quiet"   type="button" id="discardBtn">Discard changes</button>
+    <button class="btn btn--primary" type="button" id="saveBtn">Save changes</button>
+  </div>
+
+  <div class="problems" id="problems" hidden>
+    <h2 class="problems__title" id="problemsTitle"></h2>
+    <ul class="problems__list" id="problemsList"></ul>
+  </div>
+
+</div>
+
+<!-- ── before either of those ───────────────────────────────────────────── -->
+<div class="boot" id="boot">
+  <p class="boot__text" id="bootText">Opening the editor…</p>
+</div>
+
+<script src="config.js"></script>
+<script src="vendor/supabase.js"></script>
+<script src="admin.js"></script>
+
+</body>
+</html>

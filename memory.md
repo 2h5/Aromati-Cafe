@@ -107,10 +107,11 @@ the decision, don't re-derive it.
 
 ## Current phase / status
 
-**Phase 1 done bar two parked items; Phase 2 done.** Branch
-`phase1-content-as-data`, not merged — hold the merge until the browser pass on
-the choreography, since jsdom cannot run it and it is the likeliest thing to
-have broken.
+**Phases 1–5 done bar two parked items.** Branch `phase1-content-as-data`, not
+merged — hold the merge until the browser pass on the choreography, since jsdom
+cannot run it and it is the likeliest thing to have broken. The editor's live
+line-count warning is on that pass too: nothing in `npm test` has layout in it,
+so no harness can say whether the number it reports is the right one.
 
 Done — **the three menu pages now render from data, verified identical**:
 - `tools/extract-menus.mjs` — strict markup→data extractor
@@ -197,6 +198,39 @@ Also done — **Phase 2: the schema and its policies, written and checkable**:
   key is not a name, and the generator refuses to run if the labels and the
   data disagree by even one field.
 
+Also done — **Phase 5: the editor**:
+- `admin.html` / `admin.css` / `admin.js` — gate → tabs → panels → savebar.
+  Five panels: **Words** (all 62 copy fields, grouped by page and section),
+  **Hours** (the seven days, plus holidays and one-off dates), **Contact** (the
+  settings, grouped by the `sort_order` band the database already gives them,
+  so a setting added by a later migration lands somewhere sensible with no
+  change here), **Menus** (three pages, sections and items, search and
+  per-section collapse) and **FAQ** (still carrying the notice; see open item
+  1).
+- **Nothing is live until *Save changes*.** Two copies of every row — what the
+  database last confirmed, and what the owner is looking at — so "changed" is
+  *derived* rather than tracked, and an edit typed and typed back is not a
+  change anybody has to remember to un-flag.
+- **A save is a sequence, not a transaction.** Deletes first and children
+  before parents, then inserts and parents before children (a new item's
+  `course_id` does not exist until its section's insert comes back), then
+  updates. Each write that lands advances the baseline as it lands, so a
+  refusal halfway leaves an editor telling the truth: what saved is saved and
+  stops being marked, what failed stays marked, and the database's own sentence
+  is repeated rather than paraphrased.
+- **The wording belongs to the database.** Every message about a badly-formed
+  setting exists in `admin.js` word for word as it exists in the migration's
+  `raise exception`, so the owner is told before the save rather than after.
+  `tools/test-admin.mjs` reads both files and fails in **either** direction — a
+  rule added to the SQL and not to the editor is as much of a drift as the
+  reverse.
+- **`vendor/supabase.js`** — the SDK, checked in at 2.111.0 rather than pulled
+  from a CDN. `admin.html` is the page holding the owner's session token; a
+  script tag pointing at someone else's server there is a standing offer to
+  read it. `script-src 'self'` makes that enforced rather than intended.
+- **The headline check measures rather than counts.** See Phase 5 below and
+  *Deviations*.
+
 **One-off tools, already run, kept as a record of what was done to the markup**
 — re-running them is a no-op or worse, so read the header before you do:
 `tools/add-content-hooks.mjs` (marked the two anonymous footer `<p>`s that
@@ -211,9 +245,9 @@ string is a bug waiting for them to disagree. What was left after removing them
 was a slug and a sort order, which is a column on `menu_courses`. Same
 reasoning that dropped `faq.footButton` from the copy set in Phase 1.
 
-### The eighteen harnesses, and what each is for
+### The twenty harnesses, and what each is for
 
-`npm test` runs all eighteen. The two font ones run **first**: they are the
+`npm test` runs all twenty. The two font ones run **first**: they are the
 fastest, and they guard the thing that has broken most often.
 
 - `tools/check-fonts.mjs` — the font-loading invariants, statically. Cannot
@@ -314,6 +348,33 @@ fastest, and they guard the thing that has broken most often.
   as `7.5` shows up as a diff. Also covers the paths that only matter when
   things go wrong — no key, offline, 401, malformed JSON, an empty database, a
   corrupt cache, and storage that throws on every call.
+- `tools/test-admin.mjs` (`npm run test:admin`) — **the editor, driven.** Loads
+  the real `admin.html` and the real `admin.js` in jsdom against a fake project
+  that records every request instead of sending it, which makes "what would
+  this have written?" answerable exactly. Covers the gate (including an account
+  that is not the allowlisted owner, signed straight back out), that a save
+  sends **only** the columns the owner owns, that a save is refused with the
+  database's own wording, the insert order when a new item goes into a new
+  section, and a refusal halfway through a save. Two of its checks are
+  load-bearing in a way that is easy to miss: the `innerHTML` scan is run
+  against a deliberately sabotaged copy of the file and fails if it does *not*
+  notice, and the "no forbidden column was sent" assertions are preceded by a
+  control that both edits really were sent — a save that sent nothing satisfies
+  every one of them.
+- `tools/check-vendor.mjs` (`npm run check:vendor`) — the vendored SDK is still
+  the published artifact. Three facts, none of them in the same place: the
+  bytes on disk, the sha256 written down in `vendor/README.md`, and the version
+  in `package.json` and `node_modules`. Any one can be changed by hand; changing
+  one alone is caught. Also refuses a `<script src>` on `admin.html` pointing at
+  another origin, which is the single change that would undo the whole point of
+  vendoring.
+
+  This is why `.gitattributes` exists and has one line in it. Windows git
+  stores LF and hands back CRLF, so a fresh clone would have produced a file
+  with different bytes, a different digest, and a check failing in exactly the
+  way it fails when someone has tampered with it. `vendor/supabase.js -text`
+  turns that off for the one file whose bytes are load-bearing. Verified by
+  checking the file out to a scratch directory and hashing what came out.
 - `tools/check-memory.mjs` — this file still points at reality. See *Keeping it
   honest* at the top.
 - `tools/measure-font-shift.mjs` (`npm run check:layout`) — the one harness
@@ -851,27 +912,69 @@ is the source of truth, and nothing yet writes values back into the markup.
 
 ---
 
-### Phase 5 — The editor. ← *next*
+### Phase 5 — The editor. ✅ done
 
-`admin.html` / `admin.css` / `admin.js`, ported from Uptown's structure —
-gate → tabs → panels → savebar. Panels: **Menu** (all three pages), **Hours**,
-**Contact**, **Copy**, **FAQ**.
+`admin.html` / `admin.css` / `admin.js`, plus `vendor/supabase.js`. Gate → tabs
+→ panels → savebar. Panels: **Words**, **Hours**, **Contact**, **Menus**,
+**FAQ**.
 
-Ported wholesale from Uptown, not re-derived:
+Everything the Uptown port asked for holds:
 
 - Nothing live until *Save changes*; Discard reverts.
-- Labels are the owner's words, never column names.
+- Labels are the owner's words, never column names — they come from
+  `site_copy.label` and `site_settings.label`, so the editor has no second copy
+  of them to drift.
 - Validation reports *problems* in plain language and blocks the save.
-- A blocked save opens the collapsed card holding the offending field.
-- Panel open/closed state survives a save.
-- Long panels collapse by default.
+- A blocked save opens the collapsed card holding the offending field and puts
+  the cursor in it. Every problem in the list is a button that does the same.
+- Panel open/closed state survives a save, including for a row that was new
+  when the save started and has a real id by the time it finishes.
+- Long panels collapse by default; the menu panel has search across name,
+  description and qualifier, and a match inside a collapsed section opens it.
 
-New for Aromati: the `data-split` length ceiling, the six price shapes, and a
-menu list (84 items across 3 pages) to need search and per-course collapse.
+**`admin.css` shares nothing with `styles.css` and loads no webfont.** The
+nav-shift arrangement at the top of this file is fragile, has been broken twice
+by unrelated work, and the surest way not to break it a third time is not to
+touch it. The editor uses the system stack; it is a tool, not a composition.
+
+**The headline check measures instead of counting.** The character caps are
+still there as a hard backstop in `site_copy.max_length`, and the editor blocks
+a save that exceeds one. But `tools/measure-headlines.mjs` had already found
+that a character count is the wrong control — glyphs differ in width and lines
+break at whole words — and named the right one: the rendered line count of the
+real element. So the editor loads the real page into a hidden frame, puts the
+candidate text into the real element, and counts line boxes with a Range, at
+1280px and at 390px. No stylesheet is duplicated and no font metric is copied;
+it is the page itself doing the measuring, so there is nothing to drift.
+
+It **warns rather than blocks**, and says which width: "this takes an extra
+line on a phone". Whether one extra line is a problem is a judgement about that
+particular headline, which is the same conclusion the measuring tool reached
+when it printed a report instead of failing a build.
+
+That needed one deliberate change: the public pages went from
+`frame-ancestors 'none'` to `'self'`. Clickjacking is an attack by a page on
+*another* origin, which `'self'` still refuses; a same-origin frame can already
+read and script whatever it framed. `admin.html` keeps `'none'`.
+`tools/check-csp.mjs` now fails if the editor frames the site while the policy
+forbids it — otherwise the frame loads nothing, the measurement silently never
+runs, and the only symptom is a warning that stops appearing.
+
+**What is not covered by a harness:** whether the line count it reports is
+right. jsdom has no layout and the check needs a session, a server and a real
+browser. `tools/test-admin.mjs` verifies the half that can be verified — that
+every capped headline's `data-copy` hook exists on the page its row names and
+carries `data-split`, so the frame will find an element at all. The rest is on
+the browser pass.
+
+**Still not exposed, by decision:** the crêpe options row (out of scope; the
+item's panel says so and points at a developer), Build Your Own Breakfast (the
+section can be moved on the menu, its contents cannot be edited), and the
+photos, which are Phase 6.
 
 ---
 
-### Phase 6 — Photos.
+### Phase 6 — Photos. ← *next*
 
 Bucket + policies, upload widget, client-side resize to webp, HEIC rejected
 with a plain-language message, EXIF rotation corrected, `alt` required,
@@ -1282,6 +1385,15 @@ bucket, and it must run *after* a successful save, never speculatively.
    check contrast and alt text. The existing character caps stay as a coarse
    backstop against something absurd.
 
+   ✅ **Built, 2026-08-01.** The editor loads the real page into a hidden frame,
+   puts the candidate text into the real element and counts line boxes with a
+   Range, at 1280px and 390px, as the owner types. It warns and names the width
+   — "this takes an extra line on a phone" — rather than blocking, because
+   whether that matters is a judgement about that headline. The character caps
+   stayed exactly as they were. What is *not* settled is whether the warning
+   reads well in practice; that is on the browser pass, since no harness in this
+   project has layout in it.
+
    Also worth knowing before sizing anything: 390px is where everything wraps.
    Sizing every cap to hold there is harsh; the alternative is to accept an
    extra line on a phone. That is a design call, which is why the tool prints a
@@ -1298,7 +1410,11 @@ bucket, and it must run *after* a successful save, never speculatively.
    - `faq.html` still gets its nav / mobile menu / footer / hours generated like
      every other page in Phase 1 — only the 18 Q&A entries are held back.
    - `seed-faq.js` is the last file written in Phase 1, not the first.
-   - Phase 5's FAQ panel is contingent on the same answer.
+   - Phase 5's FAQ panel exists and works — it can add, edit, reorder, hide and
+     delete questions — but it opens with the same notice, saying the eighteen
+     questions have deliberately not been moved in and that anything added there
+     goes live on the site as soon as it is saved. Building the panel commits to
+     nothing; transcribing the placeholder copy would.
 
    Nothing else in Phase 1 depends on this. The menus are the bulk of the work
    and are unaffected.
@@ -1451,6 +1567,40 @@ bucket, and it must run *after* a successful save, never speculatively.
   every other copy field came through byte-identical, which is the extractor's
   whole argument restated: the transcription risk lands on the one field a human
   had to touch.
+
+- **2026-08-01 — the editor's first test run passed three assertions about a
+  sign-in that never happened.** `admin.js` waits for `DOMContentLoaded` before
+  wiring anything up. The harness built the page and dispatched a `submit` at
+  the sign-in form immediately — at a form whose handler did not exist yet. The
+  event went nowhere, and the assertions then read a page that had simply not
+  moved: no session, so no editor, so "an account that is not the owner does
+  not get the editor" was true for entirely the wrong reason.
+
+  It surfaced only because a *fourth* assertion in the same block wanted a
+  specific sentence in the gate's message area and got an empty string. Three
+  green, one red, one cause. The green ones were the dangerous part: each was
+  the shape of assertion that passes when nothing happens at all — checking
+  that something is *absent*. The fix is one `await` in the harness's setup, but
+  the habit is the useful bit: **an assertion about an absence needs a control
+  that proves the action was attempted.** The same reasoning put the "both edits
+  really were sent" line in front of the forbidden-column checks, and the
+  readable-copy probe in front of the six refusals in
+  `tools/check-live-project.mjs`.
+
+- **2026-08-01 — `frame-ancestors` went from `'none'` to `'self'`, on purpose.**
+  The editor measures a headline's wrap by loading the real page into a hidden
+  frame, and `'none'` refuses a same-origin frame as firmly as a foreign one.
+  The alternative was to rebuild the site's typography inside `admin.css` and
+  measure against a copy — which is a second source of truth for the exact
+  quantity being measured, and would be wrong the first time anyone touched
+  `styles.css`.
+
+  The security cost is nil: clickjacking is an attack by a page on *another*
+  origin, and `'self'` still refuses every one of those. What made it worth an
+  entry is the failure mode of getting it wrong, which is why
+  `tools/check-csp.mjs` now cross-checks the two files: under `'none'` the frame
+  loads nothing, the measurement never runs, and the only symptom is a warning
+  that stops appearing. Nobody notices a warning that is missing.
 
 - **2026-08-01 — the build was shipping a site with no JavaScript at all.**
   Worse than the recorded "drops 4 pages": there was no `vite.config.js`, so

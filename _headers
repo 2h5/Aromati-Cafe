@@ -16,7 +16,7 @@
 # build if anything is added that this policy would silently block.
 
 /*
-  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https://yofoiqgknsqzsuwtlqvh.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https://yofoiqgknsqzsuwtlqvh.supabase.co; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: geolocation=(), microphone=(), camera=(), payment=(), interest-cohort=()
@@ -51,7 +51,21 @@
 #                          live content and falls back to the seeds — which
 #                          looks like everything working.
 #
-#   frame-ancestors 'none' Nobody may put this site in an iframe.
+#   frame-ancestors 'self' Nobody *else* may put this site in an iframe. It was
+#                          'none' until Phase 5, and the change is deliberate:
+#                          the editor checks a headline's length by loading the
+#                          real page into a hidden frame, putting the candidate
+#                          text into the real element and counting the line
+#                          boxes. That is the only way to measure the wrap
+#                          without duplicating the site's type — and duplicated
+#                          type is type that drifts.
+#
+#                          'self' gives up nothing that mattered. Clickjacking
+#                          is an attack by a page on *another* origin, which
+#                          'self' still refuses; a same-origin frame can already
+#                          read and script the page it framed. The admin page
+#                          below keeps 'none' — it is the one holding a session
+#                          token, and nothing needs to frame it.
 
 # The editor page. It holds the owner's session token in localStorage, so an
 # injected script there is worth more to an attacker than one on a menu page.

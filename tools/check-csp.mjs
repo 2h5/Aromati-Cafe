@@ -184,6 +184,88 @@ if (!policy) {
   } else pass("robots.txt keeps the editor out of search results");
 }
 
+/* ── 7. the editor, against its own policy ────────────────────────────────
+   admin.html has a stricter rule of its own in _headers, so checking it
+   against the site-wide policy above would be checking the wrong thing. It is
+   also the page where a mistake costs the most: it is the one holding the
+   owner's session token. */
+{
+  const adminPolicy = (() => {
+    const live = headers.split("\n").filter((l) => !/^\s*#/.test(l));
+    const at = live.findIndex((l) => /^\/admin\.html\s*$/.test(l.trim()));
+    if (at < 0) return null;
+    const line = live.slice(at + 1, at + 8).find((l) => /Content-Security-Policy:/i.test(l));
+    if (!line) return null;
+    const out = {};
+    line.split(":").slice(1).join(":").split(";").forEach((part) => {
+      const bits = part.trim().split(/\s+/).filter(Boolean);
+      if (bits.length) out[bits[0]] = bits.slice(1);
+    });
+    return out;
+  })();
+
+  if (!existsSync("admin.html")) {
+    pass("no admin.html yet — nothing to check it against");
+  } else if (!adminPolicy) {
+    fail("_headers has no rule for /admin.html",
+         "it would fall back to the site-wide policy, which is not the one written for it");
+  } else {
+    const html = readFileSync("admin.html", "utf8");
+
+    /* The vendored SDK is the whole reason vendor/ exists. A CDN tag here is
+       the single change that would undo it, so it is checked from this side as
+       well as from tools/check-vendor.mjs. */
+    const external = [...html.matchAll(/<(?:script|link)[^>]*\b(?:src|href)=["']((?:https?:)?\/\/[^"']+)["']/gi)]
+      .map((m) => m[1]);
+    if (external.length) {
+      fail("the editor loads something from another origin", external.join("\n") +
+           "\nscript-src 'self' would block it, and the page would not open at all");
+    } else pass("the editor loads only its own origin");
+
+    const inlineJs = [...html.matchAll(/<script([^>]*)>([\s\S]*?)<\/script>/gi)]
+      .filter(([, attrs, body]) => !/\bsrc=/i.test(attrs) && body.trim());
+    const inlineCss = [...html.matchAll(/\sstyle=["'][^"']*["']/gi)]
+      .concat([...html.matchAll(/\son[a-z]+=["'][^"']*["']/gi)]);
+    if (inlineJs.length || inlineCss.length) {
+      fail("the editor has inline script, style or an event handler",
+           [...inlineJs.map((m) => `inline <script${m[1]}>`),
+            ...inlineCss.map((m) => m[0].trim().slice(0, 50))].join("\n") +
+           "\nthe editor is built entirely in admin.js for exactly this reason");
+    } else pass("the editor has no inline script, style attribute or handler");
+
+    if (!/<meta[^>]+name=["']robots["'][^>]+noindex/i.test(html)) {
+      fail("admin.html has no <meta name=\"robots\" content=\"noindex\">",
+           "robots.txt asks; the meta tag is the half crawlers honour more reliably");
+    } else pass("the editor asks not to be indexed, on the page as well as in robots.txt");
+
+    if ((adminPolicy["frame-ancestors"] || []).join(" ") !== "'none'") {
+      fail("the editor may be framed", "frame-ancestors on /admin.html should be 'none'");
+    } else pass("the editor cannot be put in a frame by anyone");
+  }
+}
+
+/* ── 8. the headline check needs the site to be framable by itself ─────────
+   The editor measures a headline's wrap by loading the real page into a hidden
+   frame and counting line boxes. Under frame-ancestors 'none' the frame loads
+   nothing, the measurement silently never happens, and the only symptom is a
+   warning that stops appearing — which nobody will notice is missing. */
+{
+  const measures = existsSync("admin.js") &&
+    /createElement\("iframe"|el\("iframe"/.test(readFileSync("admin.js", "utf8"));
+  const ancestors = (policy["frame-ancestors"] || []).join(" ");
+
+  if (!measures) {
+    pass("the editor does not frame the site, so frame-ancestors is unconstrained");
+  } else if (ancestors === "'none'") {
+    fail("the editor frames the site to measure headlines, but frame-ancestors is 'none'",
+         "the frame would load nothing and the length warning would silently never appear\n" +
+         "'self' is the value this needs, and it still refuses every other origin");
+  } else if (ancestors.includes("*") || /https?:/.test(ancestors)) {
+    fail("frame-ancestors allows an origin other than this one", `frame-ancestors ${ancestors}\n` +
+         "the editor only needs 'self'");
+  } else pass("frame-ancestors allows the editor's measuring frame and nothing else");
+}
+
 console.log(failures
   ? `\n${failures} problem(s) — the policy would break the site, or is not covering it`
   : "\nthe policy covers the site and blocks nothing the site needs");

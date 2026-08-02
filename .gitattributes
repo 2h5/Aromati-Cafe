@@ -1,0 +1,11 @@
+# The vendored SDK is checked byte for byte, so git must not touch its bytes.
+#
+# This repository is worked on from Windows, where the default is to store LF
+# and hand out CRLF. For every other file that is invisible and harmless. For
+# vendor/supabase.js it is not: tools/check-vendor.mjs compares its sha256
+# against the digest recorded in vendor/README.md, and a fresh clone would get
+# a file with different line endings, a different digest, and a failing check
+# that looks exactly like the tampering the check exists to find.
+#
+# -text means "leave this alone in both directions".
+vendor/supabase.js -text
