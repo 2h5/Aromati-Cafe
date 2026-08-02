@@ -42,7 +42,22 @@ const ROOT = "body";
    the text moved on is how an allowance list turns into a blindfold. */
 const INTENDED = [
   { page: "index.html", was: "Book a Table", now: "Reserve a Table",
-    why: "renamed on request, 2026-08-01" }
+    why: "renamed on request, 2026-08-01" },
+
+  /* The café's address changed, on every page that prints it. Five entries and
+     not one, because a rewrite is scoped to a page on purpose: an allowance
+     that applied everywhere would go on forgiving this string on a page that
+     stopped displaying it. */
+  { page: "index.html", was: "info@aromatiNY.com", now: "info@aromatinyc.com",
+    why: "the café's real address, 2026-08-01 (ac4615e)" },
+  { page: "faq.html", was: "info@aromatiNY.com", now: "info@aromatinyc.com",
+    why: "the café's real address, 2026-08-01 (ac4615e)" },
+  { page: "menu-food.html", was: "info@aromatiNY.com", now: "info@aromatinyc.com",
+    why: "the café's real address, 2026-08-01 (ac4615e)" },
+  { page: "menu-drinks.html", was: "info@aromatiNY.com", now: "info@aromatinyc.com",
+    why: "the café's real address, 2026-08-01 (ac4615e)" },
+  { page: "menu-wine.html", was: "info@aromatiNY.com", now: "info@aromatinyc.com",
+    why: "the café's real address, 2026-08-01 (ac4615e)" }
 ];
 
 /* Content added since the baseline, named by selector rather than by the words
