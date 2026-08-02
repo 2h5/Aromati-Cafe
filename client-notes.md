@@ -56,9 +56,16 @@ in the place it appears.
 
 Two things you can do inside a piece of text:
 
-- **Press Enter** to break a line where you want it broken.
+- **Press Enter** to break a line where you want it broken — in the bigger,
+  multi-line boxes.
 - **Put \*stars\* around a word** to make it italic — `*aroma*` comes out as
   *aroma*. They work in pairs; the editor tells you if you have left one open.
+
+**One known gap, so it does not waste your time.** A short piece of text gets a
+single-line box, and a single-line box cannot hold a line break — which today
+includes the big animated headlines, the very place you are most likely to want
+one. Ask if you need a break in one of those; it is on the list to fix, and it
+needs to be fixed alongside the line-count warning below rather than on its own.
 
 Nothing else you type is treated as anything but words, which is on purpose. If
 you paste in something odd, it appears on the site as exactly the characters you

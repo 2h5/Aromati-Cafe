@@ -87,7 +87,8 @@ surprises. Pretty URLs are a hosting rewrite later, not a file move.
 | Headlines, ledes, labels — 62 fields | `site_copy` | Words | `seed-copy.js` |
 | Opening hours, and one-off closures | `business_hours`, `hours_exceptions` | Hours | `seed-hours.js` |
 | Phone, email, Instagram, address, delivery links | `site_settings` | Contact | `seed-settings.js` |
-| Courses, items, prices, pours, options | `menu_courses`, `menu_items`, `menu_item_pours`, `menu_item_options` | Menus | `seed-menu.js` |
+| Courses, items, prices, pours | `menu_courses`, `menu_items`, `menu_item_pours` | Menus | `seed-menu.js` |
+| The crêpe's topping list | `menu_item_options` | — modelled, not exposed | `seed-menu.js` |
 | Photographs and their descriptions | `photos` + the `site-photos` bucket | Photos | `seed-photos.js` |
 | FAQ questions | `faq_entries` (empty) | FAQ | — |
 
@@ -214,22 +215,28 @@ npm test
 jsdom, the real renderer, the migrations against Postgres compiled to
 WebAssembly. `memory.md` describes each one and what it is for.
 
-The standard every one of them is held to: **it has been sabotaged and required
-to fail, naming the right check.** A harness nobody has broken on purpose is a
-harness nobody knows the failure mode of. Three assertions in this suite were
-found to be unfailable that way, and one whole rig was found to be feeding the
-site settings it silently ignored.
+Two of them drive a real headless Chrome and are in `npm test` like the rest:
+`npm run check:layout`, which measures the nav and the masthead before and after
+the fonts settle, and `npm run test:replay`, which replaces a menu board over a
+live page and checks nothing is left behind. **Both skip cleanly where there is
+no Chrome**, which is exactly when a regression would go out unnoticed — so they
+are the second guard on what they cover, never the only one.
 
-Four things are deliberately **not** in `npm test`:
+The standard every harness is held to: **it has been sabotaged and required to
+fail, naming the right check.** A harness nobody has broken on purpose is a
+harness nobody knows the failure mode of. That is not a slogan — it is how a
+comparison that could never fail, and a whole rig feeding the site settings it
+silently ignored, were both found while the suite was green.
+
+Two things are deliberately **not** in `npm test`, and neither has an `npm run`
+script, so the only way to run them is to name the file:
 
 | | Why |
 | --- | --- |
-| `node tools/check-live-project.mjs` | Needs the live project. Compares every row against the seed files, then tries six writes a defaced site would need and requires each to be refused. Run it after a migration and before a deploy |
-| `npm run check:layout` | Drives real Chrome and skips silently without it — so it is the second guard, never the first |
-| `npm run test:replay` | Also a real browser |
-| `node tools/measure-headlines.mjs` | A measuring tape, not a guard. It prints a table and leaves the judgement to a person |
+| `node tools/check-live-project.mjs` | Needs the live project. Compares every row against the seed files, then tries six writes a defaced site would need and requires each to be refused. A check that fails on a train is one people learn to skip. Run it after a migration and before a deploy |
+| `node tools/measure-headlines.mjs` | A measuring tape, not a guard. It prints where each animated headline takes an extra line, at three widths, and leaves the judgement to a person |
 
-Two of them guard the same thing from different directions and both matter:
+Two harnesses guard the fonts from different directions and both matter:
 
 - `npm run check:fonts` — static, cannot skip, runs anywhere.
 - `npm run check:csp` — refuses any origin the pages fetch that the policy in
@@ -332,7 +339,7 @@ of it optional:
 
 **Run `npm run check:fonts` before touching `styles.css` or any `<head>`.** If
 it fails, read the header of `tools/check-fonts.mjs` before changing anything —
-it lists all five real breaks and what each looked like.
+it lists the four ways this has really broken, and what each one looked like.
 
 ### The one security rule
 

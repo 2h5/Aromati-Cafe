@@ -1314,6 +1314,36 @@ is blocked on code.
 - **The browser pass** — the four rows the Phase 7 checklist marks ⚠️, plus the
   seven photograph rows and the editor's live line-count warning. jsdom has no
   layout; this is the part no harness in the project can reach.
+- **Two defects in the headline editing path, found writing the owner's guide
+  2026-08-02.** They have to be fixed together, and they belong with the
+  browser pass above because only a browser can judge either.
+
+  1. **A line break cannot be typed into a headline.** `renderCopyPanel`
+     ([admin.js:555](admin.js#L555)) gives a field a textarea only if its value
+     already contains a newline or runs past 90 characters. Every one of the
+     ten `data-split` headlines is shorter than that, so every one of them is a
+     single-line `<input>`, which cannot hold a newline at all. The panel's own
+     intro says "a line break in a box below becomes a line break on the page",
+     and `seed-copy.js` documents `"\n"` as one of the two things the owner can
+     write — but in the boxes where it matters most it cannot be typed. It is
+     also the remedy open item 0 settled on: when a headline takes an extra
+     line, an explicit break is what moves the wrap.
+
+  2. **And the measurement would be wrong the moment it could.**
+     `runMeasure` ([admin.js:1972](admin.js#L1972)) measures by writing the
+     candidate into the real element with `textContent` and counting client
+     rects. `render.js` turns `"\n"` into a `<br>`; `textContent` collapses it
+     to a space. So a headline with a deliberate break would be measured as
+     though it had none, and the warning would say "still fits" about a line
+     that wraps. Today this is unreachable because of (1) — **which is exactly
+     why fixing (1) alone would be worse than fixing neither.** The two defects
+     have been masking each other.
+
+  The fix for (2) is to measure through the same construction `render.js` uses
+  rather than a second one, since a duplicated vocabulary is one that drifts.
+  Not done here: it is editor behaviour, it can only be judged by eye, and
+  shipping an unverifiable UI change in the handoff commit is how a handoff
+  goes wrong.
 - **The three live-project rows** — `signUp()` from a console, a 10 MB file and
   a `.exe` renamed `.jpg` posted at the bucket with the owner's token.
 - **The FAQ answer** (open item 1). Everything else is built and waiting on it.
