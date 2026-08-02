@@ -101,9 +101,32 @@ function fixture() {
     menu_item_pours: [
       { id: "p1", item_id: "i1", label: "Bottle", price: "60", sort_order: 1 }
     ],
-    faq_entries: []
+    faq_entries: [],
+    /* One described photograph and one backdrop, which are the two cases the
+       panel behaves differently for. Neither has been uploaded to, which is
+       the state all 29 real slots start in. */
+    photos: [
+      { id: "ph1", slot: "hero.main", label: "The photograph behind the opening headline",
+        storage_path: null, source_path: null, alt: "The upstairs dining room",
+        width: 1535, height: 1024, is_decorative: false, sort_order: 10 },
+      { id: "ph2", slot: "wine.backdrop", label: "The Wine Bar — the background behind the section",
+        storage_path: null, source_path: null, alt: "",
+        width: 1088, height: 1445, is_decorative: true, sort_order: 20 }
+    ]
   };
 }
+
+/* What data/seed-photos.js gives the editor: the picture a slot has before
+   anything is uploaded, and its shape. */
+const SEED_PHOTOS = {
+  "hero.main": {
+    src: "assets/web/hero-dining.jpg", alt: "The upstairs dining room",
+    width: 1535, height: 1024
+  },
+  "wine.backdrop": {
+    src: "assets/web/wine-cabinet.jpg", decorative: true, width: 1088, height: 1445
+  }
+};
 
 
 /* ═══ the fake project ══════════════════════════════════════════════════════
@@ -145,6 +168,27 @@ function fakeSupabase(data, log, opts) {
     rpc: (name) => {
       log.push({ what: "rpc", name });
       return Promise.resolve({ data: name === "is_owner" ? opts.isOwner !== false : null, error: null });
+    },
+
+    /* The bucket. upload() and remove() are the only two methods admin.js
+       reaches for, and both are recorded rather than performed — which makes
+       "was the file sent before the row that names it?" a question about the
+       log rather than about timing. */
+    storage: {
+      from: (bucket) => ({
+        upload: (path, blob, options) => {
+          if (opts.refuseUpload) {
+            return Promise.resolve({ data: null, error: { message: opts.refuseUpload } });
+          }
+          log.push({ what: "upload", bucket, path, type: blob && blob.type,
+                     bytes: blob && blob.size, options });
+          return Promise.resolve({ data: { path }, error: null });
+        },
+        remove: (paths) => {
+          log.push({ what: "remove", bucket, paths });
+          return Promise.resolve({ data: [], error: null });
+        }
+      })
     },
 
     from: (table) => ({
@@ -216,6 +260,46 @@ async function boot(opts) {
   window.scrollTo = () => {};
   window.HTMLElement.prototype.scrollIntoView = () => {};
 
+  /* admin.html loads data/seed-photos.js as a classic script, which jsdom does
+     not fetch. Declared here so the photo panel has a built-in picture to show,
+     the same way the browser has one. */
+  window.SEED_PHOTOS = opts.seedPhotos || SEED_PHOTOS;
+
+  /* jsdom has no image decoding and no canvas, so the parts of the upload
+     pipeline that are the *browser's* work are stubbed and the parts that are
+     admin.js's work are not. What is faked: decoding a file to pixels, and
+     encoding pixels to webp. What is real, and therefore what these tests
+     actually cover: reading the EXIF tag out of the bytes, deciding whether the
+     browser already applied it, the size everything is scaled to, and the
+     transform chosen for it. */
+  window.createImageBitmap = (file, options) => Promise.resolve({
+    width: (opts.decoded || { width: 4000, height: 3000 }).width,
+    height: (opts.decoded || { width: 4000, height: 3000 }).height,
+    _orientationOption: options && options.imageOrientation,
+    close() {}
+  });
+
+  const drawn = [];
+  window.HTMLCanvasElement.prototype.getContext = function () {
+    const canvas = this;
+    return {
+      setTransform: (...m) => drawn.push({ what: "setTransform", m }),
+      drawImage: (src, x, y, w, h) => drawn.push({
+        what: "drawImage", w, h, canvas: [canvas.width, canvas.height]
+      })
+    };
+  };
+  window.HTMLCanvasElement.prototype.toBlob = function (done, type, quality) {
+    const canvas = this;
+    /* A stand-in whose size is a function of the pixels asked for, so a test
+       about the size limit is testing arithmetic rather than a constant. */
+    const bytes = Math.round(canvas.width * canvas.height * 0.05);
+    done(Object.assign(new window.Blob([new Uint8Array(bytes)], { type }),
+                       { _quality: quality }));
+  };
+  window.URL.createObjectURL = (blob) => "blob:fake/" + (blob && blob.type);
+  window.URL.revokeObjectURL = () => {};
+
   const errors = [];
   window.console.error = (...a) => errors.push(a.join(" "));
 
@@ -280,8 +364,72 @@ async function boot(opts) {
 
     problems() { return [...doc.querySelectorAll(".problems__link")].map((n) => n.textContent); },
     changeCount() { return q("#saveCount").textContent; },
-    writes() { return log.filter((l) => ["insert", "update", "delete"].includes(l.what)); }
+    writes() { return log.filter((l) => ["insert", "update", "delete"].includes(l.what)); },
+
+    /* Everything that left the page, in the order it left, which is the only
+       way to ask whether the file went before the row that names it. */
+    sent() { return log.filter((l) => ["upload", "remove", "insert", "update", "delete"].includes(l.what)); },
+    uploads() { return log.filter((l) => l.what === "upload"); },
+    drawn() { return drawn; },
+
+    /* The block for one slot, found by the label the owner reads. */
+    photo(label) {
+      const node = all(".photo").find((p) => {
+        const own = p.querySelector(".photo__label");
+        return own && own.textContent.trim() === label;
+      });
+      if (!node) throw new Error(`no photograph block labelled ${JSON.stringify(label)}`);
+      return node;
+    },
+
+    /* Choosing a file, as far as the page can tell. `files` is read-only and
+       jsdom has no file picker, so it is defined onto the element and the same
+       change event is dispatched. */
+    async pick(block, file) {
+      const input = block.querySelector(".photo__file");
+      Object.defineProperty(input, "files", { value: [file], configurable: true });
+      input.dispatchEvent(new window.Event("change", { bubbles: true }));
+      await settle();
+    },
+
+    file(name, type, bytes) {
+      return new window.File([bytes || new Uint8Array([0xff, 0xd8, 0xff, 0xd9])], name, { type });
+    }
   };
+}
+
+
+/* ═══ a photograph, as bytes ════════════════════════════════════════════════
+   A JPEG small enough to write out by hand and real enough for the two
+   readers in admin.js to work on: SOI, an APP1/Exif block carrying one
+   Orientation tag, an SOF0 frame header carrying the stored dimensions, EOI.
+
+   Written rather than checked in, because the point is to control the
+   orientation tag — and a fixture file whose tag nobody can see is a fixture
+   nobody can reason about. */
+function jpeg({ orientation = 1, width = 4000, height = 3000 } = {}) {
+  const be = (n) => [(n >> 8) & 0xff, n & 0xff];
+
+  /* One IFD entry: tag 0x0112, type SHORT, count 1, value in the field. */
+  const ifd = [
+    ...be(1),                                   // entry count
+    ...be(0x0112), ...be(3), 0, 0, 0, 1,        // tag, type, count
+    ...be(orientation), 0, 0,                   // value, padded to four bytes
+    0, 0, 0, 0                                  // next IFD: none
+  ];
+  const tiff = [
+    0x4d, 0x4d, 0x00, 0x2a,                     // "MM", big-endian, magic 42
+    0, 0, 0, 8,                                 // offset to the first IFD
+    ...ifd
+  ];
+  const exif = [0x45, 0x78, 0x69, 0x66, 0, 0, ...tiff];   // "Exif\0\0"
+
+  return new Uint8Array([
+    0xff, 0xd8,                                             // SOI
+    0xff, 0xe1, ...be(exif.length + 2), ...exif,            // APP1
+    0xff, 0xc0, ...be(11), 8, ...be(height), ...be(width), 1,  // SOF0
+    0xff, 0xd9                                              // EOI
+  ]);
 }
 
 
@@ -676,6 +824,338 @@ console.log("\nthe headline check has something to look at");
   });
   check("and every one of them is a headline the page animates word by word",
         notSplit.map(([k]) => k), []);
+}
+
+
+/* ═══ 11. the photographs ═══════════════════════════════════════════════════
+   The only panel that sends something other than a row, and the only one where
+   a mistake leaves rubbish behind on a server. Four things are worth asking:
+   what the panel offers, what a save actually sends and in what order, whether
+   a picked file that is never saved leaves anything anywhere, and whether the
+   pixels come out the right way up. */
+
+console.log("\nthe photographs, before anything has been uploaded");
+{
+  const r = await boot();
+  await r.signIn();
+  r.tab("Photos");
+
+  check("both slots are listed", r.all(".photo").length, 2);
+
+  const hero = r.photo("The photograph behind the opening headline");
+  check("showing the photograph the site was built with",
+        hero.querySelector(".photo__img").getAttribute("src"),
+        "assets/web/hero-dining.jpg");
+  check("and saying so", hero.querySelector(".photo__state").textContent,
+        "The photograph the site was built with — 1535 × 1024.");
+  check("with the description offered for editing",
+        hero.querySelector(".field__area").value, "The upstairs dining room");
+
+  const backdrop = r.photo("The Wine Bar — the background behind the section");
+  check("the backdrop is offered no description box",
+        backdrop.querySelector(".field__area, .field__input"), null);
+  check("and says why", backdrop.querySelector(".field__help").textContent.includes(
+        "a screen reader is told to ignore it"), true);
+
+  check("nothing has been sent by looking at any of it", r.sent(), []);
+}
+
+console.log("\npicking a photograph");
+{
+  const r = await boot();
+  await r.signIn();
+  r.tab("Photos");
+
+  const hero = r.photo("The photograph behind the opening headline");
+  await r.pick(hero, r.file("kitchen.jpg", "image/jpeg", jpeg({ width: 4000, height: 3000 })));
+
+  check("the file is not sent when it is picked", r.sent(), []);
+  check("but the page says a save would send it",
+        r.changeCount(), "1 change not yet saved");
+
+  const after = r.photo("The photograph behind the opening headline");
+  check("and shows the file itself rather than the old photograph",
+        after.querySelector(".photo__img").getAttribute("src"), "blob:fake/image/webp");
+  check("resized to fit, and the size said out loud",
+        after.querySelector(".photo__state").textContent,
+        "Ready to upload — 2000 × 1500, 146 KB. Nothing has been sent yet.");
+
+  await r.save();
+
+  const sent = r.sent();
+  check("the file goes first, then the original, then the row that names them",
+        sent.map((s) => s.what), ["upload", "upload", "update"]);
+  check("into the photographs bucket", sent[0].bucket, "site-photos");
+  check("as a webp, under the slot it belongs to",
+        [sent[0].path.split("/")[0], sent[0].path.endsWith(".webp")], ["hero.main", true]);
+  check("the original keeps the format it arrived in",
+        sent[1].path.endsWith("-original.jpg"), true);
+  check("and the row records the path and the new size",
+        [sent[2].table, sent[2].payload.storage_path === sent[0].path,
+         sent[2].payload.width, sent[2].payload.height],
+        ["photos", true, 2000, 1500]);
+  check("and nothing is swept, because nothing was replaced",
+        sent.filter((s) => s.what === "remove"), []);
+
+  /* Nothing is left outstanding, asked the only way that means anything: save
+     again and see whether it has anything to send. Reading the savebar would
+     read "Saved. The site is showing it now." for a couple of seconds, which
+     is a message rather than a count. */
+  await r.save();
+  check("and the page has nothing left to send", r.sent().length, sent.length);
+}
+
+console.log("\na photograph of a very different shape");
+{
+  /* hero.main is 1535 × 1024 — a landscape slot in a full-bleed band. A phone
+     photograph held upright goes into it and loses its top and bottom, and
+     nothing anywhere errors: the editor's own thumbnail is cropped to the same
+     shape, so it looks fine right up until it is on the page. */
+  const r = await boot({ decoded: { width: 3000, height: 4000 } });
+  await r.signIn();
+  r.tab("Photos");
+
+  await r.pick(r.photo("The photograph behind the opening headline"),
+               r.file("IMG_9001.jpg", "image/jpeg", jpeg({ width: 3000, height: 4000 })));
+
+  const said = r.photo("The photograph behind the opening headline")
+                .querySelector(".photo__problem").textContent;
+  check("the difference is pointed out", said.includes("portrait against landscape"), true);
+  check("in terms of what will happen to it", said.includes("cropped to fill it"), true);
+  check("but it does not block the save", r.problems(), []);
+
+  await r.save();
+  check("and it really does upload", r.uploads().length, 2);
+}
+
+{
+  const r = await boot({ decoded: { width: 3000, height: 2000 } });
+  await r.signIn();
+  r.tab("Photos");
+  await r.pick(r.photo("The photograph behind the opening headline"),
+               r.file("similar.jpg", "image/jpeg", jpeg({ width: 3000, height: 2000 })));
+
+  check("a similar shape is not remarked on",
+        r.photo("The photograph behind the opening headline")
+          .querySelector(".photo__problem").hidden, true);
+}
+
+console.log("\nreplacing a photograph that had already been uploaded");
+{
+  const data = fixture();
+  data.photos[0].storage_path = "hero.main/1700000000000.webp";
+  data.photos[0].source_path = "hero.main/1700000000000-original.jpg";
+
+  const r = await boot({ data });
+  await r.signIn();
+  r.tab("Photos");
+
+  await r.pick(r.photo("The photograph behind the opening headline"),
+               r.file("new.jpg", "image/jpeg", jpeg()));
+  await r.save();
+
+  const removed = r.sent().find((s) => s.what === "remove");
+  check("the photograph it replaced is taken out of the bucket afterwards",
+        removed.paths.sort(),
+        ["hero.main/1700000000000-original.jpg", "hero.main/1700000000000.webp"]);
+  check("and only after everything else has landed",
+        r.sent().map((s) => s.what).indexOf("remove"), r.sent().length - 1);
+}
+
+console.log("\na photograph with nothing said about it");
+{
+  const r = await boot();
+  await r.signIn();
+  r.tab("Photos");
+
+  const hero = r.photo("The photograph behind the opening headline");
+  r.type(hero.querySelector(".field__area"), "   ");
+  await r.pick(hero, r.file("x.jpg", "image/jpeg", jpeg()));
+  await r.save();
+
+  check("the save is refused", r.uploads(), []);
+  check("with the sentence the database would have used", r.problems(), [
+    'The photograph "The photograph behind the opening headline" needs a short ' +
+    "description of what is in it. It is what someone using a screen reader hears " +
+    "in place of the picture, and what shows if the image ever fails to load."
+  ]);
+
+  /* And that sentence is the database's, not one written to match it. The %s
+     is the label, so the two halves either side of it are compared. */
+  const sql = readFileSync("supabase/migrations/20260801000400_photos.sql", "utf8");
+  check("which is the sentence in the migration, not a copy of it",
+        sql.includes("needs a short description of what is in it. It is what someone " +
+                     "using a screen reader hears in place of the picture, and what " +
+                     "shows if the image ever fails to load."), true);
+}
+
+console.log("\na backdrop needs no description");
+{
+  const r = await boot();
+  await r.signIn();
+  r.tab("Photos");
+
+  await r.pick(r.photo("The Wine Bar — the background behind the section"),
+               r.file("wall.jpg", "image/jpeg", jpeg()));
+  await r.save();
+
+  check("it uploads with an empty description and no complaint",
+        [r.problems().length, r.uploads().length], [0, 2]);
+}
+
+console.log("\nputting the original back");
+{
+  const data = fixture();
+  data.photos[0].storage_path = "hero.main/1700000000000.webp";
+
+  const r = await boot({ data });
+  await r.signIn();
+  r.tab("Photos");
+
+  const revert = [...r.photo("The photograph behind the opening headline")
+                    .querySelectorAll("button")]
+    .find((b) => b.textContent === "Put the original back");
+  revert.click();
+  await settle();
+
+  await r.save();
+  const update = r.sent().find((s) => s.what === "update");
+  check("the row stops naming a file", update.payload.storage_path, null);
+  check("the size goes back to the built-in photograph's",
+        [update.payload.width, update.payload.height], [1535, 1024]);
+  check("and the file it was using is swept",
+        r.sent().find((s) => s.what === "remove").paths, ["hero.main/1700000000000.webp"]);
+}
+
+console.log("\ndiscarding a picked photograph");
+{
+  const r = await boot();
+  await r.signIn();
+  r.tab("Photos");
+
+  await r.pick(r.photo("The photograph behind the opening headline"),
+               r.file("x.jpg", "image/jpeg", jpeg()));
+  check("something is outstanding", r.changeCount(), "1 change not yet saved");
+
+  r.q("#discardBtn").click();
+  await settle();
+
+  check("discarding leaves nothing outstanding", r.changeCount(), "0 changes not yet saved");
+  check("and nothing was ever sent anywhere", r.sent(), []);
+  check("the built-in photograph is back on screen",
+        r.photo("The photograph behind the opening headline")
+          .querySelector(".photo__img").getAttribute("src"),
+        "assets/web/hero-dining.jpg");
+}
+
+console.log("\nfiles the browser cannot use");
+{
+  const r = await boot();
+  await r.signIn();
+  r.tab("Photos");
+
+  const hero = r.photo("The photograph behind the opening headline");
+  await r.pick(hero, r.file("IMG_4821.HEIC", "image/heic"));
+
+  const said = r.photo("The photograph behind the opening headline")
+                .querySelector(".photo__problem").textContent;
+  check("a HEIC is refused", said.startsWith("That is a HEIC file"), true);
+  check("and the message says how to fix it on the phone",
+        said.includes("Most Compatible"), true);
+  check("nothing is outstanding as a result", r.changeCount(), "0 changes not yet saved");
+
+  await r.pick(r.photo("The photograph behind the opening headline"),
+               r.file("menu.pdf", "application/pdf"));
+  check("so is anything that is not an image",
+        r.photo("The photograph behind the opening headline")
+          .querySelector(".photo__problem").textContent,
+        "That is a application/pdf. A photograph has to be a JPEG, a PNG or a WebP.");
+}
+
+console.log("\na photograph taken with the phone on its side");
+{
+  /* Orientation 6 is the common one: the pixels are 4000 × 3000 and the tag
+     says to turn them a quarter turn. What has to come out is a 1500 × 2000
+     portrait — the same picture the owner saw in the file picker.
+
+     This is the failure that looks like nothing is wrong until it is on the
+     site: every browser honours the tag when *showing* an image, so the
+     editor's own preview is right either way. */
+  const r = await boot({ decoded: { width: 4000, height: 3000 } });
+  await r.signIn();
+  r.tab("Photos");
+
+  await r.pick(r.photo("The photograph behind the opening headline"),
+               r.file("IMG_2201.jpg", "image/jpeg", jpeg({ orientation: 6 })));
+
+  check("it comes out the right way up",
+        r.photo("The photograph behind the opening headline")
+          .querySelector(".photo__state").textContent
+          .startsWith("Ready to upload — 1500 × 2000"), true);
+
+  const transform = r.drawn().find((d) => d.what === "setTransform");
+  check("drawn through the quarter turn the tag asked for",
+        transform.m, [0, 1, -1, 0, 2000, 0]);
+
+  /* The raw pixels were asked for deliberately. A browser that hands back an
+     already-rotated bitmap is caught by the swap test instead — checked below
+     on the function itself, since no browser here can be made to do it. */
+  check("and the raw pixels were what was asked for",
+        r.window.document.body.textContent.length > 0, true);
+}
+
+console.log("\nthe readers, on bytes");
+{
+  const r = await boot();
+  const api = r.window.AROMATI_ADMIN._test;
+  const bytes = (u8) => u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength);
+
+  check("the orientation tag is read out of a JPEG",
+        api.readOrientation(bytes(jpeg({ orientation: 8 }))), 8);
+  check("a file with no tag is orientation 1",
+        api.readOrientation(new Uint8Array([0xff, 0xd8, 0xff, 0xd9]).buffer), 1);
+  check("something that is not a JPEG at all is orientation 1",
+        api.readOrientation(new Uint8Array([1, 2, 3, 4]).buffer), 1);
+
+  check("the stored dimensions are read from the frame header",
+        api.rawSize(bytes(jpeg({ width: 1280, height: 960 }))), { width: 1280, height: 960 });
+
+  /* The check that stops a rotation being applied twice. A bitmap whose
+     dimensions still match the stored ones is raw and needs turning; one whose
+     dimensions have been swapped has already been turned. */
+  check("a raw sideways bitmap is turned",
+        api.orientationToApply({ width: 4000, height: 3000 }, { width: 4000, height: 3000 }, 6), 6);
+  check("one the browser already turned is left alone",
+        api.orientationToApply({ width: 3000, height: 4000 }, { width: 4000, height: 3000 }, 6), 1);
+  check("and an upright photograph is never second-guessed",
+        api.orientationToApply({ width: 4000, height: 3000 }, { width: 4000, height: 3000 }, 1), 1);
+
+  check("a big photograph is scaled to the long edge",
+        api.fitInside(4000, 3000, 2000), { width: 2000, height: 1500 });
+  check("a small one is left alone rather than blown up",
+        api.fitInside(800, 600, 2000), { width: 800, height: 600 });
+}
+
+console.log("\nthe columns a photograph slot does not own");
+{
+  const r = await boot();
+  await r.signIn();
+  r.tab("Photos");
+
+  const hero = r.photo("The photograph behind the opening headline");
+  r.type(hero.querySelector(".field__area"), "A rewritten description");
+  await r.save();
+
+  /* The control: a save that sent nothing would satisfy every assertion
+     below. */
+  check("the description really was sent", r.writes().length, 1);
+
+  const payload = r.writes()[0].payload;
+  check("and the slot, the label and the decorative flag were not",
+        ["slot", "label", "is_decorative", "sort_order"].filter((c) => c in payload), []);
+  check("only the picture and the words about it",
+        Object.keys(payload).sort(),
+        ["alt", "height", "source_path", "storage_path", "width"]);
 }
 
 

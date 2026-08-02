@@ -238,6 +238,74 @@ for (const f of files) {
   } else pass("the format triggers refuse what they say they refuse, and allow what they must");
 }
 
+/* ── the photographs ────────────────────────────────────────────────────────
+   Three rules, all of which look like they hold and none of which had run: a
+   photograph with a file needs a description, decoration is exempt from that,
+   and a slot cannot be renamed out from under the markup that reads it. */
+{
+  const problems = [];
+
+  const refused = async (what, sql) => {
+    try { await db.exec(sql); problems.push(what); } catch { /* as intended */ }
+  };
+  const allowed = async (what, sql) => {
+    try { await db.exec(sql); } catch (e) { problems.push(`${what} — ${e.message}`); }
+  };
+
+  await refused("a described photograph saved with no description",
+    `update public.photos set storage_path = 'hero.main/1.webp', alt = '   '
+     where slot = 'hero.main'`);
+
+  await allowed("a described photograph with a description",
+    `update public.photos set storage_path = 'hero.main/1.webp', alt = 'The dining room'
+     where slot = 'hero.main'`);
+
+  await allowed("decoration, which needs none",
+    `update public.photos set storage_path = 'wine.backdrop/1.webp', alt = ''
+     where slot = 'wine.backdrop'`);
+
+  /* Renaming a slot is how a photograph silently stops appearing: the markup
+     asks for "gallery.g1" and the database no longer has one. */
+  await refused("a slot renamed",
+    `update public.photos set slot = 'gallery.gone' where slot = 'gallery.g1'`);
+
+  /* The label and the decorative flag describe the markup, not the picture, so
+     an update that tries to change them has to come back unchanged rather than
+     be refused — the editor sends whole rows. */
+  await db.exec(`update public.photos set label = 'Renamed', is_decorative = true
+                 where slot = 'gallery.g2'`);
+  const g2 = await one(`select label, is_decorative from public.photos where slot = 'gallery.g2'`);
+  if (g2.label === "Renamed" || g2.is_decorative) {
+    problems.push("the label or the decorative flag was writable from an update");
+  }
+
+  if (problems.length) {
+    fail("the photograph rules do not hold", problems.join("\n"));
+  } else pass("a photograph needs a description, decoration does not, and a slot cannot move");
+
+  /* The limits that are the actual control. A bucket created without them is a
+     bucket anyone holding the owner's token can put a 200 MB file into. */
+  const bucket = await one(`select public, file_size_limit, allowed_mime_types
+                            from storage.buckets where id = 'site-photos'`);
+  const types = bucket && (bucket.allowed_mime_types || []);
+  if (!bucket) {
+    fail("the site-photos bucket was not created", "uploads would fail and nothing would say why");
+  } else if (!bucket.file_size_limit || !types.length) {
+    fail("the bucket has no size or type limit",
+         `file_size_limit: ${bucket.file_size_limit}\nallowed_mime_types: ${types.join(", ") || "(none)"}\n` +
+         "the editor's own checks are a courtesy — anyone with the token posts straight at the API");
+  } else if (types.includes("image/svg+xml")) {
+    fail("the bucket allows SVG",
+         "SVG can contain a script, and this bucket is served publicly from the site's own origin");
+  } else {
+    pass(`the bucket caps uploads at ${Math.round(bucket.file_size_limit / 1024 / 1024)} MB ` +
+         `and allows ${types.join(", ")}`);
+  }
+
+  await db.exec(`update public.photos set storage_path = null, source_path = null
+                 where storage_path is not null`);
+}
+
 console.log(failures
   ? `\n${failures} problem(s) in SQL that has now actually run`
   : "\nevery migration applies, seeds correctly, and enforces what it claims");

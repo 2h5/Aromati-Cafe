@@ -212,3 +212,50 @@ updates `site_settings` and `site_copy` values and never their labels or keys,
 it never inserts or deletes a setting, a copy field or a weekday, and it has
 full run of the menu, the holidays and the FAQ. If a rule below reads wrong to
 you, the editor is wrong too — say so.
+
+---
+
+## The photograph bucket
+
+Added in Phase 6. It is the only thing in the project that stores a *file*
+rather than a row, and it sits behind a different service with its own rules —
+so "the tables are locked down" says nothing about it, and it is worth its own
+section.
+
+**`site-photos`, and nothing else.** One bucket per feature. Sharing one means
+some future feature's tidy-up decides the fate of these files.
+
+**Anyone can fetch a photograph; only the owner can put one there.** The bucket
+is public, which is what lets a visitor — who is not logged in — see the
+pictures. Writing, replacing and deleting all ask the same `is_owner()` question
+as every content table, so there is one answer to "who may change this site" and
+it is stored in one place.
+
+**Public is not the same as listable.** Every individual photograph's URL works
+for anybody. Asking the bucket *what is in it* is a separate permission, and it
+is the owner's alone. Granting it to strangers would turn every file, including
+ones no longer used on the site, into something that can be enumerated.
+
+**The size and type limits are on the bucket, not in the editor.** 3 MB, and
+only JPEG, PNG and WebP. The editor checks too, but that is a courtesy so the
+owner finds out before waiting for an upload — it is not the control. Anyone
+holding the owner's password can post straight at the storage API and never load
+the editor at all.
+
+**SVG is not allowed and must never be added.** It is the one image format that
+can contain a script, and this bucket is served from the site's own web address
+— so a script inside one would run as if the site had written it. A test fails
+if it appears in the list.
+
+**A picked photograph is not an uploaded photograph.** Nothing is sent until
+*Save changes*. Choosing a file resizes it, turns it the right way up and shows
+it to you; discarding throws it away and the bucket never hears about it. When a
+save does happen, the file goes first and the row that names it second — a row
+pointing at a file that is not there yet is a broken picture on the live site.
+The photograph that was replaced is deleted afterwards, once everything else has
+landed.
+
+**The photographs the site shipped with cannot be lost this way.** They are in
+the site's own files, not in the bucket, and "no photograph uploaded" is the
+state every slot starts in. Putting the original back is always available and is
+just another edit.

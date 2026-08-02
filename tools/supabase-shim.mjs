@@ -22,10 +22,18 @@
        setting by the same name, but nothing verifies a signature — so these
        tests can say "a request claiming to be this user is refused", never
        "the token could not be forged".
-     - Extensions, the `storage` schema and the dashboard's own roles are
-       absent. Nothing in these two migrations touches them today; a migration
-       that does will fail here for a reason that is not a real defect, and the
-       fix is to add it to this file consciously rather than to work around it.
+     - Extensions and the dashboard's own roles are absent. A migration that
+       touches one will fail here for a reason that is not a real defect, and
+       the fix is to add it to this file consciously rather than to work around
+       it. That is what happened to `storage` in Phase 6: the photographs
+       migration creates a bucket and four policies on storage.objects, so the
+       schema is below — two tables with the columns those statements name, and
+       nothing else. What it is NOT is Supabase Storage: no upload endpoint, no
+       size or MIME enforcement (which the real service applies from
+       storage.buckets, not from a constraint), no signed URLs. So these tests
+       can say the policies are created and that they refuse the wrong caller.
+       They cannot say a 4 MB file is rejected — that is a live check, and it is
+       on the Phase 7 list.
 
    So: green here means the SQL is sound and the policies say what POLICIES.md
    claims. It does not retire step 7 of Phase 3 — run the security advisor. */
@@ -71,6 +79,39 @@ const BOOTSTRAP = `
 
   grant usage on schema auth to anon, authenticated, service_role;
   grant execute on function auth.uid() to anon, authenticated, service_role;
+
+  /* ── storage ──
+     Only what the photographs migration names. The real storage.objects has a
+     dozen more columns and a set of triggers that keep a path index in step;
+     none of that changes whether a policy is written correctly.
+
+     RLS on and no policies of its own, which is how a real project arrives:
+     everything Supabase Storage does on behalf of a signed-in caller goes
+     through policies somebody wrote. */
+  create schema storage;
+  grant usage on schema storage to anon, authenticated, service_role;
+
+  create table storage.buckets (
+    id                 text primary key,
+    name               text not null,
+    public             boolean not null default false,
+    file_size_limit    bigint,
+    allowed_mime_types text[],
+    created_at         timestamptz not null default now()
+  );
+
+  create table storage.objects (
+    id         uuid primary key default gen_random_uuid(),
+    bucket_id  text references storage.buckets (id),
+    name       text not null,
+    owner      uuid,
+    created_at timestamptz not null default now()
+  );
+
+  alter table storage.objects enable row level security;
+
+  grant select, insert, update, delete on storage.objects to anon, authenticated;
+  grant select on storage.buckets to anon, authenticated;
 `;
 
 /* The real owner account, created by hand in the dashboard on 2026-08-01.

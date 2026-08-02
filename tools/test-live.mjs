@@ -43,8 +43,8 @@ for (const f of readdirSync("supabase/migrations").filter((n) => n.endsWith(".sq
   if (!r.ok) { fail(`${f} did not apply — run tools/test-sql.mjs`, r.message); process.exit(1); }
 }
 
-/* ── PostgREST, reduced to the five requests data.js actually makes ────────
-   Deliberately not a general implementation. It answers those five and throws
+/* ── PostgREST, reduced to the six requests data.js actually makes ─────────
+   Deliberately not a general implementation. It answers those six and throws
    on anything else, so a new query added to data.js fails loudly here rather
    than being silently approximated. */
 async function rest(path) {
@@ -83,6 +83,10 @@ async function rest(path) {
     }
     return items;
   }
+  if (table === "photos") {
+    return (await db.query(
+      `select slot, storage_path, alt from public.photos order by sort_order`)).rows;
+  }
   throw new Error(`the stub does not answer ${table} — add it deliberately`);
 }
 
@@ -108,7 +112,8 @@ function sandbox({ key = "a".repeat(40), fetcher } = {}) {
   return { g, store, warnings };
 }
 
-const SEEDS = ["data/seed-settings.js", "data/seed-hours.js", "data/seed-menu.js", "data/seed-copy.js"];
+const SEEDS = ["data/seed-settings.js", "data/seed-hours.js", "data/seed-menu.js",
+               "data/seed-copy.js", "data/seed-photos.js"];
 const dataSrc = readFileSync("data.js", "utf8");
 const seedSrc = SEEDS.map((f) => readFileSync(f, "utf8")).join("\n");
 
@@ -117,7 +122,7 @@ function load(env) {
      same way the browser loads them. Function-scoped eval reproduces that
      without a module wrapper changing the semantics under test. */
   const keys = Object.keys(env.g);
-  const fn = new Function(...keys, `${seedSrc}\n${dataSrc}\nreturn { AROMATI_DATA, SEED_MENU, SEED_HOURS, SEED_HOURS_NOTE, SEED_SETTINGS, SEED_COPY };`);
+  const fn = new Function(...keys, `${seedSrc}\n${dataSrc}\nreturn { AROMATI_DATA, SEED_MENU, SEED_HOURS, SEED_HOURS_NOTE, SEED_SETTINGS, SEED_COPY, SEED_PHOTOS };`);
   return fn(...keys.map((k) => env.g[k]));
 }
 
@@ -130,7 +135,7 @@ console.log("\nthe live path against the seed path\n");
    about the site being the same site. */
 {
   const env = sandbox();
-  const { AROMATI_DATA, SEED_MENU, SEED_HOURS, SEED_SETTINGS, SEED_COPY } = load(env);
+  const { AROMATI_DATA, SEED_MENU, SEED_HOURS, SEED_SETTINGS, SEED_COPY, SEED_PHOTOS } = load(env);
   await refresh(AROMATI_DATA);
 
   /* Read what was cached rather than what was handed to the callback. The
@@ -147,7 +152,18 @@ console.log("\nthe live path against the seed path\n");
       ["the menu", fresh.menu, SEED_MENU],
       ["the hours", fresh.hours, SEED_HOURS],
       ["the settings", fresh.settings, SEED_SETTINGS],
-      ["the copy", fresh.copy, SEED_COPY]
+      ["the copy", fresh.copy, SEED_COPY],
+      /* The photographs are the one part where the live shape is a projection
+         of the seed rather than the seed itself: the seed records the built-in
+         file and its size, and the site uses neither — the picture is already
+         in the markup. What has to match is what render.js writes, which is the
+         description and an override URL that a project with no uploads does not
+         have. Written out here rather than reusing data.js's own projection, so
+         the test states its expectation instead of agreeing with the code. */
+      ["the photographs", fresh.photos, Object.keys(SEED_PHOTOS).reduce((out, slot) => {
+        out[slot] = { alt: SEED_PHOTOS[slot].alt || "", url: null };
+        return out;
+      }, {})]
     ];
     /* Compared through data.js's own `stable`, so the test cannot pass under a
        looser rule than the site uses to decide whether anything changed.
@@ -196,6 +212,48 @@ console.log("\nthe live path against the seed path\n");
   if (after && after.settings.phoneDigits === "5551234567") pass("an edit in the database reaches the page");
   else fail("an edit in the database did not come through", JSON.stringify(after && after.settings));
   await db.exec(`update public.site_settings set value = '3322073847' where key = 'phone_digits'`);
+}
+
+/* ── 3a. an uploaded photograph becomes a URL the page can use ──────────────
+   The database stores a path inside the bucket and nothing else. Turning that
+   into an address is data.js's job, and getting it wrong produces a broken
+   image rather than an error — so the whole address is checked, not just that
+   something came back.
+
+   The description is deliberately left alone by this edit, to show that
+   replacing the picture does not disturb what a screen reader is told. */
+{
+  const env = sandbox();
+  const { AROMATI_DATA, SEED_PHOTOS } = load(env);
+  await refresh(AROMATI_DATA);
+
+  await db.exec(`update public.photos set storage_path = 'hero.main/1754000000000.webp'
+                 where slot = 'hero.main'`);
+  const after = await refresh(AROMATI_DATA);
+  const hero = after && after.photos["hero.main"];
+  const want = "https://yofoiqgknsqzsuwtlqvh.supabase.co/storage/v1/object/public/" +
+               "site-photos/hero.main/1754000000000.webp";
+
+  if (!hero || hero.url !== want) {
+    fail("an uploaded photograph did not become the address it is served from",
+         `wanted: ${want}\ngot:    ${hero && hero.url}`);
+  } else if (hero.alt !== SEED_PHOTOS["hero.main"].alt) {
+    fail("replacing the picture changed its description",
+         `${hero.alt}\nshould still be\n${SEED_PHOTOS["hero.main"].alt}`);
+  } else {
+    pass("an uploaded photograph reaches the page as the address it is served from");
+  }
+
+  /* And a slot nobody has uploaded to has no address at all, which is what
+     tells render.js to leave the markup's own picture alone. */
+  const untouched = after && after.photos["gallery.g1"];
+  if (untouched && untouched.url === null) {
+    pass("a slot with no upload has no address, so the built-in photograph stands");
+  } else {
+    fail("a slot with no upload was given an address", JSON.stringify(untouched));
+  }
+
+  await db.exec(`update public.photos set storage_path = null where slot = 'hero.main'`);
 }
 
 /* ── 4. the failure modes, which are the normal case ───────────────────────── */

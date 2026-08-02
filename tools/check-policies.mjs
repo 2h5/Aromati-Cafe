@@ -79,15 +79,21 @@ const all = (re) => [...sql.matchAll(re)];
 const tables  = all(/create table public\.(\w+)/g).map((m) => m[1]);
 const rlsOn   = new Set(all(/alter table public\.(\w+)\s+enable row level security/g).map((m) => m[1]));
 
-/* create policy "name" on public.table for select|insert|update|delete to roles
-   ... up to the next statement. The body is kept so it can be searched for
-   is_owner(). */
+/* create policy "name" on <schema>.table for select|insert|update|delete to
+   roles ... up to the next statement. The body is kept so it can be searched
+   for is_owner().
+
+   The schema is captured rather than assumed, because from Phase 6 four of
+   these are on storage.objects — the bucket the photographs go into. Those are
+   the newest write policies in the project and there is no reason for them to
+   be the unchecked ones. */
 const policies = all(
-  /create policy\s+"([^"]+)"\s+on public\.(\w+)\s+for (\w+)\s+to ([^\n]+?)\s+(using|with check)([\s\S]*?);/g
+  /create policy\s+"([^"]+)"\s+on (public|storage)\.(\w+)\s+for (\w+)\s+to ([^\n]+?)\s+(using|with check)([\s\S]*?);/g
 ).map((m) => ({
-  name: m[1], table: m[2], op: m[3].toLowerCase(),
-  roles: m[4].split(",").map((r) => r.trim()),
-  body: (m[5] + m[6])
+  name: m[1], schema: m[2], table: m[3], qualified: `${m[2]}.${m[3]}`,
+  op: m[4].toLowerCase(),
+  roles: m[5].split(",").map((r) => r.trim()),
+  body: (m[6] + m[7])
 }));
 
 const WRITES = ["insert", "update", "delete"];
@@ -130,10 +136,21 @@ console.log("\n4. every write policy is gated on is_owner()");
 
   /* An update policy needs BOTH: using() decides which rows may be targeted,
      with check() decides what they may become. With only using(), an owner
-     check can be passed on the way in and abandoned on the way out. */
-  const half = policies.filter((p) => p.op === "update" &&
-    !(/using\s*\(\s*public\.is_owner\(\)\s*\)/.test(p.body) &&
-      /with check\s*\(\s*public\.is_owner\(\)\s*\)/.test(p.body)));
+     check can be passed on the way in and abandoned on the way out.
+
+     Split rather than matched whole. The content tables say
+     `using (public.is_owner())` and could be checked literally, but the storage
+     policies have to say `using (bucket_id = '…' and public.is_owner())` —
+     they are policies on one shared table, so they must name their bucket. A
+     literal match would have quietly demanded that they be written a way they
+     cannot be written. */
+  const half = policies.filter((p) => {
+    if (p.op !== "update") return false;
+    const at = p.body.indexOf("with check");
+    if (at < 0) return true;                       // no with check at all
+    return !/is_owner\(\)/.test(p.body.slice(0, at)) ||
+           !/is_owner\(\)/.test(p.body.slice(at));
+  });
   check("update policies check both using and with check", half.length === 0,
         half.map((p) => `"${p.name}" is missing one half`).join("\n         "));
 }
@@ -162,8 +179,15 @@ console.log("\n6. grants and policies agree");
     }
   }
 
+  /* Only the tables these migrations create. storage.objects is Supabase's
+     table and Supabase issues its grants; a project has them before the first
+     migration runs. Demanding one here would fail on a correct policy and the
+     obvious fix — writing a grant on somebody else's table — is worse than the
+     complaint. Rules 3 and 4 still cover those policies, which is where the
+     danger actually is. */
+  const ours = new Set(tables);
   const policied = new Map();
-  for (const p of policies.filter((x) => WRITES.includes(x.op))) {
+  for (const p of policies.filter((x) => WRITES.includes(x.op) && ours.has(x.table))) {
     if (!policied.has(p.table)) policied.set(p.table, new Set());
     policied.get(p.table).add(p.op);
   }

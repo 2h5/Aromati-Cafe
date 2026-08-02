@@ -39,8 +39,12 @@ var AROMATI_DATA = (function () {
 
   /* Bump when the cached shape changes. An old cache is then ignored rather
      than half-understood — a rename that silently reads `undefined` renders a
-     blank menu, which looks like a data-loss bug and is very hard to trace. */
-  var CACHE_KEY = "aromati:content:v1";
+     blank menu, which looks like a data-loss bug and is very hard to trace.
+
+     v2 added the photographs. A v1 cache has no `photos` key, and a returning
+     visitor whose cache is thrown away is served the seeds for one paint and
+     the live content a moment later, which is the ordinary path. */
+  var CACHE_KEY = "aromati:content:v2";
 
   /* ── the seed floor ──────────────────────────
      Read through functions rather than captured at load, so a seed file that
@@ -52,8 +56,28 @@ var AROMATI_DATA = (function () {
       hours:     typeof SEED_HOURS === "object" && SEED_HOURS ? SEED_HOURS : null,
       hoursNote: typeof SEED_HOURS_NOTE === "string" ? SEED_HOURS_NOTE : null,
       settings:  typeof SEED_SETTINGS === "object" && SEED_SETTINGS ? SEED_SETTINGS : null,
-      copy:      typeof SEED_COPY === "object" && SEED_COPY ? SEED_COPY : null
+      copy:      typeof SEED_COPY === "object" && SEED_COPY ? SEED_COPY : null,
+      photos:    seedPhotos()
     };
+  }
+
+  /* The seed file records four things about a slot — the built-in file, its
+     description, and its dimensions — and the site uses exactly one of them.
+     The built-in picture is already in the markup, so nothing has to put it
+     there; the dimensions are the editor's business, not a visitor's. What is
+     projected here is what render.js writes: a description, and an override
+     picture when there is one, which for a seed is never. */
+  function shapeSeedPhoto(entry) {
+    return { alt: typeof entry.alt === "string" ? entry.alt : "", url: null };
+  }
+
+  function seedPhotos() {
+    if (typeof SEED_PHOTOS !== "object" || !SEED_PHOTOS) return null;
+    var out = {};
+    Object.keys(SEED_PHOTOS).forEach(function (slot) {
+      out[slot] = shapeSeedPhoto(SEED_PHOTOS[slot]);
+    });
+    return out;
   }
 
   /* A cache is only usable if it still has the shape the renderer expects. A
@@ -64,7 +88,8 @@ var AROMATI_DATA = (function () {
       c.menu && typeof c.menu === "object" &&
       c.hours && c.hours.length === 7 &&
       c.settings && typeof c.settings === "object" &&
-      c.copy && typeof c.copy === "object";
+      c.copy && typeof c.copy === "object" &&
+      c.photos && typeof c.photos === "object";
   }
 
   /* localStorage throws rather than returning null in a surprising number of
@@ -215,6 +240,40 @@ var AROMATI_DATA = (function () {
     return out;
   }
 
+  /* ── photographs ─────────────────────────────
+     Layered over the seeds rather than replacing them, which makes the empty
+     cases behave correctly for free: a project whose photos table has not been
+     filled in yet compares *equal* to the seeds instead of looking like a site
+     that just lost all its pictures, and a slot the database has never heard
+     of keeps the description that is in the markup.
+
+     An empty description in the database is not an override. The editor will
+     not let a described photograph be saved without one, so the only way to
+     see an empty one here is a row that was never filled in — and reverting to
+     the built-in description is better than announcing nothing. */
+
+  function publicUrl(path) {
+    /* /storage/v1/object/public/ does not consult row level security, which is
+       why the bucket grants no select to anon: the URL is the permission, and
+       a bucket that is also readable through the API is an enumerable bucket.
+       See memory.md, "Storage abuse". */
+    return AROMATI_CONFIG.url + "/storage/v1/object/public/site-photos/" +
+      String(path).split("/").map(encodeURIComponent).join("/");
+  }
+
+  function shapePhotos(rows) {
+    var out = seedPhotos() || {};
+    rows.forEach(function (row) {
+      if (typeof row.slot !== "string" || !row.slot) return;
+      var photo = out[row.slot] || (out[row.slot] = { alt: "", url: null });
+      if (typeof row.alt === "string" && row.alt) photo.alt = row.alt;
+      if (typeof row.storage_path === "string" && row.storage_path) {
+        photo.url = publicUrl(row.storage_path);
+      }
+    });
+    return out;
+  }
+
   function shapeItem(row) {
     var item = { name: row.name };
     if (row.description) item.desc = row.description;
@@ -298,7 +357,8 @@ var AROMATI_DATA = (function () {
       get("site_copy?select=key,value"),
       get("menu_courses?select=id,page,course_key,tab_label,heading,sizes,is_static,static_id,sort_order&order=sort_order"),
       get("menu_items?select=id,course_id,name,tag,description,price,prices,price_all_sizes,no_price,options_dom_id,sort_order," +
-          "menu_item_pours(id,label,price,sort_order),menu_item_options(id,name,price,sort_order)&order=sort_order")
+          "menu_item_pours(id,label,price,sort_order),menu_item_options(id,name,price,sort_order)&order=sort_order"),
+      get("photos?select=slot,storage_path,alt")
     ];
 
     Promise.all(wanted).then(function (r) {
@@ -308,7 +368,13 @@ var AROMATI_DATA = (function () {
       /* An empty result is not fresh content, it is a project that has not
          been seeded — or a policy that stopped returning rows. Rendering it
          would blank the site, which is precisely the failure the seed floor
-         exists to prevent. */
+         exists to prevent.
+
+         The photographs are deliberately not in this list. An empty photos
+         table means no slot has been given an override, which is the state
+         every one of them starts in — and it renders as the pictures already
+         in the markup, which is right. Treating it as a failure would take the
+         menu down over a table nobody has touched yet. */
       if (!hours || !r[0].length || !r[2].length || !Object.keys(menu).length) {
         throw new Error("the database answered, but with nothing in it");
       }
@@ -318,7 +384,8 @@ var AROMATI_DATA = (function () {
         hours: hours,
         hoursNote: seedContent().hoursNote,   // not yet a database field
         settings: shapeSettings(r[0]),
-        copy: shapeCopy(r[2])
+        copy: shapeCopy(r[2]),
+        photos: shapePhotos(r[5])
       };
 
       var before = current();

@@ -107,11 +107,13 @@ the decision, don't re-derive it.
 
 ## Current phase / status
 
-**Phases 1–5 done bar two parked items.** Branch `phase1-content-as-data`, not
+**Phases 1–6 done bar two parked items.** Branch `phase1-content-as-data`, not
 merged — hold the merge until the browser pass on the choreography, since jsdom
 cannot run it and it is the likeliest thing to have broken. The editor's live
 line-count warning is on that pass too: nothing in `npm test` has layout in it,
-so no harness can say whether the number it reports is the right one.
+so no harness can say whether the number it reports is the right one. Phase 6
+adds one more to that pass, and it is the same kind of thing: whether a
+photograph the owner uploads looks right in the space it lands in.
 
 Done — **the three menu pages now render from data, verified identical**:
 - `tools/extract-menus.mjs` — strict markup→data extractor
@@ -231,6 +233,58 @@ Also done — **Phase 5: the editor**:
 - **The headline check measures rather than counts.** See Phase 5 below and
   *Deviations*.
 
+Also done — **Phase 6: the photographs**:
+- **A slot is a position, not a picture.** 29 places on the five pages where a
+  photograph goes, keyed by where they are rather than by what is in them. The
+  same file fills two of them — `georgian-salad.jpg` is in the photo strip and
+  in the gallery, described differently in each — and those are two decisions
+  rather than one duplicate.
+- **The database stores an override and nothing else.** `storage_path` is null
+  on all 29 rows to start with, and null means "the photograph in the markup".
+  So a project with no uploads renders exactly the site in git, a page with no
+  JavaScript shows the right pictures, and there is no state in which the site
+  is waiting on a bucket to look correct.
+- `tools/photo-slots.mjs` — the slot table: name, owner-facing label, and
+  whether it is decoration. Read by the extractor *and* by the SQL generator, so
+  29 names exist once.
+- `tools/extract-photos.mjs` — stamps `data-photo="…"` onto every content
+  `<img>` and writes `data/seed-photos.js` from the same pass, the same
+  arrangement as `extract-copy.mjs`. It refuses an image whose alt is empty
+  without the slot table saying it means to be: `""` and "not written yet" are
+  identical to a screen reader and only one of them is a choice.
+- `tools/gen-photo-sql.mjs` → `supabase/migrations/20260801000400_photos.sql` —
+  the 29 rows, the `is_decorative` column, the corrected alt rule, the trigger
+  that stops a slot being renamed, and the bucket with its limits. Generated, so
+  it reviews as a diff; `npm run check:photosql` fails if it stops matching.
+- **Decoration is not a missing description.** The original table said "a
+  photograph with a file must have alt text", which is right for a photograph
+  and wrong for the five backdrops that sit behind a scrim with
+  `aria-hidden="true"`. Forcing a description onto those would have a screen
+  reader announce the wallpaper. The rule is now "content, with a file, needs a
+  description" — and *which* slots are decoration is the markup's business, so
+  the flag is protected by the same trigger that protects the slot name.
+- **The element and the slot are not the same thing.** The home page's photo
+  strip scrolls forever by holding two identical groups; its nine photographs
+  are drawn eighteen times, and the second nine are `aria-hidden`. An override
+  reaches every drawing; a description reaches only the ones that are content.
+- **Four things happen to a picked file, all in the browser, before anything is
+  sent:** HEIC is refused in words that say how to fix it on the phone, the EXIF
+  rotation is applied to the pixels, it is scaled to fit 2000px, and it is
+  re-encoded as webp. See *Deviations* for why the rotation is *checked* rather
+  than trusted.
+- **Files go before rows, and the sweep goes last.** A row naming an object that
+  is not there yet is a broken image for as long as the upload takes, and
+  permanently if the upload then fails. The photograph it replaced is deleted
+  after the whole save has landed — never speculatively, or a save that fails
+  halfway has deleted the picture the row still points at.
+- **Nothing is uploaded until Save.** Picking a file decodes and re-encodes it
+  and shows it, and that is all; Discard throws it away and the bucket never
+  hears about it. This is the answer to concern 11 for the common case — the
+  orphan that remains is the *replaced* photograph, and that one is swept.
+- `tools/test-photos.mjs` and eleven new sections in `tools/test-admin.mjs`;
+  `img-src` on both policies now names the storage origin, checked by
+  `check-csp.mjs`.
+
 **One-off tools, already run, kept as a record of what was done to the markup**
 — re-running them is a no-op or worse, so read the header before you do:
 `tools/add-content-hooks.mjs` (marked the two anonymous footer `<p>`s that
@@ -245,9 +299,9 @@ string is a bug waiting for them to disagree. What was left after removing them
 was a slug and a sort order, which is a column on `menu_courses`. Same
 reasoning that dropped `faq.footButton` from the copy set in Phase 1.
 
-### The twenty harnesses, and what each is for
+### The twenty-two harnesses, and what each is for
 
-`npm test` runs all twenty. The two font ones run **first**: they are the
+`npm test` runs all twenty-two. The two font ones run **first**: they are the
 fastest, and they guard the thing that has broken most often.
 
 - `tools/check-fonts.mjs` — the font-loading invariants, statically. Cannot
@@ -285,14 +339,40 @@ fastest, and they guard the thing that has broken most often.
   thing that proves the other two were refused by policy rather than by a
   constraint. 44 checks; the Security rows of the Phase 7 checklist bar the two
   that are not SQL.
-- `tools/test-db-guards.mjs` (`npm run test:dbguards`) — puts five silent
-  database mistakes back (RLS off
-  a table, `using (true)` where `is_owner()` was meant, the allowlist opened,
-  `is_owner()` granted to `anon`, the price-shape constraint relaxed) and
-  requires the two harnesses above to fail *and name which one*.
+- `tools/test-db-guards.mjs` (`npm run test:dbguards`) — puts eight silent
+  database mistakes back (RLS off a table, `using (true)` where `is_owner()` was
+  meant, the allowlist opened, `is_owner()` granted to `anon`, the price-shape
+  constraint relaxed, the photo bucket's write policy opened, the photograph
+  description rule dropped, the bucket created with no size or type limit) and
+  requires the harnesses above to fail *and name which one*.
+
+  Number seven took two attempts and the second one is the lesson: removing the
+  description trigger alone changed nothing, because the CHECK constraint still
+  refused the row — so the mutation "passed" while proving only that the *other*
+  half worked. Both layers have to go. Same shape as the allowlist mutation,
+  which needed the missing policy *and* the revoked grant, and the same rule
+  behind both: a mutation that defeats half a defence says nothing at all about
+  the half it removed.
 - `gen-seed-sql.mjs --check` — the committed seed migration still matches the
   seed data. Editing `seed-copy.js` and forgetting to regenerate would leave
   the site saying one thing and the database seeding another.
+- `gen-photo-sql.mjs --check` (`npm run check:photosql`) — the same question for
+  the photographs migration, which is generated from `tools/photo-slots.mjs` and
+  `data/seed-photos.js`. It also refuses to generate at all if those two
+  disagree about which slots exist: a slot with no seed entry inserts a row with
+  no description, a seed entry with no slot is a photograph the editor never
+  lists, and both are silent.
+- `tools/test-photos.mjs` (`npm run test:photos`) — the photographs, in two
+  halves. First the markup against the data: every slot has a place, every place
+  has a slot, and the decorative flags agree in both directions — where "both
+  directions" matters, because a slot the data calls decoration must be
+  decoration everywhere it is drawn, while the reverse is deliberately not true
+  (the strip's nine are described once and repeated silently). Then the real
+  `render.js`, asked what it actually writes: that an override reaches the
+  aria-hidden repeat too, that a description does not, and that six kinds of
+  `src` that are not `https://` are all refused — preceded by a control proving
+  a good one is written, because six assertions about a refusal are all
+  satisfied by a renderer that does nothing.
 - `tools/check-live-project.mjs` — the same question as `test-live.mjs`, asked
   of the **real project over the real network** with the real key. **Not** in
   `npm test`: it needs a live project, and a check that fails on a train is one
@@ -361,6 +441,16 @@ fastest, and they guard the thing that has broken most often.
   notice, and the "no forbidden column was sent" assertions are preceded by a
   control that both edits really were sent — a save that sent nothing satisfies
   every one of them.
+
+  Phase 6 added eleven more sections to it, covering the only panel that sends
+  something other than a row. jsdom has no image decoding and no canvas, so what
+  is faked is exactly the *browser's* work — decoding a file to pixels, encoding
+  pixels to webp — and what is real is admin.js's: reading the EXIF tag out of
+  the bytes, deciding whether the browser had already applied it, the size
+  everything is scaled to, and the transform chosen. The JPEG those tests read
+  is written byte by byte in the harness rather than checked in as a fixture,
+  because the whole point is to control the orientation tag and a fixture whose
+  tag nobody can see is a fixture nobody can reason about.
 - `tools/check-vendor.mjs` (`npm run check:vendor`) — the vendored SDK is still
   the published artifact. Three facts, none of them in the same place: the
   bytes on disk, the sha256 written down in `vendor/README.md`, and the version
@@ -503,11 +593,14 @@ nothing, and two no-break spaces lost in transcription.
 Still worth doing in either order — read `POLICIES.md` and say whether it
 describes what you meant, and do the browser pass.
 
-**One thing left for you, and it is not SQL:** turn on Authentication →
-Policies → leaked password protection. The advisor flags it, a migration cannot
-fix it, and with one account and signups off it only ever applies when the owner
-changes their own password — which is also the password that is the whole
-editor.
+**Leaked password protection: decided, not outstanding.** 2026-08-01 — it is a
+Pro-plan feature and this project is not paying for one, so the advisor will go
+on flagging it forever and that is the answer, not a task. What it would have
+done is check a new password against HaveIBeenPwned when the owner changes it.
+What replaces it is the thing that was always doing most of the work anyway: one
+account, signups off, and a password that is not reused. Written down here
+because an unexplained WARN in the advisor is the kind of thing that gets
+"fixed" twice by two different people and then quietly ignored by a third.
 
 ---
 
@@ -726,10 +819,17 @@ the page — resolve that with the owner before building the FAQ panel.
 
 ### Photographs
 
-27 distinct `assets/` paths referenced across the 5 pages. `assets/web/` holds
-hand-optimised `.jpg`; two `-outpainted.png` files are wider crops. Note the
-source `assets/*-enhanced.png` originals are large and are *not* what the site
-loads — do not point the CMS at them.
+**Superseded by Phase 6 — read `tools/photo-slots.mjs`.** What was counted here
+at plan time was files: 27 distinct `assets/` paths across the 5 pages. What the
+CMS actually needed was *positions*, and there are 29 of them, drawn 38 times.
+The difference is the whole model: one file fills two slots where it appears in
+two sections, and nine slots are drawn twice because the photo strip repeats
+itself to scroll forever.
+
+Still true, and still worth knowing: `assets/web/` holds the hand-optimised
+`.jpg` the site actually loads, two `-outpainted.png` files are wider crops, and
+the `assets/*-enhanced.png` originals are large and are **not** what the site
+loads — nothing points the CMS at them.
 
 ---
 
@@ -974,15 +1074,39 @@ photos, which are Phase 6.
 
 ---
 
-### Phase 6 — Photos. ← *next*
+### Phase 6 — Photos. ✅ done
 
-Bucket + policies, upload widget, client-side resize to webp, HEIC rejected
-with a plain-language message, EXIF rotation corrected, `alt` required,
-dimensions captured at upload, original kept for re-framing.
+All of it: bucket + policies, upload widget, client-side resize to webp, HEIC
+rejected with a plain-language message, EXIF rotation corrected, `alt` required,
+dimensions captured at upload, original kept for re-framing. See the status
+section above for what was built; three things are worth writing down here
+because they were decisions rather than steps.
+
+**The slot list is markup, and it is checked as markup.** 29 positions across
+five pages, stamped onto the `<img>` elements themselves and generated into the
+migration from the same table. An image added to or removed from a page makes
+`tools/extract-photos.mjs` stop, rather than silently re-numbering every slot
+after it — which is the failure that would otherwise put the storefront in the
+gallery and nobody would know why.
+
+**Dimensions are stored and are not used for layout.** No `width`/`height`
+attributes were added to the 38 images. The layout today is entirely CSS —
+fixed containers, `object-fit: cover` — and adding intrinsic sizes to fix a
+reflow nobody has reported would be a change to the look of the site made
+blind, in the phase least able to check it. What the numbers *are* for is the
+editor: it compares the shape of a new photograph against the one it replaces
+and says so when they differ a lot, because the container does not change shape
+and the difference is taken out of the picture as a crop. A warning, not a
+refusal — the same reasoning as the headline check, and for the same reason:
+whether a crop matters is a judgement about that photograph.
+
+**What is not covered by a harness:** whether an uploaded photograph looks
+right. Everything about the pipeline is testable and tested; how a particular
+picture sits in a particular container is not, and it is on the browser pass.
 
 ---
 
-### Phase 7 — Full test pass.
+### Phase 7 — Full test pass. ← *next*
 
 Work the checklist below. **Report failures; do not silently work around them.**
 
@@ -1035,7 +1159,19 @@ Ported from Uptown's, plus the Aromati-specific rows.
 **Design integrity**
 - [ ] An over-long `data-split` headline is refused with a plain message
 - [ ] Long item names / descriptions on the public site — ⚠️ **owner's test**
-- [ ] A photo with no alt text blocks the save
+- [x] A photo with no alt text blocks the save — `test-admin.mjs`, and the
+      database refuses it twice over (`test-sql.mjs`)
+
+**Photographs** — the parts a harness cannot answer
+- [ ] Upload a real photograph and look at the page it lands on
+- [ ] Upload one taken with the phone held sideways — it must not arrive rotated
+- [ ] Upload a portrait photograph into a landscape slot: the shape warning
+      appears, and the crop is what the warning says it will be
+- [ ] Replace a photograph twice, then check the bucket holds one pair of files
+      for that slot and not three
+- [ ] Pick a file, then Discard — the bucket must be untouched
+- [ ] With a photograph uploaded, re-run `check-live-project.mjs`: the bucket
+      listing check stops skipping and has something to prove
 
 **Security** — see the section below for the full list
 - [ ] Logged out, attempt to read admin data — blocked
@@ -1043,8 +1179,14 @@ Ported from Uptown's, plus the Aromati-specific rows.
 - [ ] `signUp()` from the browser console — rejected
 - [ ] A second, non-allowlisted account can log in but cannot write anything
 - [ ] `<script>alert(1)</script>` as an item name — renders as literal text
-- [ ] Upload a 10 MB file — rejected at the bucket, not just in the client
-- [ ] Upload a `.exe` renamed `.jpg` — rejected by MIME type
+- [ ] Upload a 10 MB file — rejected at the bucket, not just in the client.
+      **The only way to test this is live**: the editor resizes everything to
+      2000px first, so it never sends one, and the shim in `test-sql.mjs` has no
+      upload endpoint to enforce a limit. Post one straight at
+      `/storage/v1/object/site-photos/` with the owner's token.
+- [ ] Upload a `.exe` renamed `.jpg` — rejected by MIME type. Same note: the
+      bucket is where this is decided, and the bucket is only real in the
+      project.
 
 ---
 
@@ -1198,6 +1340,15 @@ Use a **separate bucket per feature**. Uptown's reasoning is worth quoting:
 sharing a bucket means one feature's orphan-cleanup pass decides the fate of
 another feature's files.
 
+**Done, Phase 6.** `site-photos`, public read, 3 MB, `image/webp` +
+`image/jpeg` + `image/png` — the last two because the untouched original is
+kept beside the resized copy and arrives in whatever the camera produced. **No
+`image/svg+xml`, ever**: it is the one image format that can carry a script, and
+this bucket is served publicly from the site's own origin, so an SVG in it would
+run there. `test-sql.mjs` fails if it is ever added. Writes and listing are
+`is_owner()`; `anon` has neither, so a stranger can fetch a photograph by its
+URL — which is the point — and cannot ask what else is in there.
+
 **7. Token theft via the admin page.**
 The Supabase session token lives in `localStorage`. XSS on `admin.html` steals
 it. This is why the SDK is vendored rather than pulled from a CDN — and it is
@@ -1225,6 +1376,19 @@ write that down so nobody is surprised.
 **11. Orphaned storage objects.**
 Deleting an item does not delete its photo. Needs a cleanup pass scoped to one
 bucket, and it must run *after* a successful save, never speculatively.
+
+**Mostly answered, Phase 6.** The common case is gone rather than cleaned up:
+nothing is uploaded until Save, so a file that is picked and then discarded
+never reaches the bucket at all. What does need sweeping is the *replaced*
+photograph, and that is swept — after the whole save has landed, never before,
+because a delete that runs first is a delete that survives a save which then
+failed. A failure in the sweep itself is a line in the console and nothing more:
+an unreferenced object costs a few hundred kilobytes and there is nothing the
+owner could do about it.
+
+What is left: a file uploaded by a save that then failed at a later step. It is
+in the bucket and no row names it. Rare, harmless, and not worth a background
+job — but it is the reason the bucket will never be provably tidy.
 
 ### Worth adding, not in Uptown
 
@@ -1428,6 +1592,19 @@ bucket, and it must run *after* a successful save, never speculatively.
    failing the moment the owner edits anything. Design it as part of Phase 4,
    not as an afterthought. The menus do not have this problem — their markup was
    removed rather than kept.
+
+   **Phase 6 added to this rather than solving it, and did so knowingly.** The
+   photographs are the same arrangement — the built-in picture and its
+   description are in the markup, the database holds an override — so an edited
+   description makes `data/seed-photos.js` stale in exactly the same way, and
+   `check-live-project.mjs` now compares them and will say so. One thing about
+   the photographs is worse and is worth stating plainly: **an uploaded
+   photograph is the only content in this project that is not in git.** Its
+   description can be written back into the markup; the file itself lives only
+   in the bucket. If the project is lost, the site falls back to the
+   photographs it shipped with, which is a correct site — but it is not the
+   site the owner had. Anything better means downloading the bucket, which is a
+   Phase 8 handoff note, not a tool.
 3. **Staff logins would need an audit trail.** Settled for now as one shared
    account (see *Decisions*), which is why no `changed_by` column exists. If
    that changes, add the columns before the second account is created, not
@@ -1610,3 +1787,69 @@ bucket, and it must run *after* a successful save, never speculatively.
   "✓ built" throughout. Now fixed, and the copy step asserts every referenced
   script reached `dist/` — this failed silently for the whole life of the
   project, so it needed to become loud rather than merely correct.
+
+- **2026-08-01 — the EXIF rotation is checked, not trusted.** A phone does not
+  rotate pixels when you turn it sideways; it writes what the sensor saw and
+  records "this is rotated" in a tag. Every browser honours that tag when it
+  *shows* an image, so the photograph looks right in the file picker and right
+  in the editor's own preview, and then arrives on the site sideways — because
+  the copy drawn to a canvas was the raw pixels.
+
+  The fix is to apply the rotation for real. What makes it worth an entry is
+  that the obvious fix has a second, identical-looking failure: `createImageBitmap`
+  applies the tag itself by default, so rotating on top of that turns the
+  photograph *twice*, and a picture rotated twice is exactly as wrong as one
+  never rotated. So the raw pixels are asked for explicitly, and whether the
+  browser honoured the request is then measured rather than assumed — the four
+  orientations that matter swap width and height, so a bitmap whose dimensions
+  still match the JPEG's own frame header is raw and needs turning, and one
+  whose dimensions have been swapped has already been turned.
+
+  Only 5–8 can be told apart this way; 2 and 4 are mirrors and do not change the
+  dimensions. That is stated in the code rather than papered over: they are
+  produced almost only by front cameras that have already flipped the pixels,
+  and getting them wrong costs a mirrored photograph rather than a sideways one.
+
+- **2026-08-01 — the shape warning compared a photograph to itself.** Picking a
+  file writes the new dimensions onto the draft row, and the warning then read
+  those same dimensions as "the shape being replaced" — so the ratio was always
+  1 and the warning never fired. It was the test that found it, and only because
+  the test asserted the *presence* of a warning rather than its absence.
+
+  The fix is to compare against the baseline row — what the database last
+  confirmed — rather than against the draft. The general shape of the mistake is
+  worth remembering: in an editor built on two copies of every row, "what it was
+  before" is always the baseline, and reaching for the draft gets you the answer
+  to a different question that looks like the right one.
+
+- **2026-08-01 — the storage schema went into the shim rather than around it.**
+  `tools/supabase-shim.mjs` already said, in writing, that `storage` was absent
+  and that "a migration that does touch it will fail here for a reason that is
+  not a real defect, and the fix is to add it to this file consciously rather
+  than to work around it". Phase 6 was that migration, and the note was taken at
+  its word: two tables with the columns the migration names, RLS on, no policies
+  of its own — so the four bucket policies are genuinely created and genuinely
+  exercised by `test-rls.mjs`, through the same three actors as every other
+  write.
+
+  What that does *not* buy is stated in the same place: there is no upload
+  endpoint, so nothing there enforces `file_size_limit` or `allowed_mime_types`
+  — the real service applies those from `storage.buckets`, not from a
+  constraint. `test-sql.mjs` checks the limits are *recorded*; only a live
+  upload can check they are *applied*, and that is a Phase 7 row.
+
+- **2026-08-01 — `check-policies.mjs` had stopped covering the newest policies.**
+  Its parser matched `on public.<table>`, which was every policy in the project
+  until the bucket. Four storage policies were being read, counted and ignored.
+  Two changes followed, and the second is the interesting one: the "an update
+  policy needs `is_owner()` in both halves" rule was written as a literal match
+  on `using (public.is_owner())`, which the content tables satisfy and a storage
+  policy cannot — those live on one shared table and must name their bucket, so
+  they read `using (bucket_id = '…' and public.is_owner())`. A literal check
+  would have quietly demanded they be written a way they cannot be written.
+
+  Split on `with check` and look for the call in each half instead. **A checker
+  written against the shape of the code that existed when it was written will
+  reject the first correct thing that looks different** — and the direction that
+  matters is which way it fails: this one would have failed loudly, but the
+  schema-qualified match failed silently, which is why it lasted a phase.

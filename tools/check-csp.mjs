@@ -266,6 +266,54 @@ if (!policy) {
   } else pass("frame-ancestors allows the editor's measuring frame and nothing else");
 }
 
+/* ── 9. the uploaded photographs are loadable ──────────────────────────────
+   Section 3 reads the origins out of the markup and the stylesheet, and it
+   cannot see this one: a replaced photograph's URL is built at runtime in
+   data.js out of the project in config.js, so nothing static mentions it. Left
+   out of img-src, every photograph the owner uploads is a broken image on the
+   live site and works perfectly everywhere it is tested. */
+{
+  const cfg = existsSync("config.js") ? readFileSync("config.js", "utf8") : "";
+  const url = (/url\s*:\s*["'](https:\/\/[^"']+)["']/.exec(cfg) || [])[1];
+  const origin = url ? url.replace(/\/$/, "") : null;
+
+  const uploads = existsSync("admin.js") &&
+    /storage\s*\.\s*from\(/.test(readFileSync("admin.js", "utf8"));
+
+  if (!uploads) {
+    pass("the editor uploads nothing, so img-src needs no storage origin");
+  } else if (!origin) {
+    fail("config.js has no https url", "img-src cannot be checked against a project that is not named");
+  } else {
+    const imgSrc = policy["img-src"] || policy["default-src"] || [];
+    if (!imgSrc.includes(origin)) {
+      fail("img-src does not allow the project the photographs are stored in",
+           `config.js: ${origin}\nimg-src:   ${imgSrc.join(" ")}\n` +
+           "every uploaded photograph would be a broken image, and only in production");
+    } else pass("img-src allows photographs from the project config.js points at");
+
+    /* The editor shows the file the owner has just picked, before it exists
+       anywhere but in the tab. That preview is a blob: URL. */
+    const adminImg = (() => {
+      const live = headers.split("\n").filter((l) => !/^\s*#/.test(l));
+      const at = live.findIndex((l) => /^\/admin\.html\s*$/.test(l.trim()));
+      if (at < 0) return null;
+      const line = live.slice(at + 1, at + 8).find((l) => /Content-Security-Policy:/i.test(l));
+      const part = line && line.split(";").find((p) => /^\s*img-src\b/.test(p));
+      return part ? part.trim().split(/\s+/).slice(1) : null;
+    })();
+
+    if (!adminImg) {
+      fail("the editor's policy has no img-src of its own",
+           "it would inherit default-src 'self' and show neither the preview nor the stored photo");
+    } else if (!adminImg.includes("blob:") || !adminImg.includes(origin)) {
+      fail("the editor cannot show the photograph being uploaded",
+           `img-src on /admin.html: ${adminImg.join(" ")}\n` +
+           "blob: is the preview of the file just picked; the project origin is the stored one");
+    } else pass("the editor can show both the picked file and the stored photograph");
+  }
+}
+
 console.log(failures
   ? `\n${failures} problem(s) — the policy would break the site, or is not covering it`
   : "\nthe policy covers the site and blocks nothing the site needs");

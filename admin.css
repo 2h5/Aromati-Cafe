@@ -357,6 +357,51 @@ h1,h2,h3{ margin: 0; font-weight: 600; letter-spacing: -.01em; }
   color: var(--ink-soft); font-size: 14px;
 }
 
+/* ── the photographs ──────────────────────────
+   The picture and everything about it side by side, because the whole job is
+   looking at one while reading the other. Below 640 they stack, and the
+   picture stays first — it is the thing being identified. */
+
+.photo{
+  display: grid; grid-template-columns: 200px 1fr; gap: 16px;
+  padding: 16px 0; border-top: 1px solid var(--hairline);
+}
+.photo:first-child{ border-top: 0; }
+.photo--edited{ box-shadow: inset 3px 0 0 var(--cognac); padding-left: 13px; }
+
+.photo__shot{
+  aspect-ratio: 4 / 3; border-radius: 8px; overflow: hidden;
+  background: var(--hairline);
+}
+.photo__img{ width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.photo__side{ min-width: 0; }
+.photo__label{ font-size: 15px; font-weight: 600; margin: 0; }
+.photo__state{ font-size: 13px; color: var(--ink-soft); margin: 4px 0 0; }
+.photo__state--new{ color: var(--cognac); font-weight: 600; }
+.photo__state--busy{ font-style: italic; }
+
+.photo__problem{
+  font-size: 13px; margin: 8px 0 0; padding: 10px 12px;
+  border-radius: 6px; background: var(--danger-bg); color: var(--danger);
+}
+
+/* The file input itself is unstyleable and inconsistent across browsers, so
+   the label is the button and the input is hidden inside it. Hidden with
+   position, not display:none — a display:none input is not focusable, and
+   this one has to be reachable from the keyboard. */
+.photo__pick{
+  display: inline-block; margin-top: 12px; cursor: pointer;
+  padding: 8px 14px; border: 1px solid var(--hairline); border-radius: 6px;
+  font-size: 14px; background: var(--card);
+}
+.photo__pick:hover{ border-color: var(--cognac); color: var(--ink); }
+.photo__pick:focus-within{ outline: 2px solid var(--cognac); outline-offset: 2px; }
+.photo__file{
+  position: absolute; width: 1px; height: 1px;
+  opacity: 0; overflow: hidden; clip-path: inset(50%);
+}
+
 /* The hidden frame the headline check measures in. Off-screen rather than
    display:none — a frame that is not laid out has no line boxes to count. */
 .measure{
@@ -367,4 +412,6 @@ h1,h2,h3{ margin: 0; font-weight: 600; letter-spacing: -.01em; }
 @media (max-width: 640px){
   .topbar__who{ width: 100%; order: 3; }
   .card__head{ font-size: 15px; }
+  .photo{ grid-template-columns: 1fr; }
+  .photo__shot{ max-width: 260px; }
 }

@@ -119,7 +119,7 @@ var AROMATI_ADMIN = (function () {
 
   var TABLES = [
     "site_settings", "site_copy", "business_hours", "hours_exceptions",
-    "menu_courses", "menu_items", "menu_item_pours", "faq_entries"
+    "menu_courses", "menu_items", "menu_item_pours", "faq_entries", "photos"
   ];
 
   /* The columns the editor may write. Everything else on those tables is the
@@ -135,13 +135,19 @@ var AROMATI_ADMIN = (function () {
     menu_items:      ["course_id", "name", "tag", "description", "price", "prices",
                       "price_all_sizes", "no_price", "sort_order"],
     menu_item_pours: ["item_id", "label", "price", "sort_order"],
-    faq_entries:     ["question", "answer", "is_published", "sort_order"]
+    faq_entries:     ["question", "answer", "is_published", "sort_order"],
+    /* A photo slot is a position in the markup. Which picture is in it and how
+       it is described are the owner's; the slot name, the label and whether it
+       is decoration are the page's, and only_photo_may_change() puts them back
+       if anything here ever tries. */
+    photos:          ["storage_path", "source_path", "alt", "width", "height"]
   };
 
-  /* Where the owner may add and remove rows at all. site_settings, site_copy
-     and business_hours are absent on purpose: their row sets are decided by
-     what the site renders and by there being seven days in a week. The
-     database has no insert or delete policy for them either. */
+  /* Where the owner may add and remove rows at all. site_settings, site_copy,
+     business_hours and photos are absent on purpose: their row sets are decided
+     by what the site renders, by there being seven days in a week, and by how
+     many places the markup has a photograph in. The database has no insert or
+     delete policy for them either. */
   var CAN_ADD = ["hours_exceptions", "menu_courses", "menu_items", "menu_item_pours", "faq_entries"];
 
   var sb = null;              // the Supabase client
@@ -468,6 +474,7 @@ var AROMATI_ADMIN = (function () {
     { id: "hours",   name: "Hours",    render: renderHoursPanel },
     { id: "contact", name: "Contact",  render: renderContactPanel },
     { id: "menu",    name: "Menus",    render: renderMenuPanel },
+    { id: "photos",  name: "Photos",   render: renderPhotosPanel },
     { id: "faq",     name: "FAQ",      render: renderFaqPanel }
   ];
 
@@ -477,6 +484,7 @@ var AROMATI_ADMIN = (function () {
       hours: ["business_hours", "hours_exceptions"],
       contact: ["site_settings"],
       menu: ["menu_courses", "menu_items", "menu_item_pours"],
+      photos: ["photos"],
       faq: ["faq_entries"]
     }[id] || [];
     var n = 0;
@@ -1238,6 +1246,541 @@ var AROMATI_ADMIN = (function () {
   }
 
 
+  /* ═══════════════════════════════════════════════
+     4a. the photographs
+     ═══════════════════════════════════════════════
+
+     A slot is a *position* on the site — "the photograph behind the opening
+     headline" — never a filename. The set of positions is the markup's; which
+     picture is in one is the owner's. So there is no "add a photo" here and no
+     "delete a photo": there is a fixed list of places, each of which is either
+     showing the picture the site shipped with or showing one that was
+     uploaded, and either state is a complete, correct site.
+
+     That is why an untouched slot has no storage path at all. The built-in
+     photograph is in the markup, not in the database, and a project whose
+     photos table has never been written to renders exactly the site in git. */
+
+  var BUCKET = "site-photos";
+
+  /* Both of these have to agree with the bucket, which is where the real
+     limits are — see the migration. These exist so the owner finds out before
+     waiting for an upload, not because they are a control. */
+  var MAX_BYTES = 3 * 1024 * 1024;
+  var ALLOWED_TYPES = ["image/webp", "image/jpeg", "image/png"];
+
+  /* The long edge everything is resized down to. The widest a photograph is
+     ever drawn on this site is the full-bleed hero, and 2000 covers that on a
+     2× display with room to spare. Nothing is ever scaled *up*: a small
+     picture stays small rather than being blown up into a soft one. */
+  var MAX_EDGE = 2000;
+  var WEBP_QUALITY = 0.86;
+
+  /* Section names, keyed by the part of the slot before the dot. A prefix with
+     no entry falls back to the prefix itself, so a slot added later lands
+     somewhere sensible without this having to be edited first. */
+  var PHOTO_GROUPS = {
+    hero:        "The home page — the opening",
+    story:       "The home page — The Idea",
+    kitchen:     "The home page — The Kitchen",
+    cafe:        "The home page — The Café",
+    wine:        "The home page — The Wine Bar",
+    gallery:     "The home page — The Room",
+    visit:       "The home page — Visit",
+    faq:         "The FAQ page",
+    menuFood:    "The food menu",
+    menuDrinks:  "The drinks menu",
+    menuWine:    "The wine list"
+  };
+
+  /* The migration raises this sentence; the editor says it first. Same rule,
+     same words — tools/test-admin.mjs fails if they drift. */
+  function needsDescription(label) {
+    return 'The photograph "' + label + '" needs a short description of what is in ' +
+           'it. It is what someone using a screen reader hears in place of the ' +
+           'picture, and what shows if the image ever fails to load.';
+  }
+
+  var HEIC_MESSAGE =
+    "That is a HEIC file, which is what an iPhone saves by default and which no " +
+    "browser can open. The photograph itself is fine — it just needs to come out " +
+    "as a JPEG. On the phone: Settings → Camera → Formats → Most Compatible for " +
+    "new photos, or open this one, tap Share, choose Options and turn on Most " +
+    "Compatible.";
+
+  function builtIn(slot) {
+    return (typeof SEED_PHOTOS === "object" && SEED_PHOTOS && SEED_PHOTOS[slot]) || null;
+  }
+
+  function storageUrl(path) {
+    return AROMATI_CONFIG.url + "/storage/v1/object/public/" + BUCKET + "/" +
+      String(path).split("/").map(encodeURIComponent).join("/");
+  }
+
+  /* What to show in the panel, in the order the site itself would decide: the
+     file just picked, then the uploaded one, then the one the site shipped
+     with. */
+  function previewSrc(row) {
+    if (row._upload) return row._upload.preview;
+    if (row.storage_path) return storageUrl(row.storage_path);
+    var seed = builtIn(row.slot);
+    return seed ? seed.src : "";
+  }
+
+  function renderPhotosPanel(host) {
+    host.appendChild(el("p", "panel__intro",
+      "Every photograph on the site, listed in the order you would meet them " +
+      "walking down the page. Choosing a new one does not change the site until " +
+      "you press Save — and “Put the original back” is always there, because the " +
+      "photographs the site was built with stay in the site whatever you upload."));
+
+    var rows = rowsOf("photos").slice().sort(function (a, b) {
+      return (a.sort_order || 0) - (b.sort_order || 0);
+    });
+
+    if (!rows.length) {
+      host.appendChild(el("p", "empty",
+        "No photograph slots in the database yet. The site is showing the pictures " +
+        "in its own markup, which is correct — but nothing here can be changed " +
+        "until the photographs migration has been run."));
+      return;
+    }
+
+    var order = [];
+    var groups = {};
+    rows.forEach(function (row) {
+      var prefix = String(row.slot).split(".")[0];
+      if (!groups[prefix]) { groups[prefix] = []; order.push(prefix); }
+      groups[prefix].push(row);
+    });
+
+    order.forEach(function (prefix) {
+      var group = groups[prefix];
+      var cardId = "photos:" + prefix;
+      var changed = group.filter(function (r) { return rowChanged("photos", r); }).length;
+      var card = makeCard(cardId, PHOTO_GROUPS[prefix] || prefix, {
+        dot: changed > 0,
+        count: group.length + (group.length === 1 ? " photo" : " photos")
+      });
+      group.forEach(function (row) { card.body.appendChild(renderPhoto(row, cardId)); });
+      host.appendChild(card.wrap);
+    });
+  }
+
+  function renderPhoto(row, cardId) {
+    var wrap = el("div", "photo");
+    if (rowChanged("photos", row)) wrap.className = "photo photo--edited";
+
+    var figure = el("div", "photo__shot");
+    var img = el("img", "photo__img");
+    img.src = previewSrc(row);
+    /* The description is in a box directly beside this, being read and edited.
+       Announcing it here as well would say it twice. */
+    img.alt = "";
+    figure.appendChild(img);
+    wrap.appendChild(figure);
+
+    var side = el("div", "photo__side");
+    side.appendChild(el("h3", "photo__label", row.label));
+
+    var state = el("p", "photo__state");
+    side.appendChild(state);
+
+    var problem = el("p", "photo__problem");
+    problem.hidden = true;
+    side.appendChild(problem);
+
+    var view = {
+      say: function (text, kind) {
+        state.textContent = text;
+        state.className = "photo__state" + (kind ? " photo__state--" + kind : "");
+      },
+      problem: function (text) {
+        problem.textContent = text || "";
+        problem.hidden = !text;
+      },
+      redraw: function () {
+        img.src = previewSrc(row);
+        wrap.className = "photo" + (rowChanged("photos", row) ? " photo--edited" : "");
+        describeState();
+        updateSavebar();
+      }
+    };
+
+    function describeState() {
+      if (row._upload) {
+        view.say("Ready to upload — " + row._upload.width + " × " + row._upload.height +
+                 ", " + kb(row._upload.bytes) + ". Nothing has been sent yet.", "new");
+        shapeWarning(row, view);
+        return;
+      }
+      if (row.storage_path) {
+        view.say("Uploaded" + (row.width ? " — " + row.width + " × " + row.height : "") + ".");
+        return;
+      }
+      var seed = builtIn(row.slot);
+      view.say("The photograph the site was built with" +
+               (seed && seed.width ? " — " + seed.width + " × " + seed.height : "") + ".");
+    }
+
+    /* ── choose a file ── */
+    var pick = el("label", "photo__pick");
+    pick.appendChild(el("span", null, row.storage_path || row._upload
+      ? "Choose a different photograph" : "Choose a photograph"));
+    var file = el("input", "photo__file");
+    file.type = "file";
+    file.accept = ALLOWED_TYPES.join(",");
+    on(file, "change", function () {
+      var picked = file.files && file.files[0];
+      file.value = "";                     // so picking the same file twice re-runs
+      if (picked) prepare(picked, row, view);
+    });
+    pick.appendChild(file);
+    side.appendChild(pick);
+
+    /* ── put it back ──
+       Always offered, because the built-in photograph is in the markup and
+       cannot be lost. Reverting is a change like any other: it is not live
+       until the save. */
+    if (row.storage_path || row._upload) {
+      var revert = el("button", "btn btn--small", "Put the original back");
+      revert.type = "button";
+      on(revert, "click", function () {
+        forgetUpload(row);
+        row.storage_path = null;
+        row.source_path = null;
+        var seed = builtIn(row.slot);
+        row.width = seed ? (seed.width || null) : null;
+        row.height = seed ? (seed.height || null) : null;
+        renderAll();
+      });
+      side.appendChild(revert);
+    }
+
+    /* ── the description ── */
+    if (row.is_decorative) {
+      side.appendChild(el("p", "field__help",
+        "This one is background — it sits behind a scrim and a screen reader is " +
+        "told to ignore it, so it needs no description. Whatever goes here should " +
+        "be texture rather than something a reader would want described."));
+    } else {
+      side.appendChild(makeField({
+        table: "photos", row: row, col: "alt",
+        cardId: cardId, tab: "photos",
+        label: "What is in the photograph", type: "textarea", rows: 2,
+        value: row.alt || "",
+        help: "A short sentence. It is read aloud in place of the picture, and it " +
+              "is what appears if the image ever fails to load.",
+        onInput: function (v) { row.alt = v; view.redraw(); }
+      }).wrap);
+    }
+
+    wrap.appendChild(side);
+    describeState();
+    return wrap;
+  }
+
+  function kb(bytes) {
+    return bytes > 1024 * 1024
+      ? (bytes / 1024 / 1024).toFixed(1) + " MB"
+      : Math.round(bytes / 1024) + " KB";
+  }
+
+  /* The one thing that actually goes wrong with an owner-uploaded photograph:
+     the containers on this site are a fixed shape and the picture is cropped to
+     fill them. A portrait phone photo into a landscape slot loses its top and
+     bottom, and nothing errors — it just looks wrong on the page and right in
+     the editor. So the shapes are compared and the difference is said out loud.
+
+     A warning, not a refusal. Whether the crop matters is a judgement about
+     that photograph, the same reasoning as the headline check. */
+  function shapeWarning(row, view) {
+    if (!row._upload) return;
+
+    /* The shape being replaced is the one the database last confirmed, not the
+       one on the draft row — picking a file has already written the new
+       dimensions there, and comparing a photograph to itself finds no
+       difference at all. */
+    var saved = (baseline.photos && baseline.photos[row.id]) || {};
+    var was = saved.width && saved.height ? saved.width / saved.height : null;
+    var seed = builtIn(row.slot);
+    if (!was && seed && seed.width) was = seed.width / seed.height;
+    if (!was) return;
+
+    var now = row._upload.width / row._upload.height;
+    var ratio = now > was ? now / was : was / now;
+    if (ratio < 1.25) return;
+
+    view.problem(
+      "This photograph is a very different shape from the one it replaces (" +
+      shapeName(now) + " against " + shapeName(was) + "). The space on the page " +
+      "does not change shape to fit, so the picture will be cropped to fill it — " +
+      "worth looking at the page before you save."
+    );
+  }
+
+  function shapeName(ratio) {
+    if (ratio > 1.15) return "landscape";
+    if (ratio < 0.87) return "portrait";
+    return "square";
+  }
+
+
+  /* ═══════════════════════════════════════════════
+     4b. turning a camera file into a web photograph
+     ═══════════════════════════════════════════════
+
+     Four things happen to a picked file, and all four happen in the browser
+     before anything is sent anywhere:
+
+       1. HEIC is refused, in words that say how to fix it on the phone
+       2. the EXIF rotation is applied to the pixels
+       3. it is scaled down to fit MAX_EDGE
+       4. it is re-encoded as webp
+
+     Step 2 is the one that surprises people. A phone does not rotate the pixels
+     when you turn it sideways — it writes the pixels the way the sensor saw
+     them and records "this is rotated" in a tag. Every browser honours that tag
+     when it *shows* an image, so the photograph looks right in the file picker
+     and right in the editor, and then arrives on the site sideways because the
+     copy that was drawn to a canvas was the raw pixels.
+
+     So the raw pixels are asked for deliberately, the tag is read here, and the
+     rotation is applied for real. Whether the browser honoured the request is
+     then *checked* rather than assumed — a rotation applied twice is as wrong
+     as one never applied, and the two failures look identical. */
+
+  /* The canonical EXIF-to-canvas transforms. The source is drawn at (0,0) and
+     the matrix puts it the right way up; for 5–8 the canvas is the source's
+     dimensions swapped, because those four turn the picture on its side. */
+  var ORIENT = {
+    1: [1, 0, 0, 1, 0, 0],
+    2: [-1, 0, 0, 1, 1, 0],
+    3: [-1, 0, 0, -1, 1, 1],
+    4: [1, 0, 0, -1, 0, 1],
+    5: [0, 1, 1, 0, 0, 0],
+    6: [0, 1, -1, 0, 1, 0],
+    7: [0, -1, -1, 0, 1, 1],
+    8: [0, -1, 1, 0, 0, 1]
+  };
+
+  function swapsAxes(orientation) { return orientation >= 5 && orientation <= 8; }
+
+  /* The Orientation tag, out of the APP1/Exif segment of a JPEG. Anything this
+     cannot read is orientation 1, which is what a file with no tag means and
+     what every PNG and WebP is. */
+  function readOrientation(buffer) {
+    var view = new DataView(buffer);
+    if (view.byteLength < 4 || view.getUint16(0) !== 0xffd8) return 1;
+
+    var at = 2;
+    while (at + 4 <= view.byteLength) {
+      if (view.getUint8(at) !== 0xff) { at += 1; continue; }
+      var marker = view.getUint8(at + 1);
+      if (marker === 0xda) return 1;                    // start of scan: no Exif
+      var size = view.getUint16(at + 2);
+      if (size < 2) return 1;
+
+      if (marker === 0xe1 && at + 10 <= view.byteLength &&
+          view.getUint32(at + 4) === 0x45786966) {      // "Exif"
+        var tiff = at + 10;
+        if (tiff + 8 > view.byteLength) return 1;
+        /* The TIFF header says which way round its own numbers are, and it is
+           the one place in a JPEG where that is not fixed. */
+        var little = view.getUint16(tiff) === 0x4949;
+        var ifd = tiff + view.getUint32(tiff + 4, little);
+        if (ifd + 2 > view.byteLength) return 1;
+        var count = view.getUint16(ifd, little);
+        var i;
+        for (i = 0; i < count; i++) {
+          var entry = ifd + 2 + i * 12;
+          if (entry + 12 > view.byteLength) return 1;
+          if (view.getUint16(entry, little) === 0x0112) {
+            var value = view.getUint16(entry + 8, little);
+            return value >= 1 && value <= 8 ? value : 1;
+          }
+        }
+        return 1;
+      }
+      at += 2 + size;
+    }
+    return 1;
+  }
+
+  /* The dimensions as they are stored, before any rotation — the frame header
+     of a JPEG, the IHDR of a PNG. Used only to work out whether the browser
+     already turned the picture the right way up. */
+  function rawSize(buffer) {
+    var view = new DataView(buffer);
+    if (view.byteLength > 24 && view.getUint32(0) === 0x89504e47) {
+      return { width: view.getUint32(16), height: view.getUint32(20) };
+    }
+    if (view.byteLength < 4 || view.getUint16(0) !== 0xffd8) return null;
+
+    var at = 2;
+    while (at + 9 < view.byteLength) {
+      if (view.getUint8(at) !== 0xff) { at += 1; continue; }
+      var marker = view.getUint8(at + 1);
+      var size = view.getUint16(at + 2);
+      /* 0xC4, 0xC8 and 0xCC sit in the same numeric range and are not frame
+         headers — Huffman tables and arithmetic coding conditioning. */
+      if (marker >= 0xc0 && marker <= 0xcf &&
+          marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) {
+        return { width: view.getUint16(at + 7), height: view.getUint16(at + 5) };
+      }
+      if (size < 2) return null;
+      at += 2 + size;
+    }
+    return null;
+  }
+
+  /* Did the browser hand back the raw pixels, as asked, or had it already
+     applied the rotation? Only 5–8 can be told apart this way, because only
+     those four swap width and height — and only those four are the ones that
+     look catastrophically wrong when they go astray. */
+  function orientationToApply(bitmap, raw, orientation) {
+    if (!swapsAxes(orientation)) return orientation;
+    if (!raw) return orientation;
+    if (bitmap.width === raw.width && bitmap.height === raw.height) return orientation;
+    return 1;                                   // already turned; do not turn it twice
+  }
+
+  function fitInside(width, height, max) {
+    var longest = Math.max(width, height);
+    if (longest <= max) return { width: width, height: height };
+    var scale = max / longest;
+    return {
+      width: Math.max(1, Math.round(width * scale)),
+      height: Math.max(1, Math.round(height * scale))
+    };
+  }
+
+  function forgetUpload(row) {
+    if (row._upload && row._upload.preview && window.URL && window.URL.revokeObjectURL) {
+      try { window.URL.revokeObjectURL(row._upload.preview); } catch (err) { /* already gone */ }
+    }
+    delete row._upload;
+  }
+
+  function prepare(file, row, view) {
+    view.problem("");
+
+    var name = String(file.name || "");
+    if (/\.hei[cf]$/i.test(name) || /^image\/hei[cf]/i.test(file.type || "")) {
+      view.problem(HEIC_MESSAGE);
+      return;
+    }
+    if (ALLOWED_TYPES.indexOf(file.type) < 0) {
+      view.problem("That is a " + (file.type || "file of an unknown kind") +
+                   ". A photograph has to be a JPEG, a PNG or a WebP.");
+      return;
+    }
+
+    view.say("Reading the photograph…", "busy");
+
+    var makeBitmap = window.createImageBitmap;
+    if (typeof makeBitmap !== "function") {
+      view.problem("This browser cannot resize a photograph before uploading it. " +
+                   "Chrome, Safari and Firefox all can — try one of those.");
+      return;
+    }
+
+    file.arrayBuffer().then(function (buffer) {
+      var orientation = readOrientation(buffer);
+      var raw = rawSize(buffer);
+      /* "none" is a request for the pixels as stored. A browser that ignores it
+         is caught by orientationToApply rather than trusted. */
+      return makeBitmap(file, { imageOrientation: "none" }).then(function (bitmap) {
+        return { bitmap: bitmap, orientation: orientationToApply(bitmap, raw, orientation) };
+      });
+    }).then(function (decoded) {
+      var bitmap = decoded.bitmap;
+      var turn = decoded.orientation;
+
+      var fit = fitInside(bitmap.width, bitmap.height, MAX_EDGE);
+      var out = swapsAxes(turn)
+        ? { width: fit.height, height: fit.width }
+        : { width: fit.width, height: fit.height };
+
+      var canvas = document.createElement("canvas");
+      canvas.width = out.width;
+      canvas.height = out.height;
+      var ctx = canvas.getContext("2d");
+      var m = ORIENT[turn] || ORIENT[1];
+      /* The matrix is written in units of the source, so the translate terms
+         are multiplied up by the size it is being drawn at. */
+      ctx.setTransform(m[0], m[1], m[2], m[3],
+                       m[4] * fit.width, m[5] * fit.height);
+      ctx.drawImage(bitmap, 0, 0, fit.width, fit.height);
+      if (bitmap.close) bitmap.close();
+
+      view.say("Compressing…", "busy");
+      return toBlob(canvas, "image/webp", WEBP_QUALITY).then(function (blob) {
+        return { blob: blob, width: out.width, height: out.height };
+      });
+    }).then(function (made) {
+      if (!made.blob) throw new Error("this browser would not re-encode the photograph");
+      if (made.blob.size > MAX_BYTES) {
+        throw new Error("even after resizing, the photograph is " + kb(made.blob.size) +
+                        " and the limit is " + kb(MAX_BYTES) + ". Try a smaller one.");
+      }
+
+      forgetUpload(row);
+
+      /* The path carries the slot and the moment, so two uploads to the same
+         slot never collide and a file in the bucket says where it belongs
+         without anything having to be looked up. */
+      var stamp = String(Date.now());
+      var base = row.slot + "/" + stamp;
+      var keepOriginal = file.size <= MAX_BYTES && ALLOWED_TYPES.indexOf(file.type) >= 0;
+
+      row._upload = {
+        blob: made.blob,
+        path: base + ".webp",
+        width: made.width,
+        height: made.height,
+        bytes: made.blob.size,
+        preview: window.URL.createObjectURL(made.blob),
+        /* The file exactly as it was picked, so a crop can be undone later
+           against the pixels the owner actually chose. Skipped when it is over
+           the bucket's limit: the site needs the display copy, and failing the
+           whole upload to preserve something nothing reads yet would be the
+           wrong trade. */
+        source: keepOriginal ? file : null,
+        sourcePath: keepOriginal ? base + "-original" + extensionFor(file.type) : null
+      };
+
+      row.storage_path = row._upload.path;
+      row.source_path = row._upload.sourcePath;
+      row.width = made.width;
+      row.height = made.height;
+
+      renderAll();
+    }).catch(function (err) {
+      view.say("");
+      view.problem("That photograph could not be prepared: " +
+                   ((err && err.message) || err) + ".");
+    });
+  }
+
+  function extensionFor(type) {
+    if (type === "image/png") return ".png";
+    if (type === "image/webp") return ".webp";
+    return ".jpg";
+  }
+
+  /* canvas.toBlob is callback-based and predates promises everywhere. */
+  function toBlob(canvas, type, quality) {
+    return new Promise(function (resolve, reject) {
+      if (typeof canvas.toBlob !== "function") {
+        reject(new Error("this browser cannot re-encode a photograph"));
+        return;
+      }
+      canvas.toBlob(function (blob) { resolve(blob); }, type, quality);
+    });
+  }
+
+
   /* ── the FAQ ───────────────────────────────── */
 
   function renderFaqPanel(host) {
@@ -1572,6 +2115,16 @@ var AROMATI_ADMIN = (function () {
       }
     });
 
+    /* A photograph with no description is a photograph a screen reader
+       announces as nothing at all. The database refuses it too — same rule,
+       same sentence, deliberately in both places. Decoration is exempt, and
+       which slots are decoration is not the owner's to decide. */
+    rowsOf("photos").forEach(function (row) {
+      if (row.is_decorative) return;
+      if (!row.storage_path) return;
+      if (isBlank(row.alt)) add(needsDescription(row.label), "photos", row.id, "alt");
+    });
+
     rowsOf("faq_entries").forEach(function (entry) {
       if (isBlank(entry.question) || isBlank(entry.answer)) {
         add("A question in the FAQ is missing its question or its answer.",
@@ -1657,6 +2210,12 @@ var AROMATI_ADMIN = (function () {
   }
 
   function snapshot(table, row) {
+    /* The picked file has done its job: it is in the bucket, and the row naming
+       it has just been written. Holding on to it would keep a blob: URL alive
+       and would put a Blob into the deep copy Discard restores from, where it
+       would survive as an empty object. */
+    if (table === "photos") forgetUpload(row);
+
     var copy = {};
     WRITABLE[table].forEach(function (col) { copy[col] = row[col]; });
     baseline[table][row.id] = copy;
@@ -1720,6 +2279,30 @@ var AROMATI_ADMIN = (function () {
     /* ── the plan ── */
     var steps = [];
 
+    /* Files first, before any row is written. A row pointing at an object that
+       is not there yet is a broken image on the live site for however long the
+       upload takes, and if the upload then fails it is a broken image
+       permanently. This way a failed upload means nothing was written at all.
+
+       The objects the uploads replace are *not* deleted here. They are noted,
+       and swept after the whole save has landed — a delete that runs before the
+       row is updated is a delete that can leave the site pointing at nothing. */
+    var superseded = [];
+    rowsOf("photos").forEach(function (row) {
+      var was = baseline.photos && baseline.photos[row.id];
+      if (was) {
+        if (was.storage_path && was.storage_path !== row.storage_path) superseded.push(was.storage_path);
+        if (was.source_path && was.source_path !== row.source_path) superseded.push(was.source_path);
+      }
+      if (!row._upload) return;
+      steps.push({ what: "upload", table: "photos", row: row,
+                   path: row._upload.path, blob: row._upload.blob });
+      if (row._upload.source) {
+        steps.push({ what: "upload", table: "photos", row: row,
+                     path: row._upload.sourcePath, blob: row._upload.source });
+      }
+    });
+
     ["menu_item_pours", "menu_items", "menu_courses", "hours_exceptions", "faq_entries"]
       .forEach(function (table) {
         (removed[table] || []).forEach(function (id) {
@@ -1760,8 +2343,27 @@ var AROMATI_ADMIN = (function () {
         }]);
       } else {
         showProblems([]);
+        sweep(superseded);
         flash("Saved. The site is showing it now.");
       }
+    }
+
+    /* Photographs that have been replaced, taken out of the bucket now that
+       nothing points at them any more. After the save and only after it: a file
+       deleted speculatively is a file deleted on a save that then failed, and
+       the row still naming it. A failure here is worth a line in the console
+       and nothing else — an object nobody references costs a few hundred
+       kilobytes, and telling the owner about it would be telling them about a
+       problem they have no way to act on. */
+    function sweep(paths) {
+      if (!paths.length || !sb.storage) return;
+      sb.storage.from(BUCKET).remove(paths).then(function (res) {
+        if (res && res.error && window.console) {
+          console.warn("admin: could not remove replaced photographs", res.error.message);
+        }
+      }, function (err) {
+        if (window.console) console.warn("admin: could not remove replaced photographs", err);
+      });
     }
 
     function next(i) {
@@ -1769,7 +2371,16 @@ var AROMATI_ADMIN = (function () {
       var step = steps[i];
 
       var request;
-      if (step.what === "delete") {
+      if (step.what === "upload") {
+        /* upsert:false — the path carries a timestamp, so a collision would
+           mean two different photographs claiming the same name, and silently
+           overwriting one of them is the wrong answer to that. */
+        request = sb.storage.from(BUCKET).upload(step.path, step.blob, {
+          contentType: step.blob.type || "image/webp",
+          cacheControl: "31536000",
+          upsert: false
+        });
+      } else if (step.what === "delete") {
         request = sb.from(step.table).delete().eq("id", step.id);
       } else if (step.what === "insert") {
         request = sb.from(step.table).insert(payload(step.table, step.row, idMap)).select("id");
@@ -1780,7 +2391,12 @@ var AROMATI_ADMIN = (function () {
       request.then(function (res) {
         if (res.error) { finish(res.error.message || String(res.error)); return; }
 
-        if (step.what === "delete") {
+        if (step.what === "upload") {
+          /* The file is in the bucket. The row that names it is updated later
+             in this same plan; nothing is folded into the baseline here,
+             because until that update lands the site is still showing the old
+             picture and saying so would be a lie. */
+        } else if (step.what === "delete") {
           removed[step.table] = (removed[step.table] || []).filter(function (id) {
             return id !== step.id;
           });
@@ -1845,7 +2461,8 @@ var AROMATI_ADMIN = (function () {
     menu_courses: "id,page,course_key,tab_label,heading,sizes,is_static,static_id,sort_order",
     menu_items: "id,course_id,name,tag,description,price,prices,price_all_sizes,no_price,options_dom_id,sort_order",
     menu_item_pours: "id,item_id,label,price,sort_order",
-    faq_entries: "id,question,answer,is_published,sort_order"
+    faq_entries: "id,question,answer,is_published,sort_order",
+    photos: "id,slot,label,storage_path,source_path,alt,width,height,is_decorative,sort_order"
   };
 
   /* hours_exceptions has no sort_order — a holiday's place in the list is its
@@ -1861,7 +2478,8 @@ var AROMATI_ADMIN = (function () {
     menu_courses: "sort_order",
     menu_items: "sort_order",
     menu_item_pours: "sort_order",
-    faq_entries: "sort_order"
+    faq_entries: "sort_order",
+    photos: "sort_order"
   };
 
   var loaded = {};
@@ -1881,6 +2499,11 @@ var AROMATI_ADMIN = (function () {
   /* The draft is a deep copy, not a reference. An editor that hands out the
      same objects it loaded has no way to discard anything. */
   function buildDraft() {
+    /* Discard throws away picked files along with everything else, and a
+       blob: URL that nothing points at any more is a page holding onto a
+       decoded photograph until it is closed. */
+    (draft.photos || []).forEach(forgetUpload);
+
     TABLES.forEach(function (table) {
       baseline[table] = {};
       removed[table] = [];
@@ -2068,6 +2691,12 @@ var AROMATI_ADMIN = (function () {
       settingProblem: settingProblem,
       copyProblem: copyProblem,
       mustNotBeEmpty: mustNotBeEmpty,
+      needsDescription: needsDescription,
+      readOrientation: readOrientation,
+      rawSize: rawSize,
+      orientationToApply: orientationToApply,
+      fitInside: fitInside,
+      shapeName: shapeName,
       SETTING_RULES: SETTING_RULES,
       WRITABLE: WRITABLE,
       CAN_ADD: CAN_ADD,

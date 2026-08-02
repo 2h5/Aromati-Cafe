@@ -142,7 +142,23 @@ const WRITES = [
 
   ["add a course",
    `insert into public.menu_courses (page, course_key, tab_label, heading, sort_order)
-    values ('food', 'zz-new', 'New', 'New', 500)`]
+    values ('food', 'zz-new', 'New', 'New', 500)`],
+
+  ["change which photograph is in a slot",
+   `update public.photos set storage_path = 'hero.main/1.webp', alt = 'A room'
+    where slot = 'hero.main'`],
+
+  /* The bucket, through the same three actors as everything else. This is a
+     policy on storage.objects rather than on a table these migrations created,
+     and it is the only place where the thing being protected is a file rather
+     than a row — which is exactly why it is worth running the same three
+     columns over. See the shim's note on what this does and does not prove:
+     the policy is real, the upload endpoint above it is not here. */
+  ["put a file in the photo bucket",
+   `insert into storage.objects (bucket_id, name) values ('site-photos', 'hero.main/1.webp')`],
+
+  ["take a file out of the photo bucket",
+   `delete from storage.objects where bucket_id = 'site-photos'`]
 ];
 
 const READS = [
@@ -169,6 +185,15 @@ for (const [what, sql] of READS) {
     else fail(`${who} cannot read ${what} — the public site would render empty`);
   }
 }
+
+/* Something for the delete case to delete. Every actor's statement runs inside
+   a transaction that is rolled back, so the file an earlier case inserted is
+   not there for a later one — and a DELETE that matches nothing is a DELETE
+   that reads as refused, for everybody, which would have quietly turned the
+   three storage rows below into three passes about nothing. Inserted here,
+   outside the actor transactions, so it survives all three. */
+await db.exec(
+  `insert into storage.objects (bucket_id, name) values ('site-photos', 'seeded/photo.webp')`);
 
 for (const [what, sql] of WRITES) {
   for (const [who, uid, mayWrite] of ACTORS) {

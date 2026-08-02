@@ -488,6 +488,43 @@
     });
   }
 
+  /* ── photographs ──────────────────────────────
+     Keyed by slot — the position on the page — never by filename, because the
+     same photograph fills two slots in two sections with two descriptions, and
+     those are two decisions rather than one duplicate.
+
+     Only ever an *override*. The picture the site shipped with is in the
+     markup, so a page with no JavaScript, a visitor with no network and a
+     project with no database all show the right photographs; this replaces one
+     only where the owner has uploaded something. That is why an untouched site
+     needs no photos data at all to be correct.
+
+     A src is a code sink of the same family as an href — not because a script
+     runs from one, but because it is a URL the owner typed that a browser goes
+     and fetches. The same https-only rule applies, and for the same reason it
+     is applied in two places: the storage bucket decides what may be stored,
+     and this decides what may be rendered. */
+
+  function renderPhotos(photos) {
+    Array.prototype.forEach.call(document.querySelectorAll("[data-photo]"), function (img) {
+      var photo = photos[img.getAttribute("data-photo")];
+      if (!photo) return;
+
+      if (typeof photo.url === "string" && SAFE_URL.test(photo.url)) {
+        img.setAttribute("src", photo.url);
+      }
+
+      /* data-photo-decorative is this *drawing* of the slot, not the slot: the
+         home page's photo strip repeats its nine images in a second,
+         aria-hidden group so it can scroll forever, and describing those would
+         have a screen reader read the whole menu twice. An empty description
+         is left alone for the same reason it is ignored in data.js — the
+         markup's own alt is a better answer than none. */
+      if (img.hasAttribute("data-photo-decorative")) return;
+      if (typeof photo.alt === "string" && photo.alt) img.setAttribute("alt", photo.alt);
+    });
+  }
+
   /* ── go ──────────────────────────────────────
      Each step guarded on its own: a failure in one must not stop the rest, and
      must not stop script.js initialising after it. */
@@ -508,6 +545,8 @@
     var boardChanged = false;
 
     if (content.copy) step("copy", function () { renderCopy(content.copy); });
+
+    if (content.photos) step("photos", function () { renderPhotos(content.photos); });
 
     if (content.settings) {
       step("contact", function () { renderContact(content.settings); });
@@ -550,6 +589,9 @@
     hoursNote: typeof SEED_HOURS_NOTE === "string" ? SEED_HOURS_NOTE : null,
     settings:  typeof SEED_SETTINGS === "object" ? SEED_SETTINGS : null,
     copy:      typeof SEED_COPY === "object" ? SEED_COPY : null
+    /* No photos here on purpose. This branch runs when data.js is absent, and
+       the seed file records the built-in picture rather than an override —
+       there is nothing to write that the markup does not already say. */
   });
 
   if (!source) return;

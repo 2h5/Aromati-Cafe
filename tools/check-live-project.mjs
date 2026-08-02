@@ -41,7 +41,8 @@ const fail = (msg, detail) => {
 };
 const pass = (msg) => console.log(`  ok   ${msg}`);
 
-const SEEDS = ["data/seed-settings.js", "data/seed-hours.js", "data/seed-menu.js", "data/seed-copy.js"];
+const SEEDS = ["data/seed-settings.js", "data/seed-hours.js", "data/seed-menu.js",
+               "data/seed-copy.js", "data/seed-photos.js"];
 const seedSrc = SEEDS.map((f) => readFileSync(f, "utf8")).join("\n");
 const dataSrc = readFileSync("data.js", "utf8");
 const configSrc = readFileSync("config.js", "utf8");
@@ -65,8 +66,8 @@ g.window = g;
 const keys = Object.keys(g);
 const fn = new Function(...keys,
   `${configSrc}\n${seedSrc}\n${dataSrc}\n` +
-  `return { AROMATI_CONFIG, AROMATI_DATA, SEED_MENU, SEED_HOURS, SEED_SETTINGS, SEED_COPY };`);
-const { AROMATI_CONFIG, AROMATI_DATA, SEED_MENU, SEED_HOURS, SEED_SETTINGS, SEED_COPY } =
+  `return { AROMATI_CONFIG, AROMATI_DATA, SEED_MENU, SEED_HOURS, SEED_SETTINGS, SEED_COPY, SEED_PHOTOS };`);
+const { AROMATI_CONFIG, AROMATI_DATA, SEED_MENU, SEED_HOURS, SEED_SETTINGS, SEED_COPY, SEED_PHOTOS } =
   fn(...keys.map((k) => g[k]));
 
 console.log(`\nthe live project against this working copy\n`);
@@ -95,7 +96,17 @@ if (!live) {
     ["the menu", live.menu, SEED_MENU],
     ["the hours", live.hours, SEED_HOURS],
     ["the settings", live.settings, SEED_SETTINGS],
-    ["the copy", live.copy, SEED_COPY]
+    ["the copy", live.copy, SEED_COPY],
+    /* The photographs compare as what render.js writes rather than as the seed
+       file's own shape — see the same note in tools/test-live.mjs. A difference
+       here is the useful one: it means either a description has been edited, or
+       a photograph has been replaced and the file it was replaced with exists
+       only on the server. The second is not recoverable from git, so it is
+       worth knowing about long before anybody needs to recover from git. */
+    ["the photographs", live.photos, Object.keys(SEED_PHOTOS).reduce((out, slot) => {
+      out[slot] = { alt: SEED_PHOTOS[slot].alt || "", url: null };
+      return out;
+    }, {})]
   ]) {
     const a = canon(got), b = canon(want);
     if (a === b) { pass(`${what} in the project is identical to data/seed-*.js`); continue; }
@@ -134,7 +145,9 @@ const writes = [
   ["close the café", () => rest("business_hours?day_of_week=eq.1",
       { method: "PATCH", body: JSON.stringify({ is_closed: true }) })],
   ["read the owner allowlist", () => rest("admin_users?select=user_id")],
-  ["ask whether it is the owner", () => rest("rpc/is_owner", { method: "POST", body: "{}" })]
+  ["ask whether it is the owner", () => rest("rpc/is_owner", { method: "POST", body: "{}" })],
+  ["change which photograph is on the site", () => rest("photos?slot=eq.hero.main",
+      { method: "PATCH", body: JSON.stringify({ storage_path: "defaced/1.webp" }) })]
 ];
 
 /* ── the control ──────────────────────────────────────────────────────────
@@ -177,6 +190,72 @@ for (const [what, run] of writes) {
     pass(`the public key cannot ${what} (${res.status}, no rows affected)`);
   } else {
     fail(`the public key CAN ${what}`, `${res.status} ${body.slice(0, 300)}`);
+  }
+}
+
+/* ── 3. and the bucket, which is not behind PostgREST ─────────────────────────
+   The photographs live at /storage/v1/, a different service with its own
+   policies. Everything above could be perfect and this still open — and an
+   open bucket is worse than an open table, because what gets written is a file
+   served from the site's own origin. */
+{
+  const storage = (path, init) => fetch(AROMATI_CONFIG.url + "/storage/v1/" + path, {
+    ...init,
+    headers: {
+      apikey: AROMATI_CONFIG.anonKey,
+      Authorization: "Bearer " + AROMATI_CONFIG.anonKey,
+      ...(init && init.headers)
+    }
+  });
+
+  {
+    const res = await storage("object/site-photos/probe.txt", {
+      method: "POST",
+      headers: { "Content-Type": "image/webp" },
+      body: "not really a photograph"
+    });
+    const body = await res.text();
+    if (res.ok) {
+      fail("the public key CAN upload a photograph", `${res.status} ${body.slice(0, 300)}`);
+    } else {
+      /* Storage answers a policy refusal with a 400 whose body carries the real
+         403, so the status alone is not the interesting part — a 400 could just
+         as easily be a malformed request, which would be a refusal for a reason
+         that says nothing about who may write. */
+      const why = (() => { try { return JSON.parse(body).message; } catch { return body.slice(0, 120); } })();
+      pass(`the public key cannot upload a photograph (${res.status}: ${why})`);
+    }
+  }
+
+  /* Listing is the quiet one. Every individual object URL is public by design —
+     that is how a visitor sees the picture — but asking what is *in* the bucket
+     is a different permission, and a public bucket does not grant it unless
+     somebody adds a select policy for anon.
+
+     And it cannot be tested against an empty bucket. Storage answers a refused
+     listing with `[]`, which is also what it answers for a bucket with nothing
+     in it — so until a photograph has actually been uploaded, a pass here would
+     be a pass about nothing. That is said rather than claimed. */
+  {
+    const uploaded = live && live.photos &&
+      Object.keys(live.photos).some((slot) => live.photos[slot].url);
+
+    const res = await storage("object/list/site-photos", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prefix: "", limit: 100 })
+    });
+    const body = await res.text();
+    const empty = !res.ok || body === "" || body === "[]";
+
+    if (!empty) {
+      fail("the public key CAN list what is in the bucket", `${res.status} ${body.slice(0, 300)}`);
+    } else if (uploaded) {
+      pass(`the public key cannot list what is in the bucket (${res.status}, nothing came back)`);
+    } else {
+      console.log("  skip  no photograph has been uploaded yet, so an empty bucket " +
+                  "listing proves nothing");
+    }
   }
 }
 

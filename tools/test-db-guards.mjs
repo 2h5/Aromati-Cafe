@@ -23,17 +23,20 @@ import { join } from "node:path";
 
 const SRC = "supabase/migrations";
 const INIT = "20260801000000_init_cms.sql";
+const PHOTOS = "20260801000400_photos.sql";
 
 let failures = 0;
 
-function run(what, harness, mutate, expect) {
+/* `file` names which migration to break — most of the silent mistakes live in
+   the schema, the photograph ones live in their own migration. */
+function run(what, harness, mutate, expect, file = INIT) {
   const dir = mkdtempSync(join(tmpdir(), "aromati-db-"));
   try {
     for (const f of readdirSync(SRC)) cpSync(join(SRC, f), join(dir, f));
 
-    const before = readFileSync(join(dir, INIT), "utf8");
-    writeFileSync(join(dir, INIT), mutate(before));
-    const after = readFileSync(join(dir, INIT), "utf8");
+    const before = readFileSync(join(dir, file), "utf8");
+    writeFileSync(join(dir, file), mutate(before));
+    const after = readFileSync(join(dir, file), "utf8");
 
     /* A mutation that matched nothing would pass for the wrong reason. This
        has already caught one: the RLS statements are whitespace-aligned, so
@@ -47,7 +50,11 @@ function run(what, harness, mutate, expect) {
 
     let out = "";
     try {
-      out = execFileSync(process.execPath, [harness], {
+      /* check-policies.mjs takes the directory as an argument and the two
+         database harnesses take it from the environment. Both are given it,
+         because a harness that quietly read the *real* migrations would pass
+         every mutation and prove nothing. */
+      out = execFileSync(process.execPath, [harness, dir], {
         encoding: "utf8",
         env: { ...process.env, MIGRATIONS_DIR: dir }
       });
@@ -124,6 +131,43 @@ run("the one-price-shape constraint relaxed", "tools/test-sql.mjs",
     "  constraint menu_items_one_price_shape check (",
     "  constraint menu_items_one_price_shape check (true or "),
   "menu shape");
+
+/* 6 — the bucket's write policy opened to any signed-in account. The same
+       mistake as 2, on the newest policies in the project, and on the one table
+       whose grants Supabase issues rather than these migrations — which is
+       exactly the kind of thing a checker quietly stops covering. */
+run("the photo bucket open to any signed-in account", "tools/check-policies.mjs",
+  (s) => s.replace(
+    /(create policy "site-photos owner insert"\s+on storage\.objects for insert to authenticated\s+with check \(bucket_id = 'site-photos' and )public\.is_owner\(\)/,
+    "$1true"),
+  "being logged in is not enough", PHOTOS);
+
+/* 7 — the description rule dropped. Silent by construction: every photograph
+       still uploads, still appears, and announces nothing to a screen reader.
+
+       Both layers have to go, and finding that out was worth the detour. The
+       CHECK constraint refuses the row and the trigger raises the sentence the
+       owner reads; removing either one alone changes nothing observable,
+       because the other still holds. Same shape as mutation 3, and the same
+       lesson: a mutation that only defeats half of a defence proves the other
+       half works and says nothing about the half it removed. */
+run("a photograph allowed with no description", "tools/test-sql.mjs",
+  (s) => s
+    .replace(
+      "  check (is_decorative or storage_path is null or length(btrim(alt)) > 0);",
+      "  check (true);")
+    .replace(
+      "  if not new.is_decorative and new.storage_path is not null",
+      "  if false and new.is_decorative and new.storage_path is not null"),
+  "photograph rules", PHOTOS);
+
+/* 8 — the bucket created with no limits. Nothing about the editor changes;
+       what changes is what someone holding the owner's token can post. */
+run("the bucket created without its size and type limits", "tools/test-sql.mjs",
+  (s) => s.replace(
+    /values \('site-photos', 'site-photos', true, 3145728,\s*\n\s*array\['image\/webp', 'image\/jpeg', 'image\/png'\]\)/,
+    "values ('site-photos', 'site-photos', true, null, null)"),
+  "size or type limit", PHOTOS);
 
 console.log(failures
   ? `\n${failures} case(s) the database harnesses would have let through`

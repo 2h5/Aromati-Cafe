@@ -16,7 +16,7 @@
 # build if anything is added that this policy would silently block.
 
 /*
-  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https://yofoiqgknsqzsuwtlqvh.supabase.co; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https://yofoiqgknsqzsuwtlqvh.supabase.co; font-src 'self' data:; connect-src 'self' https://yofoiqgknsqzsuwtlqvh.supabase.co; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: geolocation=(), microphone=(), camera=(), payment=(), interest-cohort=()
@@ -43,6 +43,15 @@
 #                          data: URIs. Without data: here the site loads in
 #                          Georgia and the nav shifts on every navigation —
 #                          see the section at the top of memory.md.
+#
+#   img-src                'self' for the photographs the site ships with,
+#                          data: for the couple of inline SVGs, and the one
+#                          Supabase project for photographs the owner has
+#                          uploaded. The storage origin is the same host as
+#                          connect-src and has to stay in step with config.js;
+#                          without it every replaced photograph is a broken
+#                          image and the console is the only place that says
+#                          why. Checked by tools/check-csp.mjs.
 #
 #   connect-src            'self' plus exactly one Supabase project. data.js
 #                          talks to /rest/v1/ there and nowhere else. If the
