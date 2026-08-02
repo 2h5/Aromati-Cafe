@@ -455,6 +455,31 @@ fastest, and they guard the thing that has broken most often.
   read the seed file". Also confirms the checklist's own note that "today's
   model hardcodes one opening time" is stale: seven distinct opening times
   render as seven table lines, seven footer lines and seven JSON-LD entries.
+- `tools/test-menu-shapes.mjs` (`npm run test:menushapes`) — the Phase 7 Menu
+  rows. `test-sql.mjs` proves all six price shapes can be *stored*; this proves
+  they can be *drawn*, given rows in the shape PostgREST hands back. A shape
+  that stores perfectly and renders as a bare `$` is still a broken menu, and
+  nothing between the constraint and the page was looking.
+
+  The one worth reading is the gapped size — an item sold small and not large.
+  The blank is not a missing price, it is a statement, and it renders as an
+  empty cell so the two-column grid stays aligned. What keeps a lone `$` off
+  that cell is one line of CSS (`.mi__cell--none::before{content:none}`), so
+  **both halves are checked**: the class `render.js` chooses, and the rule in
+  `styles.css` that acts on it — because jsdom will not compute a `::before`,
+  and a check that only read the class would go on passing after someone
+  deleted the rule.
+
+  It also covers the two things that only exist after the board has been
+  *replaced*, which `test-replay.mjs` leaves open: it proves the tab bar is
+  rebuilt correctly but never clicks a tab. So this filters a network-delivered
+  board down to one course and back to All, and clicks a Build Your Own chip and
+  the crêpe's disclosure row — the two hand-written blocks that are out of scope
+  to build, which also makes them out of scope to break.
+
+  Mutation-tested six ways (the `--none` class, the CSS rule, the spanning
+  price, the priceless row's class, the filter, and Build Your Own being dropped
+  on rebuild); all six caught.
 - `tools/check-csp.mjs` (`npm run check:csp`) — the Content-Security-Policy in
   `_headers`, checked against the site it protects. A CSP is the one control
   whose failure mode is the *site* breaking, quietly, and only in production:

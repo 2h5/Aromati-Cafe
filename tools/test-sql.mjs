@@ -193,6 +193,25 @@ for (const f of files) {
       values ('${plain.id}', '   ', '5', 95)`]
   ];
 
+  /* The size columns themselves, which is a different constraint from the
+     prices that fill them and belongs on menu_courses. Three of anything is
+     refused because `.mi__cells` is a two-column CSS grid: a third size does
+     not overflow, it wraps under the first, and the board silently stops
+     lining up. The empty array is the subtler one — it is not "no sizes", it
+     is a course that renders a size header with nothing in it. */
+  const coursesMustRefuse = [
+    ["three size columns on one course",
+     `insert into public.menu_courses (page, course_key, tab_label, heading, sizes, sort_order)
+      values ('drinks', 'zz-three', 'Three', 'Three', array['S','M','L'], 995)`],
+    ["a course with an empty size array",
+     `insert into public.menu_courses (page, course_key, tab_label, heading, sizes, sort_order)
+      values ('drinks', 'zz-empty', 'Empty', 'Empty', array[]::text[], 996)`],
+    ["a size column with no name",
+     `insert into public.menu_courses (page, course_key, tab_label, heading, sizes, sort_order)
+      values ('drinks', 'zz-null', 'Null', 'Null', array['Small', null], 997)`]
+  ];
+  for (const c of coursesMustRefuse) mustRefuse.push(c);
+
   const slipped = [];
   for (const [what, sql] of mustRefuse) {
     try { await db.exec(sql); slipped.push(what); } catch { /* refused, as intended */ }
