@@ -480,6 +480,38 @@ fastest, and they guard the thing that has broken most often.
   Mutation-tested six ways (the `--none` class, the CSS rule, the spanning
   price, the priceless row's class, the filter, and Build Your Own being dropped
   on rebuild); all six caught.
+- `tools/test-hostile-content.mjs` (`npm run test:hostile`) — every owner-typed
+  field filled with something hostile, on all five pages. This is the "biggest
+  one" from the Security section, made mechanical: stored XSS.
+
+  The rule was already checked in four places and all four were partial —
+  `test-copy.mjs` covers the copy renderer, `test-ordering.mjs` five ordering
+  links, `test-photos.mjs` six image `src` forms, `test-rls.mjs` the database
+  storing a script tag as text. **No menu field was covered at render time**,
+  and the menu is where most of the owner's typing goes. So this poisons item
+  names, tags, descriptions, course headings, tab labels, pour labels, option
+  names, every copy field and the free-text settings at once, then asks four
+  things of the result: no script element the page did not serve, no `on*`
+  attribute anywhere, no `href`/`src` with an executing scheme, and a JSON-LD
+  block that still parses and still describes a café.
+
+  **Every field gets every payload, one payload per pass.** The first version
+  dealt the six payloads round the fields, which makes coverage a lottery —
+  whether `javascript:` lands on the one field that becomes an href depends on
+  how many menu items there are. Six passes, no luck.
+
+  **And the control is per region.** All four assertions are satisfied by a
+  renderer that draws nothing, so each pass also requires the payload to be
+  present as readable text — and counted separately in the board, the copy
+  elements and the footer. A single page-wide total was the first attempt and it
+  passed with the entire menu board disabled, because the copy fields alone kept
+  it above the threshold.
+
+  One trap, written into the file: `renderContact` finds its targets by what
+  they already are (`a[href^="mailto:"]`, `a[href*="instagram.com"]`), so a
+  sabotage that makes it write a malformed href also destroys the selector that
+  found the element. Two sabotages went uncaught for that reason and neither was
+  a gap — neither field can produce an executing href at all.
 - `tools/check-csp.mjs` (`npm run check:csp`) — the Content-Security-Policy in
   `_headers`, checked against the site it protects. A CSP is the one control
   whose failure mode is the *site* breaking, quietly, and only in production:
@@ -1963,3 +1995,23 @@ job — but it is the reason the bucket will never be provably tidy.
   assertion is that the week it serves shares no time with `data/seed-hours.js`,
   because if one matched, a consumer that never updated would pass by
   coincidence.
+
+- **2026-08-01 — the Phase 7 rig was serving settings the site ignores.**
+  Not a bug in the site; a bug in the harness, and the kind that manufactures
+  false confidence rather than false alarms.
+
+  `tools/page-boot.mjs` built its `site_settings` rows straight out of
+  `data/seed-settings.js` — `phoneDigits`, `businessName`, a nested `address`
+  object. The database is a flat key/value table keyed `phone_digits`,
+  `business_name`, `address_street`, and `data.js` **silently drops a key it
+  does not recognise**, which is right for a stray row and a trap for a test.
+  So every row was discarded, `shapeSettings` returned an empty object,
+  `renderContact` returned at its first guard, and the pages simply kept the
+  phone number that was already in the markup. Three harnesses were green while
+  the contact renderer had never once run.
+
+  Found by a sabotage that should have broken the phone link and did not — the
+  same shape as the Phase 6 lesson about mutations, one level up: **mutation-test
+  the harness, not only the code.** A green suite tells you nothing about the
+  paths the harness never reached, and the only way to find those is to break
+  something and be surprised that nobody noticed.

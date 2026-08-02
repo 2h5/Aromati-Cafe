@@ -174,12 +174,49 @@ export function menuRows(edit) {
    outright, which is how a harness says "the owner changed the hours" — the
    rows differ from data/seed-hours.js and everything on the page has to follow
    the rows rather than the file. */
+/* seed-settings.js → the rows site_settings holds.
+
+   These two do not share a vocabulary and it matters. The seed file is keyed
+   the way the site reads it — `phoneDigits`, `businessName`, a nested
+   `address` object — while the database is a flat key/value table keyed
+   `phone_digits`, `business_name`, `address_street`. data.js owns the
+   translation (SETTING_NAMES and ADDRESS_NAMES), and a key it does not
+   recognise is **silently dropped**, which is the right behaviour for a stray
+   row and a trap for a harness.
+
+   An earlier version of this file handed back the seed file's own keys. Every
+   one of them was discarded, `shapeSettings` returned an empty object,
+   `renderContact` returned at its first guard, and the pages kept the phone
+   number that was already in the markup — so the tests looked green while the
+   contact renderer had never run at all. Found by a sabotage that should have
+   broken the phone link and did not. */
+function settingRows() {
+  const s = seedEnv.SEED_SETTINGS;
+  const rows = [
+    ["phone_digits", s.phoneDigits],
+    ["phone_country", s.phoneCountry],
+    ["email", s.email],
+    ["instagram_handle", s.instagramHandle],
+    ["schema_type", s.schemaType],
+    ["business_name", s.businessName],
+    ["cuisine", s.cuisine],
+    ["address_street", s.address.street],
+    ["address_locality", s.address.locality],
+    ["address_region", s.address.region],
+    ["address_postal", s.address.postal],
+    ["address_country", s.address.country]
+  ];
+  for (const service of Object.keys(s.orderingLinks || {})) {
+    rows.push([`order_${service}_url`, s.orderingLinks[service]]);
+  }
+  return rows.map(([key, value]) => ({ key, value: String(value) }));
+}
+
 export function seedRows({ menu, hours } = {}) {
   const week = hours || seedEnv.SEED_HOURS;
   const { courses, items } = menuRows(menu);
   return {
-    site_settings: Object.keys(seedEnv.SEED_SETTINGS).map((key) => ({
-      key, value: String(seedEnv.SEED_SETTINGS[key]) })),
+    site_settings: settingRows(),
     business_hours: week.map((h, i) => ({
       day_of_week: i, is_closed: !!h.closed,
       opens_at: h.closed ? null : hhmmss(h.opens),
