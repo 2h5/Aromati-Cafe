@@ -186,6 +186,13 @@ Also done — **Phase 2: the schema and its policies, written and checkable**:
   pasted into the SQL editor. Idempotent, and it raises if the allowlist is
   still empty afterwards — a typo in the UUID is otherwise a silent no-op that
   surfaces much later as "the save button does nothing".
+- `supabase/migrations/20260801000300_advisor_fixes.sql` — Phase 3 step 7, the
+  advisor's five findings answered one at a time. One is fixed (Supabase's own
+  `rls_auto_enable()` was executable by `anon`); three are deliberate and are
+  argued in writing rather than silenced, chiefly `admin_users` having RLS on
+  with no policies, which is the design and not an oversight; one is a dashboard
+  setting no migration can reach. A linter that is wrong for this project gets
+  an answer, not a suppression.
 - `tools/copy-labels.mjs` — the one hand-written file in the copy pipeline. A
   key is not a name, and the generator refuses to run if the labels and the
   data disagree by even one field.
@@ -252,6 +259,22 @@ fastest, and they guard the thing that has broken most often.
 - `gen-seed-sql.mjs --check` — the committed seed migration still matches the
   seed data. Editing `seed-copy.js` and forgetting to regenerate would leave
   the site saying one thing and the database seeding another.
+- `tools/check-live-project.mjs` — the same question as `test-live.mjs`, asked
+  of the **real project over the real network** with the real key. **Not** in
+  `npm test`: it needs a live project, and a check that fails on a train is one
+  people learn to skip. Two halves. It compares every row the site reads against
+  `data/seed-*.js` through `data.js`'s own `stable()` — which is how the lost
+  no-break spaces were found, and how drift will be found once the owner starts
+  editing and the seed files become the *stale* offline fallback (open item 2).
+  And it tries six writes a defaced site would need, requiring each to be
+  refused over HTTP rather than in SQL, where `set role` makes it far too easy
+  to prove the wrong thing.
+
+  **It opens with a request that must succeed**, and that control is the point.
+  Six refusals look identical whether the policies are holding or the key is
+  dead, the origin is misspelt, or the network is answering everything with a
+  401 — mutation-tested by breaking the key, which turned all six into confident
+  passes and was caught by nothing else.
 - `tools/measure-headlines.mjs` — a measuring tape, **not** in `npm test` and
   deliberately not a guard: it prints where each `data-split` headline takes an
   extra line, at three widths, and leaves the judgement to a person. See open
@@ -388,31 +411,42 @@ columns, faq five, the menu pages a `footer--menu` variant), and the *values*
 problem is now solved without it. `seed-faq.js` is held back — see *What's
 still open*, item 1. Everything else in Phase 1 is done.
 
-**Phase 3 is half done.** The project exists (`yofoiqgknsqzsuwtlqvh`), public
-signups are off and the owner account is created — all three by hand in the
-dashboard on 2026-08-01. What remains needs the dashboard or the Supabase MCP
-server, which is configured in `.mcp.json` but was added mid-session and so
-supplied no tools; a restart picks it up.
+**Phase 3 is done.** The project is `yofoiqgknsqzsuwtlqvh`; every step ran
+against it on 2026-08-01 through the Supabase MCP server, which loaded once the
+session was restarted.
 
 | Phase 3 step | state |
 |---|---|
 | 1 create the project | ✅ done |
-| 2 disable public signup | ✅ done |
-| 3 create the owner account | ✅ done — `a69c4370-3872-4b61-aba2-4049e34f9549` |
-| 4 apply the migrations | **proven locally, not yet applied to the project** |
-| 5 allowlist the owner | written as `20260801000200_allowlist_owner.sql`; applies with step 4 |
-| 6 seed the content tables | generated already; applies with step 4 |
-| 7 run the security advisor | ⛔ needs the dashboard — nothing local substitutes |
+| 2 disable public signup | ✅ done — **verified**, not assumed: `POST /auth/v1/signup` with the public key answers `422 signup_disabled` |
+| 3 create the owner account | ✅ done — `a69c4370-3872-4b61-aba2-4049e34f9549`, and it is the only row in `auth.users` |
+| 4 apply the migrations | ✅ applied |
+| 5 allowlist the owner | ✅ applied — one row in `admin_users` |
+| 6 seed the content tables | ✅ applied — 17 sections, 84 items, 26 pours, 7 options, 62 copy fields |
+| 7 run the security advisor | ✅ run; answered in `20260801000300_advisor_fixes.sql` |
 
-The SQL has now actually run. That matters, because this file used to warn that
-it never had and that the first apply should be expected to fail. It does not
-fail: all three migrations apply clean, seed the right number of rows, and
-enforce every shape rule. What that does **not** retire is step 7 — see the
-"WHAT THIS IS NOT" note at the top of `tools/supabase-shim.mjs` for the four
-ways a local Postgres differs from a Supabase project.
+Verified live afterwards, not inferred from the SQL having run: the owner writes
+where a signed-in stranger writes 0 rows from the *same* statement; anon is
+refused at the grant layer before RLS is even consulted; `admin_users` is
+unreadable and un-insertable even as the owner; and the rename guard raises its
+plain-language message intact.
+
+The SQL had already been proven locally before any of this. That mattered,
+because this file used to warn the first apply should be expected to fail. It
+did not fail, here or there.
+
+**Two things the local proof could not have caught**, both found only against
+the real project — see *Deviations*: a no-op `revoke` that ran clean and changed
+nothing, and two no-break spaces lost in transcription.
 
 Still worth doing in either order — read `POLICIES.md` and say whether it
 describes what you meant, and do the browser pass.
+
+**One thing left for you, and it is not SQL:** turn on Authentication →
+Policies → leaked password protection. The advisor flags it, a migration cannot
+fix it, and with one account and signups off it only ever applies when the owner
+changes their own password — which is also the password that is the whole
+editor.
 
 ---
 
@@ -726,11 +760,15 @@ agreed.
 
 ---
 
-### Phase 3 — Supabase project + apply. **First phase needing the DB.** ← *next*
+### Phase 3 — Supabase project + apply. **First phase needing the DB.** ✅ done
 
-Step 6's seeding is already generated and committed:
-`supabase/migrations/20260801000100_seed_content.sql`. Steps 1–3 and 7 are
-dashboard work that cannot be done from here.
+All seven steps ran against `yofoiqgknsqzsuwtlqvh` on 2026-08-01 — see *Current
+phase / status* for the per-step table and what was verified live afterwards.
+Steps 1–3 were done by hand in the dashboard; 4–7 through the Supabase MCP
+server.
+
+Step 6's seeding was already generated and committed:
+`supabase/migrations/20260801000100_seed_content.sql`.
 
 Owner/developer tasks, done together:
 
@@ -745,21 +783,39 @@ Owner/developer tasks, done together:
    `20260727000100_restrict_is_owner_to_authenticated.sql` is).
 
 **Done when:** the advisor is clean and a logged-out `curl` can read the menu
-but not write it.
+but not write it. ✅ Both hold. The advisor's remaining findings are answered in
+`20260801000300_advisor_fixes.sql` rather than fixed, with the reasoning in the
+file; the read/write asymmetry is checked on every run of
+`tools/check-live-project.mjs` rather than by hand once.
+
+**One caveat on the migration history.** The files were applied by transcribing
+them through MCP tool calls rather than by `supabase db push`, because the CLI
+was not linked and linking needs the database password. So the project assigned
+its own version timestamps (`20260801234339…`) instead of reusing the filenames,
+and the names still match one-to-one. Prefer `db push` once the project is
+linked — the transcription is exactly what cost two no-break spaces below.
 
 ---
 
-### Phase 4 — The site reads from Supabase. ✅ built, awaiting the anon key
+### Phase 4 — The site reads from Supabase. ✅ done and live
 
 `data.js` holds the fallback chain: `network → localStorage → SEED_*`.
 `render.js` paints once, synchronously, from cache-or-seed, then repaints only
 if the network came back with something genuinely different. `config.js` holds
 the project URL and the publishable key.
 
-**The one thing outstanding: paste the anon key into `config.js`.** Dashboard →
-Project Settings → API Keys → the publishable/anon key. Until then the site
-runs entirely from the seeds, which is a supported state and not a broken one —
-it is exactly what happens if the database is ever unpaid or deleted.
+**The key is in.** `config.js` carries the modern `sb_publishable_` key rather
+than the legacy anon JWT: both work and `data.js` sends whichever is there as
+both `apikey` and `Bearer`, but the publishable one rotates on its own and is
+not a JWT, so it has no expiry date to be surprised by later. The legacy anon
+key is still enabled in the dashboard and can be turned off — nothing here uses
+it. `tools/check-live-project.mjs` confirms the round trip end to end: every
+item, pour, setting, hour and copy field the live project returns is identical
+to `data/seed-*.js`.
+
+Running from the seeds with no key remains a supported state, not a broken one
+— it is exactly what happens if the database is ever unpaid or deleted, and it
+is what `file://` still does.
 
 - **No SDK on the public pages.** Plain `fetch` against `/rest/v1/`. Five
   requests; `menu_items` embeds its pours and options in one of them.
@@ -795,7 +851,7 @@ is the source of truth, and nothing yet writes values back into the markup.
 
 ---
 
-### Phase 5 — The editor.
+### Phase 5 — The editor. ← *next*
 
 `admin.html` / `admin.css` / `admin.js`, ported from Uptown's structure —
 gate → tabs → panels → savebar. Panels: **Menu** (all three pages), **Hours**,
@@ -1351,6 +1407,50 @@ bucket, and it must run *after* a successful save, never speculatively.
 
   The lesson is the one the font work already taught: a checker that has never
   been seen to fail is not evidence. Both harnesses have a mutation test now.
+
+- **2026-08-01 — a `revoke` that ran clean and did nothing.** Applying the
+  advisor fixes, `revoke execute on function public.rls_auto_enable() from anon,
+  authenticated` succeeded and left `anon` holding EXECUTE. The grant was never
+  to those roles: the ACL read `{=X/postgres, …}`, and a bare `=` is the grant
+  to **PUBLIC**. `anon` and `authenticated` held it by membership, and revoking
+  a privilege a role does not *directly* hold is a silent no-op in Postgres —
+  no error, no warning, no effect. The fix is `from public`.
+
+  What makes it worth recording is how nearly it survived. The migration
+  reported success; the advisor's own output is served from a per-finding cache
+  and went on reporting the pre-fix state either way, so re-running it looked
+  like staleness rather than a real finding; and the migration comment already
+  claimed the fix was verified — because I had verified that the `ensure_rls`
+  event trigger still worked afterwards. That check was real and it passed, and
+  it proved nothing, because *not breaking anything* is precisely what a no-op
+  guarantees. **Verify the thing you changed, not the thing you were afraid of
+  breaking.** Caught by asking `has_function_privilege()` afterwards.
+
+- **2026-08-01 — two no-break spaces lost in transcription, and the check that
+  caught them.** The migrations were applied by hand-transcribing the files
+  through tool calls, because the Supabase CLI was not linked and linking needs
+  the database password. The transcription flattened the two `U+00A0`
+  characters in `hero.sub` — `Café ✦ Wine Bar` — to ordinary spaces. Both repo
+  files carry the correct bytes; only the live row was wrong.
+
+  Nothing else would have found it. The migration succeeded, the seed file's own
+  row-count assertions passed, and the page renders — just with a headline that
+  can now wrap at the star on a narrow screen, which is the exact thing the
+  no-break spaces exist to prevent and which that field's `help` text tells the
+  owner is deliberate. It took `tools/check-live-project.mjs` comparing the live
+  project against `data/seed-*.js` code point by code point.
+
+  Fixed by a `fix_hero_sub_nbsp` migration applied to the project — recorded in
+  its history, with no repo file, because the repo was never wrong: applying
+  `20260801000100_seed_content.sql` to a fresh project produces the right bytes
+  and never needs the correction. It is built from
+  `chr(160)` rather than a literal so the next person to move that SQL through
+  an editor or a chat window cannot lose it the same way. **An invisible
+  character does not survive being retyped, so it should not have to be** — use
+  `supabase db push` once the project is linked. The 84 menu items, 26 pours and
+  every other copy field came through byte-identical, which is the extractor's
+  whole argument restated: the transcription risk lands on the one field a human
+  had to touch.
 
 - **2026-08-01 — the build was shipping a site with no JavaScript at all.**
   Worse than the recorded "drops 4 pages": there was no `vite.config.js`, so

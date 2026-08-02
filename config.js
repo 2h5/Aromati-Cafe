@@ -32,6 +32,14 @@ var AROMATI_CONFIG = {
   url: "https://yofoiqgknsqzsuwtlqvh.supabase.co",
 
   /* Dashboard → Project Settings → API Keys → the **publishable / anon** key.
-     Paste it between the quotes. Until then the site runs from the seeds. */
-  anonKey: ""
+     Filled in on 2026-08-01, when the migrations were first applied.
+
+     This is the modern `sb_publishable_` key rather than the legacy anon JWT.
+     The project offers both and either would work — data.js sends whichever is
+     here as both `apikey` and `Bearer`. The publishable one is preferred for
+     two reasons: it can be rotated on its own without invalidating anything
+     else, and it is not a JWT, so it carries no expiry date to be surprised by
+     in a couple of years. The legacy key is still enabled in the dashboard;
+     turning it off is safe once nothing is using it, and nothing here is. */
+  anonKey: "sb_publishable_pd33KkoVYvTcEpXcemAZnA_dhEI-qdf"
 };
