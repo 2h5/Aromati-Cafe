@@ -409,6 +409,32 @@ fastest, and they guard the thing that has broken most often.
   new board and every check passes without the replay path ever executing.
   Harmless in production, useless in a test. Mutation-tested: disabling the
   teardown gives two spacers, and dropping the rebind stops the row opening.
+- `tools/test-resilience.mjs` (`npm run test:resilience`) — the Phase 7
+  Resilience rows, made permanent. `test-live.mjs` already covers what `data.js`
+  *returns* when the network dies; this boots a whole page — real markup, real
+  `render.js`, real `script.js` — and asks what a person would see, because a
+  data layer that degrades perfectly into a renderer that throws is still a
+  blank page. Six sections: the network dying with a good cache in
+  `localStorage` (and the cache is deliberately *not* the seed, so "the cache
+  rendered" and "the seeds rendered" cannot be confused); a wrong project URL on
+  a first visit; a course with every item deleted; every course on the page
+  deleted; five loads with the rows shuffled differently each time; and all five
+  pages opened with no key at all.
+
+  Two things in it are the test rather than decoration. **The shuffle** — five
+  loads of identical input would prove only that a function is deterministic, so
+  the rows, and the embedded pours and options, arrive in a different order
+  every time and the board must come out identical to the character. And **the
+  tab bar is compared against the same page with nothing removed**, not against
+  a number: the question is not "are there seven tabs" but "did emptying a
+  course cost it its tab".
+
+  Mutation-tested four ways: never reading the cache, never rendering the board,
+  never rendering the hours pill, and emptying the Visit table without refilling
+  it. All four caught, each by the section that should have caught it. An
+  earlier draft compared arrays with `===`, so every "nothing threw" check was
+  unfailable — found by the sabotage run, and the reason the comparison now goes
+  through `JSON.stringify`.
 - `tools/check-csp.mjs` (`npm run check:csp`) — the Content-Security-Policy in
   `_headers`, checked against the site it protects. A CSP is the one control
   whose failure mode is the *site* breaking, quietly, and only in production:
