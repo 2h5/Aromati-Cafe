@@ -755,7 +755,7 @@ today, and it must keep working if the database is down, deleted or unpaid.
 
 ### Explicitly out of scope — do not build, do not break
 
-- **Build Your Own Breakfast** (`#build`, [script.js:787](script.js#L787)).
+- **Build Your Own Breakfast** (`#build`, [script.js:882](script.js#L882)).
   Stays hardcoded exactly as it is. Its chips carry `data-price` / `data-name`
   and it has its own bagel sub-field and hint map; making it editable is a
   content type of its own and the owner has not asked for it. **The Phase 1
@@ -2345,3 +2345,66 @@ job — but it is the reason the bucket will never be provably tidy.
   done: point Cloudflare Pages at the GitHub repo with `npm run build` and an
   output of `dist`, so a push deploys and nobody has to remember the build step
   at all.
+- **2026-08-02 — a day spent fixing a bug that does not exist on shipping iOS.**
+  Reported from the device: on iPhone the menu board reveals its courses in order
+  as you scroll, but many sections skip the animation and appear fully formed.
+  Two rounds of work went into it — a per-line observer, then a whole-section
+  arrival — before the owner checked a second phone. **The reporting device runs
+  the iOS 27 beta, and all their Apple devices do. A stable iOS 26 iPhone shows
+  none of it.** The board was correct the whole time.
+
+  Everything from those two rounds is reverted. `script.js` is back at its
+  committed state and `styles.css` was never touched. What is left is this entry
+  and a section in `HANDOFF-ios.md`.
+
+  **The rule, which is the whole value of the day: replicate an iOS-only
+  rendering report on a second device before writing any code for it** — and if
+  the reporter runs a beta, that second device is the one that has to be on a
+  shipping build. It costs one borrowed phone. Nothing below can be trusted ahead
+  of it, not source reading, not arithmetic, not WebKit's own source, because all
+  of those answer "is this code wrong" and the question that mattered was "is
+  anything actually broken". Ask that one first.
+
+  **How far this reaches, checked rather than assumed.** The first instinct was
+  to void the whole `HANDOFF-ios.md` list on the same grounds, since every bug on
+  it came from the same beta devices. That was too broad, and the owner corrected
+  it: **a second person on their own device has seen the kitchen reel fail and
+  the wine backdrop go missing.** Those two are real and the work on them stands.
+  Only the hero parallax stutter is in the same position the menu bug was — one
+  observer, one beta device, never checked against a shipping build — and
+  "stutter" is exactly what a beta compositor produces unprompted. That one is
+  now flagged in the handoff as unconfirmed, with the check to run.
+
+  The lesson is therefore narrower than it first looked and more useful for
+  being narrow: the beta does not invalidate a report, **a single unreplicated
+  observer does.** Two of these three had a second witness and survived. Ask who
+  else has seen it before asking what the code is doing.
+
+  Two findings worth keeping out of the wreckage:
+
+  **WebKit composites normally inside CSS multi-column.** Every element on the
+  board sits inside a fragmented flow — `.carte__body` is `columns:2`, and
+  `columns:1` below 1020px, and a `column-count` other than `auto` still makes an
+  element a multi-column *container*. The tempting theory is that WebKit refuses
+  to composite there, which would force the reveal transitions onto the main
+  thread where an iOS momentum scroll would freeze them onto their end state. It
+  fits every symptom and the whole device split. It is false:
+  `RenderLayerCompositor::canBeComposited` returns `true` for a layer inside a
+  fragmented flow and excludes only the flow thread's own layer. The FIXME people
+  remember is bug 84900, which was about CSS Regions and was closed WONTFIX in
+  2022 when Regions were removed. Verified by downloading the file and reading
+  the function. This one is durable and it kills a theory that will come up again
+  the moment anyone opens the Layers panel on the kitchen reel.
+
+  **`cascade()` does stagger by index, and that is genuinely wrong at phone
+  widths — but nothing is asking to be fixed.** Lines get
+  `--md = base + 90 + i * 55`, which only holds while the whole course is on
+  screen. Below 1020px the board is one column and a course runs past the bottom
+  of the screen, so the last line of an eight-item course is finished 1.2s after
+  a trigger that fires while it is still ~900px below the fold. On paper the
+  lower half of a long course reveals unseen. On a stable iPhone this does not
+  read as a defect, and the fix for it — every line on its own observer — was
+  built, tested clean, and rejected on the device for making a course assemble
+  itself in pieces as you read down it. Recorded here so that if it ever *is*
+  reported by someone on a shipping build, the analysis is already done and the
+  answer that does not work is already known.

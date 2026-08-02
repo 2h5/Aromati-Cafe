@@ -8,20 +8,24 @@ Branch: `phase1-content-as-data`.
 ## The situation in one line
 
 Three iOS-only bugs. Two agents have now attempted fixes — six changes between
-them, all reasoned from source code, **none verified to work.** Everything below
-is still broken on device.
+them, all reasoned from source code, **none verified to work.** Bugs 2 and 3 are
+still broken on device and are independently corroborated; bug 1 has only ever
+been seen on a beta build and has not been checked against a stable one.
 
 ## The bugs
 
-| # | Symptom | iPhone | iPad | Android |
-|---|---------|--------|------|---------|
-| 1 | Hero parallax stutters | broken | — | fine |
-| 2 | Kitchen reel: no plates, no drift | broken | broken | fine |
-| 3 | Wine (04) backdrop absent | broken | fine | fine |
+| # | Symptom | iPhone | iPad | Android | Corroborated? |
+|---|---------|--------|------|---------|---------------|
+| 1 | Hero parallax stutters | broken | — | fine | **no — owner's beta device only** |
+| 2 | Kitchen reel: no plates, no drift | broken | broken | fine | yes — seen by a second person |
+| 3 | Wine (04) backdrop absent | broken | fine | fine | yes |
 
 Every browser on iOS is WebKit, so none of this reproduces on Windows. Chrome
 DevTools device emulation renders with Blink — the engine that already works —
 and will never show any of it.
+
+The last column exists because a fourth bug on this list turned out not to be a
+bug. See the section immediately below before touching bug 1.
 
 ---
 
@@ -67,6 +71,51 @@ traced to the observer.
 **First thing to do on the Mac:** open the page on the iPhone with the inspector
 attached and look at whether `.plate`, `.wine__board`, and `.story__img` have
 `.in`. One reading decides whether this whole family of bugs is one bug.
+
+---
+
+## One of these was never a bug — check bug 1 before working on it
+
+**The owner runs the iOS 27 beta on all their Apple devices.** A fourth item
+that used to be on this list — the menu board's courses revealing with no
+animation on iPhone — was chased through two full rounds of fixes before anyone
+opened the site on a second phone. On a stable iOS 26 iPhone it did not exist.
+Nothing had ever been wrong with that code; the whole thing was a beta
+rendering artifact. Both rounds are reverted and `script.js` is untouched. The
+analysis is in the last entry of `memory.md`.
+
+**Bugs 2 and 3 are not in that category.** A second person, on their own
+device, has seen the kitchen reel fail and the wine backdrop go missing. Those
+are real and they are worth the work.
+
+**Bug 1 is the one to check.** The hero parallax stutter has only ever been seen
+on the owner's beta iPhone, and "stutter" is exactly the kind of symptom a beta
+compositor produces on its own. Ten minutes on the stable phone either promotes
+it to a real bug or deletes it from this file. Do that before writing code for
+it — bug 4 cost two rounds for want of that check.
+
+Note also that bug 2 showing on both the iPhone *and* the iPad is weaker
+evidence than it looks, since both run the beta — but a second person has seen
+it independently, and that is what carries it.
+
+---
+
+## Ruled out, with evidence — do not re-derive this
+
+**WebKit composites normally inside CSS multi-column.** Every element on the
+menu board sits inside a fragmented flow (`.carte__body` is `columns:2`, and
+`columns:1` below 1020px — still a multi-column *container*). The tempting
+theory is that WebKit refuses to composite there, forcing the reveal
+transitions onto the main thread, where an iOS momentum scroll would freeze
+them. It fits everything. It is wrong:
+`RenderLayerCompositor::canBeComposited` returns `true` for layers inside a
+fragmented flow and excludes only the flow thread's own layer. The FIXME people
+remember is bug 84900, which was about CSS Regions and was closed WONTFIX in
+2022 when Regions were removed. Read the function before building on this —
+`curl` the file and grep it, it takes two minutes.
+
+This will come up again the moment anyone opens the Layers panel on the reel
+for bug 2. It is already answered.
 
 ---
 
