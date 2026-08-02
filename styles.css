@@ -878,13 +878,25 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
   display:flex; width:max-content;
   animation:reel-drift 68s linear infinite;
 }
-.reel:hover .reel__track,
+/* Pause-on-hover is desktop-only. iOS synthesises :hover on tap and leaves it
+   stuck until you tap elsewhere, so one accidental touch stops the reel for
+   good — hover:hover is false on touch, which is the split we want. The
+   :focus-within half stays unconditional: it is a keyboard affordance, and
+   nothing inside a plate is focusable, so touch cannot reach it. Same guard
+   the plate hover filters below already use. */
+@media (hover:hover){
+  .reel:hover .reel__track{ animation-play-state:paused; }
+}
 .reel:focus-within .reel__track{ animation-play-state:paused; }
 @keyframes reel-drift{ to{ transform:translateX(-50%); } }
 .reel__group{ display:flex; gap:clamp(14px,1.8vw,26px); padding-right:clamp(14px,1.8vw,26px); }
 
+/* --plate-w is the single source of truth for a plate's width, because the
+   image below has to repeat it. Overridden per breakpoint; never set flex-basis
+   directly or the two fall out of step. */
 .plate{
-  flex:0 0 clamp(220px,22vw,320px);
+  --plate-w:clamp(220px,22vw,320px);
+  flex:0 0 var(--plate-w);
   position:relative; border-radius:6px; overflow:hidden;
 }
 /* No filter on a resting plate, and this is the third place in this file that
@@ -899,7 +911,22 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
    iPad, while Blink tiles the same layer without complaining and Android looks
    perfect. The brightness(.92) is now the flat overlay below; the saturate(.94)
    is gone, a 6% shift under a gradient that already covers the bottom half. */
+/* The width here is load-bearing and must stay a *definite* length. img{} at the
+   top of this file sets width:100%, which lays out correctly but is treated as
+   auto during intrinsic sizing — so when .reel__track resolves width:max-content
+   each photo contributed its intrinsic file width (~1700px) instead of its
+   flex-basis. The track came out 31756px instead of 4932px: the plates packed
+   correctly into the first ~2466px of each 15878px group and the rest was empty,
+   so the reel drifted through 13000px of nothing. Plates appeared, slid off,
+   blinked back at the seam. translateX(-50%) was wrong by the same factor, so
+   the loop never joined either.
+   flex:0 0 <fixed> should cap the contribution at the basis; WebKit uses the
+   content's intrinsic size regardless, Blink does not — iPhone and iPad broken,
+   Android perfect. vw resolves without a containing block, so unlike a
+   percentage it survives intrinsic sizing. Measured on device: 31756px before,
+   4932px after. */
 .plate img{
+  width:var(--plate-w);
   aspect-ratio:4/3.2; height:auto;
   transition:transform 1.1s var(--ease), filter .6s var(--ease);
 }
@@ -1980,7 +2007,16 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
   .story__img--b{ grid-column:1/-1; aspect-ratio:16/9; }
   .wine__title{ grid-column:1/-1; max-width:16ch; }
   .wine__lede{ grid-column:1/-1; padding-bottom:0; max-width:62ch; }
-  .wine__board{ grid-column:1/-1; aspect-ratio:16/10; min-height:0; }
+  /* align-self:start is load-bearing, not tidying. The base rule stretches this
+     to match the list column; here it is the only item in its row, and every
+     child is position:absolute, so its content height is 0. A stretched item
+     has a definite cross size, which means aspect-ratio is never consulted —
+     the row sizes to 0 and the board renders 440x0. WebKit lets stretch win;
+     Blink resolves the ratio first, so this was invisible on iPhone and fine
+     everywhere we tested. Measured on device: 0px before, 297px after.
+     .story__img--a two rules up survives the same treatment only because it
+     never had align-self:stretch. */
+  .wine__board{ grid-column:1/-1; aspect-ratio:16/10; min-height:0; align-self:start; }
   .wine__col{ grid-column:1/-1; }
   .visit{ grid-template-columns:1fr; }
   .visit__media{ min-height:0; }
@@ -2043,7 +2079,7 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
   .wine__item{ gap:14px; }
   .wine__cta{ flex-direction:column; align-items:flex-start; }
   .wine__board figcaption, .story__img figcaption{ font-size:10px; letter-spacing:.13em; }
-  .plate{ flex-basis:min(64vw, 260px); }
+  .plate{ --plate-w:min(64vw, 260px); }
   .reel__label em{ display:none; }
   .carte__tabs{ flex-wrap:nowrap; overflow-x:auto; justify-content:flex-start; scrollbar-width:none; }
   .carte__tabs::-webkit-scrollbar{ display:none; }
