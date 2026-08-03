@@ -240,13 +240,53 @@
   boot("menus dropdown", function () {
     var drop = document.getElementById("navdrop");
     var btn = document.getElementById("menusBtn");
-    if (!drop || !btn) return;
+    var panel = document.getElementById("menusPanel");
+    if (!drop || !btn || !panel) return;
     var hoverTimer = null;
+
+    /* The panel's gold wash is one element, so it travels between menu rows
+       instead of switching three separate backgrounds on and off. This is the
+       same CSSOM-positioned fill used by the CMS handoff's selection rows. */
+    function currentLink() {
+      return panel.querySelector("a.is-on");
+    }
+
+    function highlightedLink() {
+      var hovered = panel.querySelector("a:hover");
+      if (hovered) return hovered;
+      var focused = document.activeElement;
+      if (focused && panel.contains(focused) && focused.closest) return focused.closest("a");
+      return currentLink();
+    }
+
+    function positionMark(link) {
+      if (panel.offsetParent === null) return;
+      if (!link) {
+        panel.style.setProperty("--navdrop-mark-o", "0");
+        return;
+      }
+      panel.style.setProperty("--navdrop-mark-x", link.offsetLeft + "px");
+      panel.style.setProperty("--navdrop-mark-y", link.offsetTop + "px");
+      panel.style.setProperty("--navdrop-mark-w", link.offsetWidth + "px");
+      panel.style.setProperty("--navdrop-mark-h", link.offsetHeight + "px");
+      panel.style.setProperty("--navdrop-mark-o", "1");
+      if (!panel._markReady) {
+        panel.offsetWidth;
+        panel.classList.add("navdrop__panel--ready");
+        panel._markReady = true;
+      }
+    }
+
+    panel.querySelectorAll("a").forEach(function (link) {
+      link.addEventListener("mouseenter", function () { positionMark(link); });
+      link.addEventListener("focus", function () { positionMark(link); });
+    });
 
     function open(on) {
       clearTimeout(hoverTimer);
       drop.classList.toggle("is-open", on);
       btn.setAttribute("aria-expanded", on ? "true" : "false");
+      if (on) window.requestAnimationFrame(function () { positionMark(currentLink()); });
     }
 
     btn.addEventListener("click", function (e) {
@@ -268,6 +308,11 @@
       // a beat of grace, so crossing the gap to the panel doesn't close it
       hoverTimer = setTimeout(function () { open(false); }, 160);
     });
+    panel.addEventListener("mouseleave", function () { positionMark(currentLink()); });
+    panel.addEventListener("focusout", function (e) {
+      if (!panel.contains(e.relatedTarget)) positionMark(currentLink());
+    });
+    window.addEventListener("resize", function () { positionMark(highlightedLink()); });
     document.addEventListener("click", function (e) {
       if (!drop.contains(e.target)) open(false);
     });

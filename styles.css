@@ -353,17 +353,37 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
   visibility:hidden;
   transition:opacity .32s var(--ease), transform .42s var(--ease-exp), visibility 0s linear .42s;
 }
+.navdrop__panel::before{
+  content:"";
+  position:absolute; left:0; top:0; z-index:0;
+  width:var(--navdrop-mark-w, 0px); height:var(--navdrop-mark-h, 0px);
+  transform:translate(var(--navdrop-mark-x, 0px), var(--navdrop-mark-y, 0px));
+  opacity:var(--navdrop-mark-o, 0);
+  background:rgba(201,163,92,.14);
+  border-radius:6px;
+  pointer-events:none;
+  transition:none;
+  will-change:transform, width, height, opacity;
+}
+.navdrop__panel--ready::before{
+  transition:
+    transform 320ms var(--ease),
+    width 260ms var(--ease),
+    height 260ms var(--ease),
+    opacity 180ms ease;
+}
 .navdrop.is-open .navdrop__panel{
   opacity:1; transform:none; pointer-events:auto;
   visibility:visible; transition-delay:0s, 0s, 0s;
 }
 .navdrop__panel a{
+  position:relative; z-index:1;
   display:flex; flex-direction:column; gap:2px;
   padding:11px 14px; border-radius:6px;
-  transition:background .3s var(--ease), color .3s var(--ease);
+  transition:color .3s var(--ease);
 }
-.navdrop__panel a:hover, .navdrop__panel a:focus-visible{ background:rgba(201,163,92,.14); outline:none; }
-.navdrop__panel a.is-on{ background:rgba(201,163,92,.1); }
+.navdrop__panel a:hover, .navdrop__panel a:focus-visible,
+.navdrop__panel a.is-on, .navdrop__panel a.is-on:hover{ background:transparent; outline:none; }
 .navdrop__k{
   font-family:var(--serif); font-size:18px; letter-spacing:.01em;
   text-transform:none; font-weight:400; color:var(--gold);
