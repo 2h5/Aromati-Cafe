@@ -226,10 +226,24 @@ button{ font-family: inherit; }
   background: var(--maroon-800);
   padding-left: max(12px, env(safe-area-inset-left));
 }
+/* `flex: 1` so the list is as tall as the rail rather than as tall as six
+   buttons: a list that exactly fits its content will start scrolling the
+   moment anything steals a pixel of height from it.
+
+   And `overflow-x: hidden` explicitly, because the sliding wash below is
+   absolutely positioned and translated, which counts as scrollable overflow.
+   Leaving it at `visible` computes to `auto` next to `overflow-y: auto`, and
+   the two axes then feed each other: the wash is a little too wide, a
+   horizontal scrollbar appears, it eats the height, a vertical scrollbar
+   appears, it eats the width, and the wash is now definitely too wide. That
+   settles into a stable wrong state across a narrow band of viewport widths
+   and clears itself once the rail is wide enough — which is exactly how it
+   was found. The wash is decoration; it has no business scrolling anything. */
 .rail__list{
   position: relative;
   display: flex; flex-direction: column; gap: 2px;
-  min-height: 0; overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0; overflow-y: auto; overflow-x: hidden;
   scrollbar-width: thin;
 }
 /* The wash behind the chosen area is one element that slides between them,
@@ -307,9 +321,12 @@ button{ font-family: inherit; }
 }
 .index__tools:not(:empty){ margin-top: 12px; }
 
+/* Same hazard as the rail: the fill below is absolutely positioned, its width
+   is a pixel count measured before a scrollbar may have appeared, and one
+   axis left at `visible` beside an `auto` one computes to `auto` too. */
 .index__list{
   position: relative;
-  flex: 1 1 auto; min-height: 0; overflow-y: auto;
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden;
   padding: 8px;
 }
 /* The fill under the chosen section, as one element that slides between rows.

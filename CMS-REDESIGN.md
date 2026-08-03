@@ -259,6 +259,18 @@ Recorded so they are visible rather than silent.
    all, so what they last knew survives being hidden rather than being
    overwritten with zeroes and having to grow back.
 
+   And one that only shows up mid-drag: **a translated absolute element counts
+   as scrollable overflow.** `overflow-y: auto` beside an `overflow-x` left at
+   `visible` computes the second one to `auto` as well, so the two axes feed
+   each other — the wash is a little too wide, a horizontal scrollbar appears
+   and eats the height, a vertical scrollbar appears and eats the width, and
+   the wash is now definitely too wide. It settles into a stable wrong state
+   across a narrow band of viewport widths and clears itself once the pane is
+   wide enough. Both scrolling lists say `overflow-x: hidden` outright, and
+   `.rail__list` is `flex: 1` so it is as tall as the rail rather than as tall
+   as six buttons — a list that exactly fits its content starts scrolling the
+   moment anything steals a pixel from it.
+
    The rail fill has the matching trap: **the unsaved dot lives inside the
    button and changes its width.** `updateSavebar` adds and removes dots
    without re-rendering, and the removal happens a fifth of a second later
