@@ -347,13 +347,37 @@ async function boot(opts) {
       button.click();
     },
 
+    /* One section of the current area is in the editor at a time, so a test
+       that wants a particular one says so. By the label the owner reads. */
+    section(label) {
+      const row = all(".index__label").find((n) => n.textContent.trim().startsWith(label));
+      if (!row) throw new Error(`no section called ${JSON.stringify(label)}`);
+      row.closest(".index__pick").click();
+    },
+
+    /* Look for something in the editor pane, and if it is not there, go
+       looking through the other sections of the same area for it. Which is
+       what a person does, and it keeps every test below saying what it is
+       about rather than where it had to click first. */
+    inSomeSection(find) {
+      const here = find();
+      if (here) return here;
+      const rows = all(".index__pick");
+      for (const row of rows) {
+        row.click();
+        const found = find();
+        if (found) return found;
+      }
+      return null;
+    },
+
     /* Fields are found by the value they are showing, which is how the person
-       editing finds them too. The search box is excluded: it lives in the menu
-       panel, it is empty to start with, and typing a heading into it instead of
-       into the heading box is a mistake that looks exactly like a pass. */
+       editing finds them too. The search box is excluded: it lives beside the
+       menu index, it is empty to start with, and typing a heading into it
+       instead of into the heading box is a mistake that looks like a pass. */
     fieldShowing(value) {
-      const node = all("#panels .field__input, #panels .field__area")
-        .find((n) => n.value === value);
+      const node = this.inSomeSection(() =>
+        all("#panels .field__input, #panels .field__area").find((n) => n.value === value));
       if (!node) throw new Error(`no field showing ${JSON.stringify(value)}`);
       return node;
     },
@@ -389,12 +413,13 @@ async function boot(opts) {
     uploads() { return log.filter((l) => l.what === "upload"); },
     drawn() { return drawn; },
 
-    /* The block for one slot, found by the label the owner reads. */
+    /* The block for one slot, found by the label the owner reads — in whichever
+       section of the Photos index it lives in. */
     photo(label) {
-      const node = all(".photo").find((p) => {
+      const node = this.inSomeSection(() => all(".photo").find((p) => {
         const own = p.querySelector(".photo__label");
         return own && own.textContent.trim() === label;
-      });
+      }));
       if (!node) throw new Error(`no photograph block labelled ${JSON.stringify(label)}`);
       return node;
     },
@@ -556,7 +581,8 @@ console.log("\nediting a paragraph");
   const field = r.fieldShowing("Aromati, from the Georgian word for *aroma*.");
   r.type(field, "Aromati, from the Georgian word for *aroma*, in Murray Hill.");
 
-  check("one change is counted", r.changeCount(), "1 change not yet saved");
+  check("one change is counted, and says where it is",
+        r.changeCount(), "1 unsaved change in The Idea");
   check("and nothing has been sent yet", r.writes(), []);
 
   r.type(field, "Aromati, from the Georgian word for *aroma*.");
@@ -567,7 +593,12 @@ console.log("\nediting a paragraph");
   await wait(260);
   await settle();
   check("the field marker finishes leaving", field.parentElement.classList.contains("field--edited"), false);
-  check("the savebar finishes leaving", r.q("#savebar").hidden, true);
+  /* The bar stays put and goes quiet rather than sliding out from under the
+     pointer — the pane's foot does not move as the last edit is undone. */
+  check("the savebar finishes going quiet",
+        r.q("#savebar").classList.contains("savebar--clean"), true);
+  check("and says so in words", r.changeCount(), "No changes yet");
+  check("with nothing left to press", r.q("#saveBtn").disabled, true);
 
   r.type(field, "Aromati, from the Georgian word for *aroma*, in Murray Hill.");
 
@@ -579,7 +610,7 @@ console.log("\nediting a paragraph");
         Object.keys(writes[0].payload), ["value"]);
   check("with what was typed", writes[0].payload.value,
         "Aromati, from the Georgian word for *aroma*, in Murray Hill.");
-  check("and the savebar goes quiet", r.q("#savebar").hidden, false);   // it flashes "Saved."
+  check("and the savebar speaks up", r.q("#savebar").classList.contains("savebar--clean"), false);
   check("the change is no longer counted as outstanding",
         r.q("#saveCount").textContent, "Saved. The site is showing it now.");
 }
@@ -674,17 +705,18 @@ console.log("\nadding a section and an item inside it");
   await r.signIn();
   r.tab("Menus");
 
+  /* Add a section sits under the index, and the new section is the one the
+     editor opens on — there is nothing to unfold. */
   r.all(".btn").find((b) => b.textContent === "Add a section").click();
 
-  let card = r.lastCard();
-  r.type(r.fieldLabelled(card, "Heading on the page"), "Pastries");
-  r.type(r.fieldLabelled(card, "Tab label"), "Pastries");
-  r.type(r.fieldLabelled(card, "Filter name"), "pastries");
+  const settings = r.all(".card")[0];
+  r.type(r.fieldLabelled(settings, "Heading on the page"), "Pastries");
+  r.type(r.fieldLabelled(settings, "Tab label"), "Pastries");
+  r.type(r.fieldLabelled(settings, "Filter name"), "pastries");
 
-  [...card.querySelectorAll(".btn")].find((b) => b.textContent === "Add an item").click();
+  r.all(".btn").find((b) => b.textContent === "Add an item").click();
 
-  card = r.lastCard();
-  const item = card.querySelector(".item");
+  const item = r.q(".item");
   r.type(r.fieldLabelled(item, "Name"), "Croissant");
   r.type(r.fieldLabelled(item, "Price"), "6");
 
@@ -701,8 +733,7 @@ console.log("\ndeleting");
 {
   const r = await boot();
   await r.signIn();
-  r.tab("Menus");
-  r.all(".card__head")[0].click();                              // open Breakfast
+  r.tab("Menus");                                               // Breakfast is already open
   r.all(".item__head")[0].click();                              // open Morning Plate
   r.all(".btn--danger").find((b) => b.textContent === "Delete this item").click();
   await r.save();
@@ -726,7 +757,6 @@ console.log("\nthe section that is built into the page");
   });
   await r.signIn();
   r.tab("Menus");
-  r.all(".card__head")[0].click();
   check("Build Your Own offers no fields to edit",
         r.all(".card .field__input").length, 0);
   check("and says where its contents live instead",
@@ -911,7 +941,7 @@ console.log("\ndiscard, after a save");
   check("the first edit is saved", r.writes().length, 1);
 
   r.type(r.fieldShowing("First edit."), "Second edit, not wanted.");
-  check("a second edit is outstanding", r.changeCount(), "1 change not yet saved");
+  check("a second edit is outstanding", r.changeCount(), "1 unsaved change in The Idea");
 
   r.q("#discardBtn").click();
   await settle();
@@ -921,7 +951,7 @@ console.log("\ndiscard, after a save");
 
   check("discarding goes back to what was saved, not to what was loaded",
         r.fieldShowing("First edit.").value, "First edit.");
-  check("and leaves nothing to save", r.q("#savebar").hidden, true);
+  check("and leaves nothing to save", r.q("#savebar").classList.contains("savebar--clean"), true);
 
   /* The failure this replaces was silent: Discard restored the value the page
      opened with, the editor then believed that was an unsaved change, and the
@@ -954,7 +984,7 @@ console.log("\na save the database refuses halfway through");
         r.problems()[0].includes('violates check constraint "site_copy_within_max_length"'), true);
   check("with an honest count of what landed",
         r.problems()[0].includes("Saved 1 of 2 changes"), true);
-  check("the failed edit is still marked as outstanding", r.changeCount(), "1 change not yet saved");
+  check("the failed edit is still marked as outstanding", r.changeCount(), "1 unsaved change");
 }
 
 
@@ -1012,7 +1042,7 @@ console.log("\nthe photographs, before anything has been uploaded");
   await r.signIn();
   r.tab("Photos");
 
-  check("both slots are listed", r.all(".photo").length, 2);
+  check("both slots are listed", r.all(".index__row").length, 2);
 
   const hero = r.photo("The photograph behind the opening headline");
   check("showing the photograph the site was built with",
@@ -1043,7 +1073,7 @@ console.log("\npicking a photograph");
 
   check("the file is not sent when it is picked", r.sent(), []);
   check("but the page says a save would send it",
-        r.changeCount(), "1 change not yet saved");
+        r.changeCount(), "1 unsaved change in Opening");
 
   const after = r.photo("The photograph behind the opening headline");
   check("and shows the file itself rather than the old photograph",
@@ -1207,14 +1237,14 @@ console.log("\ndiscarding a picked photograph");
 
   await r.pick(r.photo("The photograph behind the opening headline"),
                r.file("x.jpg", "image/jpeg", jpeg()));
-  check("something is outstanding", r.changeCount(), "1 change not yet saved");
+  check("something is outstanding", r.changeCount(), "1 unsaved change in Opening");
 
   r.q("#discardBtn").click();
   await settle();
   await wait(260);
   await settle();
 
-  check("discarding leaves nothing outstanding", r.changeCount(), "0 changes not yet saved");
+  check("discarding leaves nothing outstanding", r.changeCount(), "No changes yet");
   check("and nothing was ever sent anywhere", r.sent(), []);
   check("the built-in photograph is back on screen",
         r.photo("The photograph behind the opening headline")
@@ -1236,7 +1266,7 @@ console.log("\nfiles the browser cannot use");
   check("a HEIC is refused", said.startsWith("That is a HEIC file"), true);
   check("and the message says how to fix it on the phone",
         said.includes("Most Compatible"), true);
-  check("nothing is outstanding as a result", r.changeCount(), "0 changes not yet saved");
+  check("nothing is outstanding as a result", r.changeCount(), "No changes yet");
 
   await r.pick(r.photo("The photograph behind the opening headline"),
                r.file("menu.pdf", "application/pdf"));

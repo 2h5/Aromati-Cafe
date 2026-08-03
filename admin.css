@@ -11,66 +11,102 @@
    is to notice. Nothing here is worth risking it for, so this file shares
    nothing with it and loads no webfont at all.
 
-   The editor is a tool, not a composition. It uses the system font stack, at a
-   size that is comfortable to read for an hour, and borrows only the palette so
-   that it still feels like the same business.
+   That is also why the display face is a *local* stack. The site's wordmark is
+   Playfair Display; if the machine has it, the headings here are set in it and
+   the editor looks like the business it edits. If it does not, they fall to
+   Georgia, which is a serif of the same temperature and costs nothing. No
+   @font-face, no <link>, no request.
 
    No inline styles anywhere: _headers sets style-src 'self' for this path, so a
    style="…" attribute would be dropped silently in production and work
-   perfectly on a laptop. Everything below is a class. */
+   perfectly on a laptop. Everything below is a class.
+
+   ── the shape ──
+   topbar, then a three-column grid that is exactly one viewport tall. The
+   document never scrolls; the index and the editor do, separately. Under
+   1200px the rail lies down under the topbar. Under 900px the index and the
+   editor take turns, and .shell--editing says which one is showing. */
 
 :root{
-  --oxblood:      #4a1517;
-  --oxblood-deep: #2d0d0f;
-  --wine:         #6b1f23;
-  --cream:        #f4ede1;
-  --parchment:    #ece1cf;
-  --cognac:       #b07a4a;
-  --gold:         #c9a35c;
-  --ink:          #1d1310;
-  --ink-soft:     #4c3a33;
-  --hairline:     rgba(29,19,16,.16);
+  --ink:        #2a1a15;
+  --ink-soft:   #7a6a5e;
+  --ink-faint:  #a08e80;
 
-  --paper:        #fbf8f3;
-  --card:         #ffffff;
-  --danger:       #8a2116;
-  --danger-bg:    #fdf0ed;
-  --ok:           #2f6b45;
+  --maroon-900: #33100d;
+  --maroon-800: #3e1512;
+  --maroon-600: #6b1f19;
 
-  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --gold:       #c9a227;
+  --gold-soft:  #e4c87a;
 
-  --radius: 10px;
-  --pad: clamp(16px, 3vw, 32px);
+  --cream:      #f7f2ea;
+  --card:       #fffdf9;
+  --field:      #fbf7f0;
+  --line:       #e8dfd1;
+  --line-input: #e4daca;
+
+  --tan:        #f0e6d6;    /* the selected index row */
+  --tint:       rgba(201,162,39,.10);
+  --tint-warm:  rgba(107,31,25,.05);
+
+  --danger:     #8a2116;
+  --danger-bg:  #fdf1ee;
+  --ok:         #2f6b45;
+
+  --sans: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, sans-serif;
+  --serif: "Playfair Display", "Iowan Old Style", "Palatino Linotype",
+           Palatino, Georgia, serif;
+
+  --ease: cubic-bezier(.22,.61,.36,1);
+
+  --topbar: 64px;
+  --rail: 224px;
+  --index: 300px;
+  --measure: 760px;
 }
 
 *{ box-sizing: border-box; }
 
-html{ -webkit-text-size-adjust: 100%; }
+html{ -webkit-text-size-adjust: 100%; height: 100%; }
 
 body{
-  margin: 0;
-  background: var(--paper);
+  margin: 0; height: 100%;
+  background: var(--cream);
   color: var(--ink);
-  font: 400 16px/1.55 var(--sans);
+  font: 400 15px/1.6 var(--sans);
   min-width: 0;
-  /* The savebar is fixed to the bottom; without this the last card on a long
-     panel sits underneath it and cannot be reached on a phone. */
-  padding-bottom: calc(96px + env(safe-area-inset-bottom));
+  overflow: hidden;            /* only the panes scroll */
 }
 
 h1,h2,h3{ margin: 0; font-weight: 600; letter-spacing: -.01em; }
 
+button{ font-family: inherit; }
+
 .noscript{
-  margin: 0; padding: 20px var(--pad);
-  background: var(--oxblood); color: var(--cream);
+  margin: 0; padding: 20px 26px;
+  background: var(--maroon-800); color: var(--cream);
+}
+
+.index__group,
+.editor__eyebrow{
+  font-size: 10px; font-weight: 600;
+  letter-spacing: .2em; text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+/* Gold, never blue. The browser's default focus ring is the one piece of
+   another palette that would otherwise get in. */
+:focus-visible{
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
 }
 
 /* ── the boot state ──────────────────────────── */
 
 .boot{
   display: grid; place-items: center;
-  min-height: 60vh; padding: var(--pad);
+  min-height: 60vh; padding: 26px;
 }
 .boot[hidden]{ display: none; }
 .boot__text{ color: var(--ink-soft); }
@@ -80,53 +116,58 @@ h1,h2,h3{ margin: 0; font-weight: 600; letter-spacing: -.01em; }
 
 .gate{
   display: grid; place-items: center;
-  min-height: 100vh; padding: var(--pad);
-  background: var(--oxblood-deep);
+  min-height: 100vh; padding: 26px;
+  background: var(--maroon-900);
 }
 .gate[hidden]{ display: none; }
 
 .gate__card{
   width: 100%; max-width: 380px;
   background: var(--card);
-  border-radius: var(--radius);
-  padding: 32px 28px 24px;
-  box-shadow: 0 24px 60px rgba(0,0,0,.35);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 34px 26px 26px;
 }
 
 .gate__title{
-  font-size: 26px; letter-spacing: .12em; text-transform: uppercase;
-  color: var(--oxblood);
+  font: 500 30px/1.1 var(--serif);
+  letter-spacing: .02em;
+  color: var(--maroon-800);
 }
-.gate__sub{ margin: 6px 0 22px; color: var(--ink-soft); font-size: 15px; }
+.gate__sub{ margin: 8px 0 26px; color: var(--ink-soft); font-size: 15px; }
 .gate__foot{
   margin: 20px 0 0; padding-top: 16px;
-  border-top: 1px solid var(--hairline);
+  border-top: 1px solid var(--line);
   font-size: 13px; line-height: 1.5; color: var(--ink-soft);
 }
 
 /* ── the frame ───────────────────────────────── */
 
+.app{ height: 100%; display: grid; grid-template-rows: var(--topbar) 1fr; }
+.app[hidden]{ display: none; }
+
 .topbar{
-  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-  padding: 14px max(var(--pad), env(safe-area-inset-left))
-    14px max(var(--pad), env(safe-area-inset-right));
-  background: var(--oxblood); color: var(--cream);
+  display: flex; align-items: center; gap: 14px;
+  padding: 0 max(20px, env(safe-area-inset-left))
+    0 max(20px, env(safe-area-inset-right));
+  background: var(--maroon-900); color: var(--cream);
 }
 .topbar__brand{
-  font-weight: 600; letter-spacing: .14em; text-transform: uppercase; font-size: 14px;
+  font: 500 20px/1 var(--serif);
+  letter-spacing: .04em;
 }
-.topbar__who{ font-size: 13px; opacity: .8; }
+.topbar__who{ font-size: 13px; color: rgba(247,242,234,.66); }
 .topbar__spacer{ flex: 1 1 auto; }
 .topbar__link{
   display: inline-flex; align-items: baseline; gap: 5px;
-  color: var(--gold); font-size: 14px; text-decoration: none;
+  color: var(--gold-soft); font-size: 13px; text-decoration: none;
   transition: color 300ms ease;
 }
-.topbar__link:hover{ text-decoration: none; }
+.topbar__link:hover{ color: var(--cream); text-decoration: none; }
 .topbar__link-go{
   display: inline-block; font-size: .82em;
   opacity: 0; transform: translate(-4px, 4px);
-  transition: opacity 400ms ease, transform 400ms cubic-bezier(.22,.61,.36,1);
+  transition: opacity 400ms ease, transform 400ms var(--ease);
 }
 .topbar__link:hover .topbar__link-go,
 .topbar__link:focus-visible .topbar__link-go{
@@ -135,14 +176,14 @@ h1,h2,h3{ margin: 0; font-weight: 600; letter-spacing: -.01em; }
 
 #signOut{
   position: relative; isolation: isolate; overflow: hidden;
-  transition: color 450ms cubic-bezier(.22,.61,.36,1),
-    border-color 450ms cubic-bezier(.22,.61,.36,1);
+  border-color: rgba(247,242,234,.4); color: var(--cream);
+  transition: color 450ms var(--ease), border-color 450ms var(--ease);
 }
 #signOut::before{
   content: ""; position: absolute; inset: 0; z-index: 0;
   border-radius: inherit; background: var(--cream);
   transform: scaleX(0); transform-origin: right;
-  transition: transform 550ms cubic-bezier(.22,.61,.36,1);
+  transition: transform 550ms var(--ease);
 }
 #signOut span{ position: relative; z-index: 1; }
 #signOut:hover:not(:disabled){ color: var(--ink); border-color: var(--cream); }
@@ -154,66 +195,254 @@ h1,h2,h3{ margin: 0; font-weight: 600; letter-spacing: -.01em; }
 }
 .app--enter .topbar__link,
 .app--enter #signOut{
-  animation: admin-topbar-in 280ms cubic-bezier(.22,.61,.36,1) both;
+  animation: admin-topbar-in 280ms var(--ease) both;
 }
 .app--enter #signOut{ animation-delay: 70ms; }
 
-.tabs{
-  display: flex; gap: 2px; flex-wrap: wrap;
-  padding: 0 max(var(--pad), env(safe-area-inset-left))
-    0 max(var(--pad), env(safe-area-inset-right));
-  background: var(--oxblood-deep);
-  position: sticky; top: 0; z-index: 5;
+/* ── the three panes ─────────────────────────── */
+
+/* The rail and the index run the full height. The editor, the problems list
+   and the savebar stack down the third column, so the savebar is the foot of
+   the editor's column rather than a child of the editor — which is what lets
+   it survive the index and the editor taking turns on a narrow screen. */
+.shell{
+  min-height: 0;
+  display: grid;
+  grid-template-columns: var(--rail) var(--index) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto auto;
 }
-.tabs::after{
+.rail{ grid-column: 1; grid-row: 1 / -1; }
+.index{ grid-column: 2; grid-row: 1 / -1; }
+.editor{ grid-column: 3; grid-row: 1; }
+.problems{ grid-column: 3; grid-row: 2; }
+.savebar{ grid-column: 3; grid-row: 3; }
+
+/* ── the rail ────────────────────────────────── */
+
+.rail{
+  display: flex; flex-direction: column;
+  min-height: 0;
+  padding: 14px 12px max(14px, env(safe-area-inset-bottom));
+  background: var(--maroon-800);
+  padding-left: max(12px, env(safe-area-inset-left));
+}
+.rail__list{
+  position: relative;
+  display: flex; flex-direction: column; gap: 2px;
+  min-height: 0; overflow-y: auto;
+  scrollbar-width: thin;
+}
+/* The wash behind the chosen area is one element that slides between them,
+   rather than a background that switches off here and on there. Its geometry
+   comes from the button itself, set through the CSSOM in renderRail. */
+.rail__list::after{
   content: "";
-  position: absolute; left: 0; top: 0;
-  width: var(--tab-underline-width, 0px); height: 3px;
-  background: var(--gold); pointer-events: none;
-  transform: translate(var(--tab-underline-x, 0px), var(--tab-underline-y, 0px));
+  position: absolute; left: 0; top: 0; z-index: 0;
+  width: var(--rail-mark-w, 0px); height: var(--rail-mark-h, 0px);
+  transform: translate(var(--rail-mark-x, 0px), var(--rail-mark-y, 0px));
+  background: var(--tint);
+  border-radius: 8px;
+  pointer-events: none;
   transition: none;
-  will-change: transform, width;
+  will-change: transform, width, height;
 }
-.tabs--ready::after{
+.rail__list--ready::after{
   transition:
-    transform 360ms cubic-bezier(.22,.61,.36,1),
-    width 260ms cubic-bezier(.22,.61,.36,1);
+    transform 380ms var(--ease),
+    width 300ms var(--ease),
+    height 300ms var(--ease);
 }
 .tab{
-  appearance: none; border: 0; cursor: pointer;
-  background: transparent; color: rgba(244,237,225,.62);
-  font: 600 14px/1 var(--sans);
-  padding: 14px 16px;
-  border-bottom: 3px solid transparent;
-  transition: color 180ms ease, background-color 180ms ease, border-color 180ms ease;
+  position: relative; z-index: 1;
+  display: flex; align-items: center; gap: 8px;
+  appearance: none; border: 0; cursor: pointer; text-align: left;
+  width: 100%;
+  background: transparent; color: rgba(247,242,234,.68);
+  font: 500 14px/1 var(--sans);
+  padding: 11px 12px;
+  border-radius: 8px;
+  transition: color 180ms ease, background-color 180ms ease;
 }
-.tab:hover{ color: var(--cream); }
-.tab[aria-selected="true"]{ color: var(--cream); border-bottom-color: transparent; }
+.tab__name{ flex: 1 1 auto; }
+.tab__count{
+  order: 3;
+  font-size: 12px; font-variant-numeric: tabular-nums;
+  color: rgba(247,242,234,.34);
+}
+.tab:hover{ color: var(--cream); background: rgba(247,242,234,.05); }
+.tab[aria-selected="true"]{
+  color: var(--gold-soft);
+  background: transparent;      /* the sliding wash is behind it */
+}
+.tab[aria-selected="true"]:hover{ background: transparent; }
+.tab[aria-selected="true"] .tab__count{ color: rgba(228,200,122,.6); }
 .tab__dot{
-  display: inline-block; width: 7px; height: 7px; margin-left: 7px;
+  order: 2;
+  width: 6px; height: 6px; flex: 0 0 auto;
   border-radius: 50%; background: var(--gold);
-  vertical-align: middle;
-  animation: admin-status-in 220ms cubic-bezier(.22,.61,.36,1) both;
+  animation: admin-status-in 220ms var(--ease) both;
 }
 .tab__dot--leaving{
-  animation: admin-status-out 220ms cubic-bezier(.22,.61,.36,1) both;
+  animation: admin-status-out 220ms var(--ease) both;
   pointer-events: none;
 }
 
-.panels{
-  padding: var(--pad) max(var(--pad), env(safe-area-inset-right))
-    var(--pad) max(var(--pad), env(safe-area-inset-left));
-  max-width: 900px; margin: 0 auto;
+/* ── the index ───────────────────────────────── */
+
+.index{
+  display: flex; flex-direction: column;
+  min-height: 0; min-width: 0;
+  background: var(--card);
+  border-right: 1px solid var(--line);
 }
-.panel[hidden]{ display: none; }
-.panel--enter{
-  animation: admin-panel-in 260ms cubic-bezier(.22,.61,.36,1) both;
+.index__head{
+  flex: 0 0 auto;
+  padding: 16px 16px 12px;
+  border-bottom: 1px solid var(--line);
 }
-.menu__results--enter{
-  animation: admin-panel-in 260ms cubic-bezier(.22,.61,.36,1) both;
+.index__title{
+  margin: 0;
+  font: 500 20px/1.2 var(--serif);
+  color: var(--ink);
+}
+.index__tools:not(:empty){ margin-top: 12px; }
+
+.index__list{
+  position: relative;
+  flex: 1 1 auto; min-height: 0; overflow-y: auto;
+  padding: 8px;
+}
+/* The fill under the chosen section, as one element that slides between rows.
+   Its geometry comes from the row itself, set through the CSSOM in
+   positionIndexMark — a style attribute would be dropped by style-src 'self'
+   in production and work perfectly on a laptop. */
+.index__list::after{
+  content: "";
+  position: absolute; left: 0; top: 0; z-index: 0;
+  width: var(--index-mark-w, 0px); height: var(--index-mark-h, 0px);
+  transform: translate(var(--index-mark-x, 0px), var(--index-mark-y, 0px));
+  opacity: var(--index-mark-o, 0);
+  background: var(--tan);
+  border-radius: 8px;
+  pointer-events: none;
+  transition: none;
+  will-change: transform, width, height;
+}
+.index__list--ready::after{
+  transition:
+    transform 320ms var(--ease),
+    width 260ms var(--ease),
+    height 260ms var(--ease),
+    opacity 200ms ease;
+}
+.index__list--enter{ animation: admin-pane-in 260ms var(--ease) both; }
+
+/* Coming back from the editor on a narrow screen, the index has been off the
+   screen entirely — so it arrives from the side it went to, rather than
+   blinking into place. Above 900px both panes are always visible and there is
+   nothing to arrive, so the animation is scoped to where it means something. */
+@keyframes admin-index-back{
+  from{ opacity: 0; transform: translateX(-18px); }
+  to{ opacity: 1; transform: none; }
+}
+.index__group{
+  margin: 14px 0 6px; padding: 0 8px;
+}
+.index__group:first-child{ margin-top: 4px; }
+
+.index__row{
+  position: relative; z-index: 1;
+  display: flex; align-items: center; gap: 2px;
+  border-radius: 8px;
+  transition: background-color 160ms ease;
+}
+.index__row[hidden]{ display: none; }
+.index__row:hover{ background: var(--tint-warm); }
+/* The fill is the ::after above, sliding. The row itself stays transparent so
+   the two never disagree about where the chosen section is. */
+.index__row--on,
+.index__row--on:hover{ background: transparent; }
+
+.index__pick{
+  display: flex; align-items: center; gap: 9px;
+  flex: 1 1 auto; min-width: 0;
+  appearance: none; border: 0; background: transparent; cursor: pointer;
+  text-align: left;
+  padding: 9px 10px;
+  border-radius: 8px;
+  font: 400 14px/1.35 var(--sans); color: var(--ink);
+}
+.index__row--on .index__pick{ font-weight: 500; }
+.index__label{
+  flex: 1 1 auto; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.index__count{
+  flex: 0 0 auto;
+  font-size: 12px; color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+.index__dot{
+  flex: 0 0 auto;
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--line);
+  transition: background-color 200ms ease;
+}
+.index__dot--dirty{ background: var(--gold); }
+.index__dot--here{ background: var(--maroon-600); }
+.index__dot--clean{ background: #ddd0bc; }
+
+.index__moves{ display: flex; gap: 3px; padding-right: 7px; }
+
+.index__foot{ flex: 0 0 auto; }
+.index__foot:not(:empty){
+  padding: 10px 14px max(14px, env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line);
+}
+.index__foot .btn--add{ margin-top: 0; width: 100%; }
+
+/* ── the editor pane ─────────────────────────── */
+
+.editor{
+  position: relative;
+  display: flex; flex-direction: column;
+  min-height: 0; min-width: 0;
+}
+.editor__scroll{
+  flex: 1 1 auto; min-height: 0;
+  overflow-y: auto; overflow-x: hidden;
+  padding: 30px max(26px, env(safe-area-inset-right)) 40px 26px;
+}
+.editor__page{
+  max-width: var(--measure);
+  margin: 0 auto;
+}
+.editor__page--enter{ animation: admin-pane-in 260ms var(--ease) both; }
+
+.editor__head{ margin-bottom: 22px; }
+.editor__back{
+  display: none;                       /* narrow screens only */
+  align-items: center; gap: 7px;
+  appearance: none; border: 0; background: transparent; cursor: pointer;
+  padding: 0 0 12px;
+  font: 500 13px/1 var(--sans); color: var(--ink-soft);
+}
+.editor__back-go{ font-size: 15px; line-height: 1; }
+.editor__eyebrow{ margin: 0 0 8px; }
+.editor__title{
+  margin: 0;
+  font: 500 34px/1.15 var(--serif);
+  letter-spacing: 0;
+  color: var(--ink);
+}
+.editor__lede{
+  margin: 10px 0 0; max-width: 62ch;
+  font-size: 14px; line-height: 1.6; color: var(--ink-soft);
 }
 
-@keyframes admin-panel-in{
+.editor__body{ padding-bottom: 8px; }
+
+@keyframes admin-pane-in{
   from{ opacity: 0; transform: translateY(8px); }
   to{ opacity: 1; transform: translateY(0); }
 }
@@ -225,134 +454,122 @@ h1,h2,h3{ margin: 0; font-weight: 600; letter-spacing: -.01em; }
   from{ opacity: 1; transform: translateY(0) scale(1); }
   to{ opacity: 0; transform: translateY(-3px) scale(.82); }
 }
-@keyframes admin-savebar-in{
-  from{ opacity: 0; transform: translateY(12px); }
-  to{ opacity: 1; transform: translateY(0); }
-}
-@keyframes admin-savebar-out{
-  from{ opacity: 1; transform: translateY(0); }
-  to{ opacity: 0; transform: translateY(12px); }
-}
-
-.panel__intro{
-  margin: 0 0 22px; max-width: 62ch;
-  color: var(--ink-soft); font-size: 15px;
-}
 
 /* ── cards ───────────────────────────────────── */
 
 .card{
   background: var(--card);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 1px 0 rgba(58,42,34,.03);
+  padding: 18px 20px 20px;
   margin-bottom: 14px;
-  overflow: hidden;
 }
-.card--flagged{ border-color: var(--danger); }
+.card__title{
+  margin: 0 0 4px;
+  font: 500 20px/1.2 var(--serif); color: var(--ink);
+}
+.card__help{
+  margin: 0 0 4px;
+  font-size: 13px; line-height: 1.55; color: var(--ink-soft);
+}
 
-.card__head{
-  display: flex; align-items: center; gap: 10px; width: 100%;
-  appearance: none; border: 0; cursor: pointer; text-align: left;
-  background: transparent;
-  padding: 15px 18px;
-  font: 600 16px/1.3 var(--sans); color: var(--ink);
+/* A field standing on its own in the editor pane is its own card. Fields
+   inside a row, a pour or the hours grid are not — they are one control in a
+   card that already exists. */
+.editor__body > .field{
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 1px 0 rgba(58,42,34,.03);
+  padding: 16px 20px 18px;
+  margin: 0 0 14px;
 }
-.card__head:hover{ background: rgba(176,122,74,.07); }
-.card__caret{ color: var(--cognac); font-size: 12px; width: 12px; flex: 0 0 auto; }
-.card__count{ margin-left: auto; font-weight: 400; font-size: 13px; color: var(--ink-soft); }
-.card__dot{
-  width: 7px; height: 7px; border-radius: 50%; background: var(--gold); flex: 0 0 auto;
-}
-.card__body{
-  display: grid;
-  grid-template-rows: 0fr;
-  padding: 0;
-  border-top: 1px solid transparent;
-  opacity: 0;
-  transition:
-    grid-template-rows 240ms cubic-bezier(.22,.61,.36,1),
-    padding 240ms cubic-bezier(.22,.61,.36,1),
-    border-top-color 180ms ease,
-    opacity 160ms ease;
-}
-.card__body.is-open{
-  grid-template-rows: 1fr;
-  padding: 4px 18px 20px;
-  border-top-color: var(--hairline);
-  opacity: 1;
-}
-.card__body-inner,
-.item__body-inner{
-  min-height: 0;
-  overflow: hidden;
-}
-.card__body[hidden], .item__body[hidden]{ display: none; }
 
 /* ── fields ──────────────────────────────────── */
 
 .field{ display: block; margin: 16px 0 0; }
-.field:first-child{ margin-top: 12px; }
+.field:first-child{ margin-top: 0; }
 
 .field__label{
-  display: block; margin-bottom: 5px;
-  font-weight: 600; font-size: 14px;
+  display: block; margin-bottom: 6px;
+  font-weight: 500; font-size: 13px; color: var(--ink);
 }
 .field__help{
-  display: block; margin: 4px 0 0;
-  font-size: 13px; line-height: 1.45; color: var(--ink-soft);
+  display: block; margin: 6px 0 0;
+  font-size: 12px; line-height: 1.5; color: var(--ink-soft);
 }
 .field__input, .field__area, .field__select{
   display: block; width: 100%;
-  font: 400 15px/1.5 var(--sans); color: var(--ink);
-  background: var(--paper);
-  border: 1px solid var(--hairline); border-radius: 8px;
-  padding: 9px 11px;
-  box-shadow: inset 0 0 0 0 transparent;
-  transition: border-color 180ms ease, box-shadow 220ms ease, background-color 180ms ease;
+  font: 400 15px/1.6 var(--sans); color: var(--ink);
+  background: var(--field);
+  border: 1px solid var(--line-input); border-radius: 8px;
+  padding: 9px 12px;
+  transition: border-color 180ms ease, background-color 180ms ease;
 }
-.field__area{ resize: vertical; min-height: 84px; }
+.field__area{ resize: vertical; min-height: 76px; }
 .field__input:focus, .field__area:focus, .field__select:focus{
   outline: none;
-  border-color: var(--cognac);
-  box-shadow: inset 0 0 0 2px var(--cognac);
+  border-color: var(--gold);
+  background: #fff;
 }
 .field__input:disabled, .field__area:disabled{
-  background: #f0ece5; color: var(--ink-soft); cursor: not-allowed;
+  background: #f2ece2; color: var(--ink-soft); cursor: not-allowed;
 }
 .field--bad .field__input, .field--bad .field__area{
   border-color: var(--danger); background: var(--danger-bg);
 }
 
 .field__error{
-  display: block; margin: 5px 0 0;
-  font-size: 13px; line-height: 1.45; color: var(--danger); font-weight: 500;
+  display: block; margin: 6px 0 0;
+  font-size: 12px; line-height: 1.5; color: var(--danger); font-weight: 500;
 }
 .field__note{
-  display: block; margin: 5px 0 0;
-  font-size: 13px; line-height: 1.45; color: var(--ink-soft);
+  display: block; margin: 6px 0 0;
+  font-size: 12px; line-height: 1.5; color: var(--ink-soft);
 }
 .field__note--warn{ color: var(--danger); }
-.field__count{ float: right; font-weight: 400; font-size: 13px; color: var(--ink-soft); }
+.field__count{
+  float: right; font-weight: 400; font-size: 12px; color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
 .field__count--over{ color: var(--danger); font-weight: 600; }
+
 .field--edited > .field__label::after,
 .field--edited-leaving > .field__label::after{
   content: "edited";
   display: inline-block;
-  margin-left: 8px; padding: 1px 6px;
-  font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
-  color: var(--oxblood); background: rgba(201,163,92,.28); border-radius: 20px;
+  margin-left: 8px; padding: 1px 7px;
+  font-size: 10px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--maroon-800); background: var(--tint); border-radius: 999px;
 }
 .field--edited > .field__label::after{
-  animation: admin-status-in 220ms cubic-bezier(.22,.61,.36,1) both;
+  animation: admin-status-in 220ms var(--ease) both;
 }
 .field--edited-leaving > .field__label::after{
-  animation: admin-status-out 220ms cubic-bezier(.22,.61,.36,1) both;
+  animation: admin-status-out 220ms var(--ease) both;
+}
+
+/* The hours grid says "Opens" and "Closes" once, along the top. The label is
+   still in the markup for anyone listening rather than looking — collapsed to
+   nothing, not removed. The edited badge sets its own size, so it survives. */
+.field--bare > .field__label{
+  font-size: 0; line-height: 0; margin: 0;
+}
+.field--bare > .field__label::after{
+  font-size: 10px; line-height: 1.6; margin: 0 0 4px;
 }
 
 /* ── the time picker ──────────────────────────
    The input is still the browser's, and still holds the value; only the
    dropdown it hangs off is replaced. Chrome's indicator goes, because two
-   pickers on one field is worse than either. */
+   pickers on one field is worse than either.
+
+   It hangs below the input now instead of pushing the layout down, which it
+   only ever did because the old accordion body clipped its own overflow. It is
+   anchored to the *right* edge of its field: the rightmost column of the hours
+   grid is narrower than the panel, and a panel that grew leftwards from there
+   stays inside the pane where one growing rightwards would not. */
 
 .timefield{ position: relative; }
 .timefield__control{ position: relative; }
@@ -370,31 +587,28 @@ h1,h2,h3{ margin: 0; font-weight: 600; letter-spacing: -.01em; }
   background: transparent; color: var(--ink-soft);
   transition: background-color 160ms ease, color 160ms ease;
 }
-.timefield__toggle:hover{ background: rgba(176,122,74,.14); color: var(--oxblood); }
-.timefield__toggle[aria-expanded="true"]{ background: rgba(176,122,74,.18); color: var(--oxblood); }
-.timefield__toggle:focus-visible{ outline: 2px solid var(--cognac); outline-offset: 1px; }
+.timefield__toggle:hover{ background: var(--tint); color: var(--maroon-800); }
+.timefield__toggle[aria-expanded="true"]{ background: var(--tint); color: var(--maroon-800); }
 .timefield__glyph{
   width: 17px; height: 17px;
   fill: none; stroke: currentColor; stroke-width: 1.7;
   stroke-linecap: round; stroke-linejoin: round;
 }
 
-/* Opened in the flow, not over it: .card__body-inner clips its overflow, so a
-   panel floating above the field would be cut off at the card's edge. Same
-   0fr → 1fr row the cards animate on, so it reads as the same gesture. */
 .tpick{
-  --tpick-width: min(330px, 100%);
+  --tpick-width: 300px;
+  position: absolute; top: 100%; right: 0; z-index: 30;
   display: grid;
   grid-template-rows: 0fr;
-  width: var(--tpick-width);
+  width: var(--tpick-width); max-width: 92vw;
   margin-top: 0;
   opacity: 0;
   transition:
-    grid-template-rows 240ms cubic-bezier(.22,.61,.36,1),
-    margin-top 240ms cubic-bezier(.22,.61,.36,1),
+    grid-template-rows 240ms var(--ease),
+    margin-top 240ms var(--ease),
     opacity 160ms ease;
 }
-.tpick.is-open{ grid-template-rows: 1fr; margin-top: 8px; opacity: 1; }
+.tpick.is-open{ grid-template-rows: 1fr; margin-top: 6px; opacity: 1; }
 .tpick[hidden]{ display: none; }
 .tpick__clip{ min-height: 0; overflow: hidden; }
 
@@ -405,10 +619,10 @@ h1,h2,h3{ margin: 0; font-weight: 600; letter-spacing: -.01em; }
   width: 100%; max-width: none;
   padding: 8px;
   background: var(--card);
-  border: 1px solid var(--hairline); border-radius: 10px;
-  box-shadow: 0 8px 20px rgba(29,19,16,.06);
+  border: 1px solid var(--line); border-radius: 12px;
+  box-shadow: 0 10px 26px rgba(58,42,34,.10);
   transform: translateY(-6px);
-  transition: transform 240ms cubic-bezier(.22,.61,.36,1);
+  transition: transform 240ms var(--ease);
 }
 .tpick.is-open .tpick__cols{ transform: none; }
 
@@ -416,8 +630,8 @@ h1,h2,h3{ margin: 0; font-weight: 600; letter-spacing: -.01em; }
 .tpick__cap{
   display: block; height: 23px; box-sizing: border-box;
   padding: 0 0 6px; text-align: center; line-height: 17px;
-  font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
-  color: var(--ink-soft);
+  font-size: 10px; font-weight: 600; letter-spacing: .2em; text-transform: uppercase;
+  color: var(--ink-faint);
 }
 .tpick__col{
   position: relative;
@@ -432,106 +646,177 @@ h1,h2,h3{ margin: 0; font-weight: 600; letter-spacing: -.01em; }
   display: flex; align-items: center; justify-content: center;
   width: 100%; height: 32px; box-sizing: border-box;
   appearance: none; cursor: pointer;
-  border: 0; border-radius: 7px;
+  border: 0; border-radius: 999px;
   padding: 0; margin: 0;
   background: transparent; color: var(--ink-soft);
   font: 500 14px/1 var(--sans); text-align: center;
+  font-variant-numeric: tabular-nums;
   scroll-snap-align: center;
   transition: background-color 150ms ease, color 150ms ease;
 }
-.tpick__opt:hover{ background: rgba(176,122,74,.14); color: var(--ink); }
+.tpick__opt:hover{ background: var(--tint); color: var(--ink); }
 .tpick__opt--on{
-  background: var(--wine); color: var(--cream); font-weight: 600;
-  animation: admin-pick-in 200ms cubic-bezier(.22,.61,.36,1);
+  background: var(--maroon-600); color: var(--cream); font-weight: 600;
+  animation: admin-pick-in 200ms var(--ease);
 }
-.tpick__opt:focus-visible{ outline: 2px solid var(--cognac); outline-offset: -2px; }
 
 @keyframes admin-pick-in{
   from{ transform: scale(.9); }
   to{ transform: scale(1); }
 }
 
+/* ── the week, as a grid ──────────────────────
+   Day, "Closed all day", Opens, Closes — the last two named once along the
+   top rather than seven times down the page. */
+
+.hours{ display: grid; gap: 0; }
+.hours__head,
+.hours__row{
+  display: grid;
+  grid-template-columns: minmax(96px, 1.1fr) minmax(130px, .9fr)
+                         minmax(120px, 1fr) minmax(120px, 1fr);
+  gap: 14px;
+  align-items: center;
+}
+.hours__head{
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+.hours__cap{
+  font-size: 10px; font-weight: 600;
+  letter-spacing: .2em; text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.hours__row{
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.hours__row:last-child{ border-bottom: 0; padding-bottom: 0; }
+.hours__day{ font-size: 15px; font-weight: 500; }
+.hours__row--shut .hours__day{ color: var(--ink-soft); }
+.hours__shut{
+  grid-column: span 2;
+  font-size: 13px; color: var(--ink-faint);
+}
+.hours__row > .field{ margin: 0; min-width: 0; }
+
 .row{ display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
 .row > .field{ flex: 1 1 160px; margin-top: 12px; }
 .row > .field--narrow{ flex: 0 1 130px; }
 .row--hours{ min-width: 0; align-items: flex-start; }
+.row + .row{ margin-top: 8px; padding-top: 12px; border-top: 1px solid var(--line); }
 
-.check{ display: flex; align-items: center; gap: 8px; font-size: 15px; margin-top: 12px; }
-.check input{ width: 18px; height: 18px; accent-color: var(--wine); }
+.check{ display: flex; align-items: center; gap: 8px; font-size: 14px; margin-top: 12px; }
+.check input{ width: 17px; height: 17px; accent-color: var(--maroon-600); }
+.check--bare{ margin-top: 0; }
+.check--bare span{
+  font-size: 0;                 /* the column header says it once */
+}
 
 /* ── buttons ─────────────────────────────────── */
 
 .btn{
   appearance: none; cursor: pointer;
-  font: 600 14px/1 var(--sans);
-  padding: 10px 16px; border-radius: 8px;
+  font: 500 13px/1 var(--sans);
+  padding: 10px 18px; border-radius: 999px;
   border: 1px solid transparent;
+  transition: background-color 180ms ease, color 180ms ease,
+    border-color 180ms ease, opacity 180ms ease;
 }
-.btn:disabled{ opacity: .45; cursor: not-allowed; }
-.btn--primary{ background: var(--wine); color: var(--cream); }
-.btn--primary:hover:not(:disabled){ background: var(--oxblood); }
-.btn--quiet{ background: transparent; color: inherit; border-color: currentColor; opacity: .85; }
-.btn--quiet:hover:not(:disabled){ opacity: 1; }
-.btn--wide{ width: 100%; margin-top: 20px; padding: 12px; }
-.btn--small{ font-size: 13px; padding: 7px 11px; }
-.btn--danger{ color: var(--danger); border-color: currentColor; background: transparent; }
-.btn--add{ margin-top: 14px; }
+.btn:disabled{ opacity: .4; cursor: not-allowed; }
+.btn--primary{ background: var(--maroon-600); color: var(--cream); }
+.btn--primary:hover:not(:disabled){ background: var(--maroon-800); }
+.btn--ghost{
+  background: transparent; color: var(--ink-soft);
+  border-color: var(--line-input);
+}
+.btn--ghost:hover:not(:disabled){ color: var(--ink); border-color: var(--ink-faint); }
+.btn--quiet{ background: transparent; color: inherit; border-color: currentColor; }
+.btn--wide{ width: 100%; margin-top: 20px; padding: 13px; }
+.btn--small{ font-size: 13px; padding: 8px 14px; }
+.btn--danger{ color: var(--danger); border-color: rgba(138,33,22,.35); background: transparent; }
+.btn--danger:hover:not(:disabled){ background: var(--danger-bg); }
+.btn--add{ margin-top: 14px; background: var(--field); border-color: var(--line-input); color: var(--ink); }
+.btn--add:hover:not(:disabled){ border-color: var(--gold); }
 
-.tools{ display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+.tools{ display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+
+.mini{
+  appearance: none; cursor: pointer;
+  border: 1px solid var(--line-input); background: var(--card); color: var(--ink-soft);
+  border-radius: 7px; width: 26px; height: 26px;
+  font: 500 11px/1 var(--sans);
+  transition: color 160ms ease, border-color 160ms ease;
+}
+.mini:hover:not(:disabled){ color: var(--ink); border-color: var(--gold); }
+.mini:disabled{ opacity: .3; cursor: not-allowed; }
 
 /* ── messages ────────────────────────────────── */
 
 .msg{
-  margin: 16px 0 0; padding: 11px 13px;
-  border-radius: 8px; font-size: 14px; line-height: 1.5;
+  margin: 16px 0 0; padding: 11px 14px;
+  border-radius: 10px; font-size: 14px; line-height: 1.5;
   background: var(--danger-bg); color: var(--danger);
 }
 .msg--ok{ background: #eef5f0; color: var(--ok); }
 .msg[hidden]{ display: none; }
 
-.notice{
-  margin: 0 0 20px; padding: 14px 16px;
-  border-left: 3px solid var(--cognac);
-  background: rgba(176,122,74,.09);
-  font-size: 14px; line-height: 1.55; color: var(--ink-soft);
-  border-radius: 0 8px 8px 0;
+/* The one aside a panel is allowed: said once, at the top. */
+.note{
+  margin: 0 0 18px; padding: 14px 18px;
+  background: var(--tint);
+  border: 1px solid rgba(201,162,39,.28);
+  border-radius: 12px;
+  font-size: 13px; line-height: 1.6; color: var(--ink-soft);
 }
-.notice strong{ color: var(--ink); }
+.note strong{ color: var(--ink); font-weight: 600; }
+
+.static{
+  padding: 14px 16px; margin-top: 12px;
+  border: 1px dashed var(--line-input); border-radius: 10px;
+  font-size: 13px; line-height: 1.55; color: var(--ink-soft);
+}
+
+.empty{
+  padding: 18px; text-align: center;
+  color: var(--ink-faint); font-size: 13px;
+}
 
 /* ── the savebar ─────────────────────────────── */
 
 .savebar{
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
-  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-  padding: 12px max(var(--pad), env(safe-area-inset-left))
-    max(12px, env(safe-area-inset-bottom)) max(var(--pad), env(safe-area-inset-right));
-  background: var(--oxblood-deep); color: var(--cream);
-  box-shadow: 0 -8px 24px rgba(0,0,0,.22);
+  flex: 0 0 auto;
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px max(26px, env(safe-area-inset-right))
+    max(12px, env(safe-area-inset-bottom)) 26px;
+  background: rgba(247,242,234,.86);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid var(--line);
+  transition: opacity 220ms ease;
 }
-.savebar[hidden]{ display: none; }
-.savebar:not([hidden]){
-  animation: admin-savebar-in 240ms cubic-bezier(.22,.61,.36,1) both;
+.savebar__dot{
+  width: 6px; height: 6px; flex: 0 0 auto;
+  border-radius: 50%; background: var(--gold);
+  transition: background-color 220ms ease;
 }
-.savebar:not([hidden]).savebar--leaving{
-  animation: admin-savebar-out 220ms cubic-bezier(.22,.61,.36,1) both;
-  pointer-events: none;
-}
-.savebar__count{ font-size: 14px; }
+.savebar__count{ font-size: 13px; color: var(--ink); }
 .savebar__spacer{ flex: 1 1 auto; }
-.savebar--busy{ opacity: .8; }
+.savebar--busy{ opacity: .75; }
+.savebar--leaving .savebar__count{ opacity: .6; }
+.savebar--clean .savebar__dot{ background: #ddd0bc; }
+.savebar--clean .savebar__count{ color: var(--ink-faint); }
 
 .problems{
-  position: fixed; left: 0; right: 0;
-  bottom: calc(62px + env(safe-area-inset-bottom)); z-index: 19;
-  max-height: 42vh; overflow-y: auto;
-  padding: 14px max(var(--pad), env(safe-area-inset-left))
-    14px max(var(--pad), env(safe-area-inset-right));
+  flex: 0 0 auto;
+  max-height: 40vh; overflow-y: auto;
+  padding: 14px max(26px, env(safe-area-inset-right)) 14px 26px;
   background: var(--danger-bg);
-  border-top: 3px solid var(--danger);
+  border-top: 2px solid var(--danger);
 }
 .problems[hidden]{ display: none; }
-.problems__title{ font-size: 15px; color: var(--danger); margin-bottom: 8px; }
-.problems__list{ margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.55; }
+.problems__title{ font-size: 14px; color: var(--danger); margin-bottom: 8px; }
+.problems__list{ margin: 0; padding-left: 20px; font-size: 13px; line-height: 1.6; }
 .problems__item{ margin-bottom: 4px; }
 .problems__link{
   appearance: none; border: 0; background: none; cursor: pointer; padding: 0;
@@ -539,45 +824,92 @@ h1,h2,h3{ margin: 0; font-weight: 600; letter-spacing: -.01em; }
   text-align: left;
 }
 
-/* ── the menu panel ──────────────────────────── */
+/* ── the menu index controls ─────────────────── */
 
-.search{ margin: 0 0 18px; }
+.search{ margin: 10px 0 0; }
 .search__input{
-  width: 100%; font: 400 15px/1.5 var(--sans);
-  padding: 10px 13px; border-radius: 8px;
-  border: 1px solid var(--hairline); background: var(--card);
+  width: 100%; font: 400 14px/1.5 var(--sans);
+  padding: 8px 12px; border-radius: 8px;
+  border: 1px solid var(--line-input); background: var(--field);
+  color: var(--ink);
 }
-.search__note{ display: block; margin-top: 6px; font-size: 13px; color: var(--ink-soft); }
+.search__input:focus{ outline: none; border-color: var(--gold); background: #fff; }
+.search__note{ display: block; margin-top: 6px; font-size: 12px; color: var(--ink-soft); }
 
-.pagepick{ display: flex; gap: 2px; margin: 0 0 18px; flex-wrap: wrap; }
-.pagepick__btn{
-  appearance: none; cursor: pointer;
-  border: 1px solid var(--hairline); background: var(--card); color: var(--ink-soft);
-  font: 600 14px/1 var(--sans); padding: 9px 14px;
+.pagepick{
+  position: relative;
+  display: flex; gap: 2px;
+  padding: 3px;
+  background: var(--field);
+  border: 1px solid var(--line-input);
+  border-radius: 999px;
 }
-.pagepick__btn:first-child{ border-radius: 8px 0 0 8px; }
-.pagepick__btn:last-child{ border-radius: 0 8px 8px 0; }
-.pagepick__btn[aria-pressed="true"]{ background: var(--wine); color: var(--cream); border-color: var(--wine); }
+/* The maroon pill travels between the three pages rather than switching off
+   under one and on under the next. Geometry from the pressed button, set
+   through the CSSOM in positionPagePick. */
+.pagepick::after{
+  content: "";
+  position: absolute; left: 0; top: 3px; bottom: 3px; z-index: 0;
+  width: var(--pick-w, 0px);
+  transform: translateX(var(--pick-x, 0px));
+  background: var(--maroon-600);
+  border-radius: 999px;
+  pointer-events: none;
+  transition: none;
+  will-change: transform, width;
+}
+.pagepick--ready::after{
+  transition: transform 320ms var(--ease), width 260ms var(--ease);
+}
+.pagepick__btn{
+  position: relative; z-index: 1;
+  flex: 1 1 0;
+  appearance: none; cursor: pointer;
+  border: 0; background: transparent; color: var(--ink-soft);
+  font: 500 13px/1 var(--sans); padding: 8px 10px;
+  border-radius: 999px;
+  transition: color 220ms ease;
+}
+.pagepick__btn:hover{ color: var(--ink); }
+.pagepick__btn[aria-pressed="true"]{ color: var(--cream); }
+.pagepick__btn[aria-pressed="true"]:hover{ color: var(--cream); }
+
+/* ── reordering ───────────────────────────────
+   A row that has just been moved is put back where it was with no transition,
+   then released — so the swap is something you watch happen rather than
+   something that has already happened. `is-shifted` is the frame it spends in
+   the old place; `is-settling` is the journey. Both are set by playReorder,
+   which puts the transform on through the CSSOM. */
+
+.is-shifted{ transition: none; }
+.is-settling{ transition: transform 300ms var(--ease); }
+.is-shifted, .is-settling{ position: relative; z-index: 2; }
+
+/* ── menu items ──────────────────────────────── */
 
 .item{
-  border: 1px solid var(--hairline); border-radius: 8px;
-  margin-top: 12px; background: var(--paper);
+  border: 1px solid var(--line); border-radius: 10px;
+  margin-top: 10px; background: var(--field);
 }
 .item[hidden]{ display: none; }
 .item__head{
   display: flex; align-items: center; gap: 10px; width: 100%;
   appearance: none; border: 0; background: transparent; cursor: pointer; text-align: left;
-  padding: 11px 14px; font: 500 15px/1.3 var(--sans); color: var(--ink);
+  padding: 11px 14px; font: 500 14px/1.3 var(--sans); color: var(--ink);
+  border-radius: 10px;
 }
-.item__price{ margin-left: auto; color: var(--ink-soft); font-size: 14px; }
+.item__price{ margin-left: auto; color: var(--ink-faint); font-size: 13px; }
+.item__dot{
+  width: 6px; height: 6px; border-radius: 50%; background: var(--gold); flex: 0 0 auto;
+}
 .item__body{
   display: grid;
   grid-template-rows: 0fr;
   padding: 0;
   opacity: 0;
   transition:
-    grid-template-rows 240ms cubic-bezier(.22,.61,.36,1),
-    padding 240ms cubic-bezier(.22,.61,.36,1),
+    grid-template-rows 240ms var(--ease),
+    padding 240ms var(--ease),
     opacity 160ms ease;
 }
 .item__body.is-open{
@@ -585,46 +917,14 @@ h1,h2,h3{ margin: 0; font-weight: 600; letter-spacing: -.01em; }
   padding: 0 14px 16px;
   opacity: 1;
 }
+.item__body-inner{ min-height: 0; overflow: hidden; }
+.item__body[hidden]{ display: none; }
 .item__moves{ display: flex; gap: 4px; margin-left: 8px; }
 
-.mini{
-  appearance: none; cursor: pointer;
-  border: 1px solid var(--hairline); background: var(--card); color: var(--ink-soft);
-  border-radius: 6px; width: 28px; height: 28px;
-  font: 600 13px/1 var(--sans);
-}
-.mini:hover:not(:disabled){ color: var(--ink); border-color: var(--cognac); }
-.mini:disabled{ opacity: .3; cursor: not-allowed; }
-
-@media (prefers-reduced-motion: reduce){
-  .tab, .tabs::after{ transition: none; }
-  .app--enter .topbar__link, .app--enter #signOut{ animation: none; }
-  .topbar__link-go, #signOut, #signOut::before{ transition: none; }
-  .tab__dot, .tab__dot--leaving,
-  .field--edited > .field__label::after, .field--edited-leaving > .field__label::after,
-  .savebar:not([hidden]), .savebar:not([hidden]).savebar--leaving{ animation: none; }
-  .panel--enter, .menu__results--enter{ animation: none; }
-  .card__body, .item__body, .tpick, .tpick__cols{ transition: none; }
-  .tpick__cols{ transform: none; }
-  .tpick__opt{ transition: none; }
-  .tpick__opt--on{ animation: none; }
-}
-
-.pours{ margin-top: 14px; }
-.pours__title{ font-size: 14px; font-weight: 600; }
+.pours{ margin-top: 16px; }
+.pours__title{ font-size: 13px; font-weight: 500; margin: 0; }
 .pour{ display: flex; gap: 8px; align-items: flex-end; margin-top: 8px; }
 .pour .field{ margin-top: 0; }
-
-.static{
-  padding: 13px 16px; margin-top: 12px;
-  border: 1px dashed var(--hairline); border-radius: 8px;
-  font-size: 14px; color: var(--ink-soft);
-}
-
-.empty{
-  padding: 18px; text-align: center;
-  color: var(--ink-soft); font-size: 14px;
-}
 
 /* ── the photographs ──────────────────────────
    The picture and everything about it side by side, because the whole job is
@@ -632,48 +932,27 @@ h1,h2,h3{ margin: 0; font-weight: 600; letter-spacing: -.01em; }
    picture stays first — it is the thing being identified. */
 
 .photo{
-  display: grid; grid-template-columns: 200px 1fr; gap: 16px;
-  padding: 16px 0; border-top: 1px solid var(--hairline);
+  display: grid; grid-template-columns: 190px 1fr; gap: 16px;
+  padding: 16px 0; border-top: 1px solid var(--line);
 }
-.photo:first-child{ border-top: 0; }
-.photo--edited{ box-shadow: inset 3px 0 0 var(--cognac); padding-left: 13px; }
+.photo:first-child{ border-top: 0; padding-top: 0; }
+.photo--edited{ box-shadow: inset 3px 0 0 var(--gold); padding-left: 14px; }
 
 .photo__shot{
-  aspect-ratio: 4 / 3; border-radius: 8px; overflow: hidden;
-  background: var(--hairline);
+  aspect-ratio: 4 / 3; border-radius: 10px; overflow: hidden;
+  background: var(--line);
 }
 .photo__img{ width: 100%; height: 100%; object-fit: cover; display: block; }
 
 .photo__side{ min-width: 0; }
-.photo__label{ font-size: 15px; font-weight: 600; margin: 0; }
-.photo__state{ font-size: 13px; color: var(--ink-soft); margin: 4px 0 0; }
-.photo__state--new{ color: var(--cognac); font-weight: 600; }
+.photo__label{ font-size: 15px; font-weight: 500; margin: 0; }
+.photo__state{ font-size: 12px; color: var(--ink-soft); margin: 4px 0 0; }
+.photo__state--new{ color: var(--maroon-600); font-weight: 600; }
 .photo__state--busy{ font-style: italic; }
 
-.photo__section-break{
-  display: flex; align-items: center; gap: 12px;
-  margin: 28px 0 14px;
-  color: var(--ink-soft);
-}
-.photo__section-break::before,
-.photo__section-break::after{
-  content: ""; flex: 1 1 auto; height: 1px;
-  background: var(--hairline);
-}
-.photo__section-break__label{
-  display: inline-flex; align-items: center; gap: 8px;
-  color: var(--cognac);
-  font-size: 11px; font-weight: 700; letter-spacing: .12em;
-  line-height: 1; text-transform: uppercase; white-space: nowrap;
-}
-.photo__section-break__label::before{
-  content: ""; width: 6px; height: 6px;
-  border-radius: 50%; background: var(--gold);
-}
-
 .photo__problem{
-  font-size: 13px; margin: 8px 0 0; padding: 10px 12px;
-  border-radius: 6px; background: var(--danger-bg); color: var(--danger);
+  font-size: 12px; margin: 8px 0 0; padding: 10px 12px;
+  border-radius: 8px; background: var(--danger-bg); color: var(--danger);
 }
 
 /* The file input itself is unstyleable and inconsistent across browsers, so
@@ -682,17 +961,12 @@ h1,h2,h3{ margin: 0; font-weight: 600; letter-spacing: -.01em; }
    this one has to be reachable from the keyboard. */
 .photo__pick{
   display: inline-block; margin-top: 12px; cursor: pointer;
-  padding: 8px 14px; border: 1px solid var(--hairline); border-radius: 6px;
-  font-size: 14px; background: var(--card);
-  box-shadow: inset 0 0 0 0 transparent;
-  transition: border-color 180ms ease, box-shadow 220ms ease, color 180ms ease;
+  padding: 8px 16px; border: 1px solid var(--line-input); border-radius: 999px;
+  font-size: 13px; background: var(--card);
+  transition: border-color 180ms ease, color 180ms ease;
 }
-.photo__pick:hover{ border-color: var(--cognac); color: var(--ink); }
-.photo__pick:focus-within{
-  outline: none;
-  border-color: var(--cognac);
-  box-shadow: inset 0 0 0 2px var(--cognac);
-}
+.photo__pick:hover{ border-color: var(--gold); color: var(--ink); }
+.photo__pick:focus-within{ outline: 2px solid var(--gold); outline-offset: 2px; }
 .photo__file{
   position: absolute; width: 1px; height: 1px;
   opacity: 0; overflow: hidden; clip-path: inset(50%);
@@ -705,42 +979,112 @@ h1,h2,h3{ margin: 0; font-weight: 600; letter-spacing: -.01em; }
   width: 1280px; height: 900px; border: 0; visibility: hidden;
 }
 
-@media (max-width: 900px), (max-width: 1024px) and (orientation: landscape){
-  /* The editor has no intentional horizontal scrollers. Keep a sideways
-     swipe from pulling the whole page out of alignment on a phone. */
-  html{ overflow-x: hidden; overflow-x: clip; }
-  body{ overflow-x: hidden; overflow-x: clip; overscroll-behavior-x: none; }
-  /* A two-line sticky tab bar covers the beginning of a panel after the owner
-     scrolls past the topbar. Keep the phone nav compact and let it travel with
-     the page instead, so the Hours introduction and first card are never
-     hidden underneath it. The tab row is its own small scroller only when a
-     very narrow phone cannot fit every label; the document never moves. */
-  .tabs{
-    position: relative; top: auto; flex-wrap: nowrap;
+/* ── two panes, then one ─────────────────────── */
+
+@media (max-width: 1199px){
+  /* The rail lies down under the topbar rather than shrinking into icons.
+     Six words are more use than six glyphs nobody has learned yet. It takes
+     the first row across, and everything else moves down one. */
+  .shell{
+    grid-template-columns: var(--index) minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
+  }
+  .index{ grid-column: 1; grid-row: 2 / -1; }
+  .editor{ grid-column: 2; grid-row: 2; }
+  .problems{ grid-column: 2; grid-row: 3; }
+  .savebar{ grid-column: 2; grid-row: 4; }
+  .rail{
+    grid-column: 1 / -1; grid-row: 1;
+    flex-direction: row; align-items: center; gap: 14px;
+    padding: 0 max(12px, env(safe-area-inset-left));
+    min-height: 52px;
+  }
+  .rail__list{
+    flex: 1 1 auto; flex-direction: row; gap: 2px;
     overflow-x: auto; overflow-y: hidden;
     scrollbar-width: none; -webkit-overflow-scrolling: touch;
     overscroll-behavior-x: contain;
-    padding-left: max(8px, env(safe-area-inset-left));
-    padding-right: max(8px, env(safe-area-inset-right));
+    padding: 8px 0;
   }
-  .tabs::-webkit-scrollbar{ display: none; width: 0; height: 0; }
-  .tab{ flex: 0 0 auto; padding: 14px 10px; white-space: nowrap; }
+  .rail__list::-webkit-scrollbar{ display: none; width: 0; height: 0; }
+  .tab{ width: auto; flex: 0 0 auto; white-space: nowrap; }
+  }
+
+@media (max-width: 899px){
+  /* One column. The index and the editor share the second row and take turns;
+     the problems list and the savebar keep their own rows underneath, so they
+     are on screen whichever of the two is showing. */
+  .shell{ grid-template-columns: minmax(0, 1fr); }
+  .index, .editor{ grid-column: 1; grid-row: 2; }
+  .problems{ grid-column: 1; grid-row: 3; }
+  .savebar{ grid-column: 1; grid-row: 4; }
+  .index{ border-right: 0; }
+  .shell .index{ display: flex; }
+  .shell .editor{ display: none; }
+  .shell--editing .index{ display: none; }
+  .shell--editing .editor{ display: flex; }
+  .index--back{ animation: admin-index-back 300ms var(--ease) both; }
+  .editor__back{ display: inline-flex; }
+  .editor__scroll{ padding: 22px max(16px, env(safe-area-inset-right)) 32px 16px; }
+  .editor__title{ font-size: 27px; }
+  .savebar, .problems{ padding-left: 16px; padding-right: 16px; }
+  .index__head{ padding: 14px 14px 12px; }
+
   /* iOS Safari zooms controls smaller than 16px when they receive focus. */
   .field__input, .field__area, .field__select, .search__input{ font-size: 16px; }
+
+  /* The week stops being a table and becomes seven small blocks. Four columns
+     of 90px is not a grid, it is a puzzle. */
+  .hours__head{ display: none; }
+  .hours__row{
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 10px;
+    padding: 14px 0;
+  }
+  .hours__day{ grid-column: 1 / -1; }
+  .check--bare{ grid-column: 1 / -1; }
+  .check--bare span{ font-size: 14px; }
+  .hours__shut{ grid-column: 1 / -1; }
+
   .row--hours{
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     gap: 0;
     align-items: stretch;
   }
-  .row--hours > .field{
-    min-width: 0;
-    width: 100%;
-    flex: none;
-  }
+  .row--hours > .field{ min-width: 0; width: 100%; flex: none; }
   .row--hours > .btn{ display: block; width: 100%; }
-  .topbar__who{ width: 100%; order: 3; }
-  .card__head{ font-size: 15px; }
+  .field--bare > .field__label{ font-size: 13px; line-height: 1.4; margin-bottom: 6px; }
+
   .photo{ grid-template-columns: 1fr; }
   .photo__shot{ max-width: 260px; }
+}
+
+@media (max-width: 620px){
+  .topbar{ gap: 10px; padding: 0 14px; }
+  .topbar__who{ display: none; }
+  .topbar__link span:first-child{ font-size: 12px; }
+}
+
+@media (prefers-reduced-motion: reduce){
+  .tab{ transition: none; }
+  .rail__list--ready::after{ transition: none; }
+  .index__list--ready::after{ transition: none; }
+  .pagepick--ready::after{ transition: none; }
+  .index--back{ animation: none; }
+  /* move() does not measure at all under this setting, so there is nothing
+     to undo here — this is only in case a class outlives its journey. */
+  .is-settling{ transition: none; }
+  .app--enter .topbar__link, .app--enter #signOut{ animation: none; }
+  .topbar__link-go, #signOut, #signOut::before{ transition: none; }
+  .tab__dot, .tab__dot--leaving,
+  .field--edited > .field__label::after, .field--edited-leaving > .field__label::after{
+    animation: none;
+  }
+  .editor__page--enter, .index__list--enter{ animation: none; }
+  .item__body, .tpick, .tpick__cols{ transition: none; }
+  .tpick__cols{ transform: none; }
+  .tpick__opt{ transition: none; }
+  .tpick__opt--on{ animation: none; }
+  .index__row, .savebar{ transition: none; }
 }

@@ -76,8 +76,52 @@ the features around it, not adding a new architecture.
 
 The editor has panels for Words, Hours, Contact, Menus, Photos and FAQ. Save is
 explicit; Discard restores the last confirmed values. Which panel was open is
-kept in `localStorage` under `aromati.admin.tab`, so a reload lands where the
-owner was rather than on Words.
+kept in `localStorage` under `aromati.admin.tab`, and which section of it under
+`aromati.admin.section`, so a reload lands where the owner was rather than on
+Words.
+
+## The editor's layout
+
+The editor is three panes and the document itself does not scroll:
+
+- a dark **rail** on the left for the six areas,
+- a light **section index** listing that area's sections — flat, nothing folds,
+  one click selects, a dot per row for unsaved work,
+- an **editor pane** showing the selected section with its fields already open,
+  and the savebar sticky at its foot.
+
+Under 1200px the rail lies down under the topbar. Under 900px the index and the
+editor take turns and `.shell--editing` says which is showing.
+
+There is no accordion anywhere except inside a menu section, where the items
+still expand one at a time. `CMS-REDESIGN.md` is the working spec for this
+layout and the interpretation calls behind it; delete it once the redesign has
+settled.
+
+Things that are easy to break here:
+
+- The desktop time picker is unchanged apart from where it lands. It now hangs
+  below its input instead of pushing the layout down, anchored to the right so
+  the last column of the hours grid cannot push it out of the pane. Mobile
+  still gets the operating system's own picker.
+- The savebar no longer hides. It stays and goes quiet (`.savebar--clean`), and
+  both its buttons are disabled when there is nothing to save. It and the
+  problems list are children of the shell, not of the editor: under 900px the
+  index and the editor take turns, and a savebar inside the editor would
+  disappear whenever the owner went back to the list with work still unsaved.
+- The hours grid says Opens and Closes once, as column headers. The per-field
+  labels are still in the markup at `font-size: 0` — they are what a screen
+  reader announces, and the "edited" badge hangs off them.
+- The gold wash behind the chosen area in the rail, and the tan fill behind the
+  chosen section in the index, are each one element that slides — positioned
+  from the chosen element's own geometry through the CSSOM in
+  `positionRailMark` and `positionIndexMark`. Setting either through a `style`
+  attribute instead would be dropped by `style-src 'self'` in production and
+  work perfectly on a laptop. The rows themselves stay transparent, so the
+  fill and the row can never disagree about what is selected.
+- There is no "last saved" or "last published" anywhere, deliberately. Every
+  content table does carry `updated_at`, so if it is ever wanted it is one
+  `max()` away and needs no migration.
 
 The Opens and Closes boxes are still `input[type=time]` — that is what holds the
 value, what can be typed into, and what opens the phone's own wheel. Only the

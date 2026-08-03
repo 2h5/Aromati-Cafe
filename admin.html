@@ -71,6 +71,17 @@
 </div>
 
 <!-- ── the editor ───────────────────────────────────────────────────────── -->
+<!--
+  Three panes, and only the panes scroll.
+
+    rail    which of the six areas
+    index   which section inside that area — a flat list, nothing folds
+    editor  that section's fields, already open, with the savebar at its foot
+
+  The shell is a grid that fills the viewport exactly once; the document itself
+  never scrolls. Under 1200px the rail lies down under the topbar; under 900px
+  the index and the editor take turns and .shell--editing says which.
+-->
 <div class="app" id="app" hidden>
 
   <header class="topbar">
@@ -81,22 +92,45 @@
     <button class="btn btn--quiet" type="button" id="signOut"><span>Sign out</span></button>
   </header>
 
-  <nav class="tabs" id="tabs" aria-label="Sections"></nav>
+  <div class="shell" id="shell">
 
-  <main class="panels" id="panels"></main>
+    <nav class="rail" aria-label="Sections">
+      <div class="rail__list" id="tabs"></div>
+    </nav>
 
-  <!-- The savebar is the only thing that writes. Nothing above it is live
-       until it is used, and Discard puts everything back. -->
-  <div class="savebar" id="savebar" hidden>
-    <span class="savebar__count" id="saveCount"></span>
-    <span class="savebar__spacer"></span>
-    <button class="btn btn--quiet"   type="button" id="discardBtn">Discard changes</button>
-    <button class="btn btn--primary" type="button" id="saveBtn">Save changes</button>
-  </div>
+    <aside class="index" id="index" aria-label="Sections in this area">
+      <div class="index__head">
+        <p class="index__title" id="indexTitle"></p>
+        <div class="index__tools" id="indexTools"></div>
+      </div>
+      <div class="index__list" id="indexList"></div>
+      <div class="index__foot" id="indexFoot"></div>
+    </aside>
 
-  <div class="problems" id="problems" hidden>
-    <h2 class="problems__title" id="problemsTitle"></h2>
-    <ul class="problems__list" id="problemsList"></ul>
+    <main class="editor">
+      <div class="editor__scroll" id="panels"></div>
+    </main>
+
+    <!-- Both of these are the shell's, not the editor's. Under 900px the index
+         and the editor take turns, and a savebar living inside the editor is a
+         savebar that disappears the moment the owner goes back to the list —
+         with unsaved work still in the draft and nothing on screen saying so.
+         They sit in the editor's column at every width that has one. -->
+    <div class="problems" id="problems" hidden>
+      <h2 class="problems__title" id="problemsTitle"></h2>
+      <ul class="problems__list" id="problemsList"></ul>
+    </div>
+
+    <!-- The savebar is the only thing that writes. Nothing above it is live
+         until it is used, and Discard puts everything back. -->
+    <div class="savebar savebar--clean" id="savebar">
+      <span class="savebar__dot" aria-hidden="true"></span>
+      <span class="savebar__count" id="saveCount"></span>
+      <span class="savebar__spacer"></span>
+      <button class="btn btn--ghost"   type="button" id="discardBtn">Discard</button>
+      <button class="btn btn--primary" type="button" id="saveBtn">Save changes</button>
+    </div>
+
   </div>
 
 </div>

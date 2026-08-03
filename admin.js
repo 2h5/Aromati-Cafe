@@ -219,11 +219,19 @@ var AROMATI_ADMIN = (function () {
 
   var ui = {
     tab: "copy",
-    open: {},                 // cardId → true when expanded
+    section: {},              // tabId → which section of it the editor is showing
+    open: {},                 // itemId → true when an item inside a section is expanded
     menuPage: "food",
     search: "",
+    editing: false,           // narrow screens: the editor is covering the index
     fields: []                // every rendered field, for validation to reach
   };
+
+  /* Whether anything has been written since the page opened. It is the
+     difference between "No changes yet" and "All changes saved", and it is
+     deliberately about this session only — the editor does not claim to know
+     when the site last changed, because nothing on this page reports that. */
+  var savedSomething = false;
 
   function tempId() { newRows += 1; return "new:" + newRows; }
   function isNew(row) { return typeof row.id === "string" && row.id.indexOf("new:") === 0; }
@@ -362,7 +370,7 @@ var AROMATI_ADMIN = (function () {
   function makeField(spec) {
     var f = {
       table: spec.table, row: spec.row, col: spec.col,
-      cardId: spec.cardId, tab: spec.tab, label: spec.label
+      cardId: spec.cardId, openId: spec.openId, tab: spec.tab, label: spec.label
     };
 
     /* Kept rather than baked into className, because the mark-as-edited pass
@@ -479,9 +487,14 @@ var AROMATI_ADMIN = (function () {
     }
     f.refresh = refreshMark;
 
+    /* cardId is the section the field lives in. Reaching a field from the
+       problems list means selecting that section in the index — and, if the
+       field is inside a menu item, expanding the one item too. A problem the
+       owner is sent to and cannot see is not a problem they were told about. */
     f.focus = function () {
       openTab(f.tab);
-      if (f.cardId) ui.open[f.cardId] = true;
+      if (f.cardId) selectSection(f.tab, f.cardId);
+      if (f.openId) ui.open[f.openId] = true;
       renderAll();
       /* Re-rendering built a new node, so the field to focus is the one now on
          the page with the same identity — not the one this closure captured. */
@@ -524,9 +537,11 @@ var AROMATI_ADMIN = (function () {
      format the row wants. Desktop gets the branded rolling dial below; mobile
      never creates this control, so the operating system owns the time picker.
 
-     The panel opens in the flow rather than over it. .card__body-inner clips
-     what overflows it — that is what makes the card's open animation work — so
-     anything floating above the field would be cut off at the card's edge. */
+     The panel used to open in the flow rather than over it, because the old
+     accordion body clipped its own overflow to animate. There is no accordion
+     around a field any more, so it hangs below the input like a dropdown
+     should. The control itself is unchanged — same markup, same dials, same
+     keys — only where it lands moved. */
 
   var MINUTE_STEP = 5;
   var DIAL_CYCLES = 9;
@@ -941,41 +956,29 @@ var AROMATI_ADMIN = (function () {
     return { wrap: wrap, input: input };
   }
 
-  /* ── cards ─────────────────────────────────── */
+  /* ── cards ─────────────────────────────────────
+     A card is now a plain container. Nothing folds: the index decides what is
+     on screen, and what is on screen is open. */
 
-  function makeCard(id, title, opts) {
-    opts = opts || {};
+  function makeCard(title) {
     var wrap = el("section", "card");
-    var head = el("button", "card__head");
-    head.type = "button";
+    if (title) wrap.appendChild(el("h3", "card__title", title));
+    var body = el("div", "card__body");
+    wrap.appendChild(body);
+    return { wrap: wrap, body: body };
+  }
 
-    var caret = el("span", "card__caret", "▸");
-    head.appendChild(caret);
-    head.appendChild(el("span", null, title));
+  /* The one gold-tinted aside a panel is allowed. Text, or a build-it-yourself
+     function for the two places that need a bold lead-in. */
+  function makeNote(fill) {
+    var note = el("p", "note");
+    if (typeof fill === "function") fill(note);
+    else note.textContent = fill;
+    return note;
+  }
 
-    if (opts.dot) head.appendChild(el("span", "card__dot"));
-    if (opts.count !== undefined && opts.count !== null) {
-      head.appendChild(el("span", "card__count", opts.count));
-    }
-
-    var shell = el("div", "card__body");
-    var body = el("div", "card__body-inner");
-    shell.appendChild(body);
-    var open = !!ui.open[id];
-    shell.hidden = !open;
-    if (open) shell.classList.add("is-open");
-    caret.textContent = open ? "▾" : "▸";
-
-    on(head, "click", function () {
-      var nowOpen = shell.hidden;
-      setDisclosure(shell, nowOpen);
-      caret.textContent = nowOpen ? "▾" : "▸";
-      ui.open[id] = nowOpen;
-    });
-
-    wrap.appendChild(head);
-    wrap.appendChild(shell);
-    return { wrap: wrap, body: body, shell: shell, head: head };
+  function plural(n, one, many) {
+    return n + " " + (n === 1 ? one : many);
   }
 
 
@@ -983,13 +986,27 @@ var AROMATI_ADMIN = (function () {
      4. the panels
      ═══════════════════════════════════════════════ */
 
+  /* A panel no longer renders itself. It lists its sections — label, counts,
+     what has changed inside, and a render for the one the owner picked — and
+     the three panes are built from that list. The index is the list; the
+     editor is one entry of it. */
+
   var PANELS = [
-    { id: "copy",    name: "Words",    render: renderCopyPanel },
-    { id: "hours",   name: "Hours",    render: renderHoursPanel },
-    { id: "contact", name: "Contact",  render: renderContactPanel },
-    { id: "menu",    name: "Menus",    render: renderMenuPanel },
-    { id: "photos",  name: "Photos",   render: renderPhotosPanel },
-    { id: "faq",     name: "FAQ",      render: renderFaqPanel }
+    { id: "copy",    name: "Words",   sections: copySections, note: copyNote },
+    { id: "hours",   name: "Hours",   sections: hoursSections },
+    { id: "contact", name: "Contact", sections: contactSections },
+    { id: "menu",    name: "Menus",   sections: menuSections,
+      indexHead: menuIndexHead, refreshHead: menuRefreshHead,
+      indexFoot: menuIndexFoot,
+      emptyIndex: "This page has no sections yet." },
+    { id: "photos",  name: "Photos",  sections: photoSections,
+      emptyIndex: "No photograph slots yet.",
+      emptyEditor: "No photograph slots in the database yet. The site is showing " +
+        "the pictures in its own markup, which is correct — but nothing here can " +
+        "be changed until the photographs migration has been run." },
+    { id: "faq",     name: "FAQ",     sections: faqSections,
+      note: faqNote, indexFoot: faqIndexFoot,
+      emptyIndex: "No questions yet." }
   ];
 
   function panelChangeCount(id) {
@@ -1015,9 +1032,13 @@ var AROMATI_ADMIN = (function () {
      and not at Words. localStorage throws outright in a locked-down Safari, so
      both halves are wrapped and both fail to the old behaviour. */
   var TAB_KEY = "aromati.admin.tab";
+  var SECTION_KEY = "aromati.admin.section";
 
   function openTab(id) {
     ui.tab = id;
+    /* On a narrow screen the index and the editor take turns. Arriving in an
+       area means arriving at its list, not at whatever was last open in it. */
+    ui.editing = false;
     try { window.localStorage.setItem(TAB_KEY, id); } catch (e) { /* not fatal */ }
   }
 
@@ -1028,6 +1049,35 @@ var AROMATI_ADMIN = (function () {
     if (known) ui.tab = saved;
   }
 
+  /* Which section is showing is a place too, and there is one per area, so a
+     trip to Hours and back lands on the same words as before. A section id
+     that no longer exists — a deleted menu section, a renamed group — falls
+     back to the first one rather than to an empty pane. */
+  function selectSection(tab, id) {
+    ui.section[tab] = id;
+    ui.editing = true;
+    try {
+      window.localStorage.setItem(SECTION_KEY, JSON.stringify(ui.section));
+    } catch (e) { /* not fatal */ }
+  }
+
+  function restoreSections() {
+    var raw;
+    try { raw = window.localStorage.getItem(SECTION_KEY); } catch (e) { return; }
+    if (!raw) return;
+    var parsed;
+    try { parsed = JSON.parse(raw); } catch (e) { return; }
+    if (!parsed || typeof parsed !== "object") return;
+    PANELS.forEach(function (panel) {
+      if (typeof parsed[panel.id] === "string") ui.section[panel.id] = parsed[panel.id];
+    });
+  }
+
+  /* The dot is inside the button, so it changes the button's width — and the
+     gold wash behind the chosen area is sized from that width. Every path that
+     puts a dot in or takes one out has to say so, including the one that runs
+     a fifth of a second later when the exit animation has finished. Otherwise
+     the wash grows with the first edit and never shrinks back. */
   function setTabDot(tab, hasChange) {
     var dot = tab.querySelector(".tab__dot");
     if (hasChange) {
@@ -1036,6 +1086,7 @@ var AROMATI_ADMIN = (function () {
         dot.classList.remove("tab__dot--leaving");
       } else {
         tab.appendChild(el("span", "tab__dot"));
+        positionRailMark(tab.parentNode);
       }
       return;
     }
@@ -1045,65 +1096,256 @@ var AROMATI_ADMIN = (function () {
     dot._exitToken = token;
     dot.classList.add("tab__dot--leaving");
     function remove() {
-      if (dot._exitToken === token && dot.parentNode === tab) tab.removeChild(dot);
+      if (dot._exitToken !== token || dot.parentNode !== tab) return;
+      tab.removeChild(dot);
+      positionRailMark(tab.parentNode);
     }
     if (prefersReducedMotion()) remove();
     else window.setTimeout(remove, STATUS_EXIT_MS);
   }
 
-  function positionTabUnderline(host) {
-    if (!host) return;
-    var active = host.querySelector('.tab[aria-selected="true"]');
-    if (!active) return;
-    var firstPosition = !host._tabUnderlineReady;
-    host.style.setProperty("--tab-underline-x", active.offsetLeft + "px");
-    host.style.setProperty("--tab-underline-y",
-      (active.offsetTop + active.offsetHeight - 3) + "px");
-    host.style.setProperty("--tab-underline-width", active.offsetWidth + "px");
-    if (firstPosition) {
-      /* Force the initial geometry to be painted before enabling transitions;
-         otherwise a reload animates the indicator from the top of the bar. */
-      host.offsetWidth;
-      host.classList.add("tabs--ready");
-      host._tabUnderlineReady = true;
-    }
-  }
-
-  function wireTabUnderline(host) {
-    if (host._tabUnderlineWired) return;
-    host._tabUnderlineWired = true;
-    on(window, "resize", function () { positionTabUnderline(host); });
-  }
+  /* ── the rail ──────────────────────────────── */
 
   function makeTab(panel) {
-    var b = el("button", "tab", panel.name);
+    var b = el("button", "tab");
     b.type = "button";
-    on(b, "click", function () { openTab(panel.id); renderAll(true); });
+    b.appendChild(el("span", "tab__name", panel.name));
+    b.appendChild(el("span", "tab__count"));
+    on(b, "click", function () { openTab(panel.id); renderAll("tab"); });
     return b;
   }
 
-  function renderTabs() {
+  /* The gold wash behind the chosen area is one element that moves, not a
+     background that turns on and off. It is set through the CSSOM rather than
+     a style attribute — style-src 'self' drops the attribute, and would drop
+     it silently in production and nowhere else. */
+  function positionRailMark(host) {
+    if (!host || host.offsetParent === null) return;   // hidden pane, see above
+    var active = host.querySelector('.tab[aria-selected="true"]');
+    if (!active) return;
+    var first = !host._markReady;
+    host.style.setProperty("--rail-mark-x", active.offsetLeft + "px");
+    host.style.setProperty("--rail-mark-y", active.offsetTop + "px");
+    host.style.setProperty("--rail-mark-w", active.offsetWidth + "px");
+    host.style.setProperty("--rail-mark-h", active.offsetHeight + "px");
+    if (first) {
+      /* Paint the first position before transitions are allowed, or a reload
+         animates the wash in from the corner of the rail. */
+      host.offsetWidth;
+      host.classList.add("rail__list--ready");
+      host._markReady = true;
+    }
+  }
+
+  function wireRailMark(host) {
+    if (host._markWired) return;
+    host._markWired = true;
+    on(window, "resize", function () { positionRailMark(host); });
+  }
+
+  function wireIndexMark(host) {
+    if (host._markWired) return;
+    host._markWired = true;
+    on(window, "resize", function () {
+      positionIndexMark(host, host.querySelector(".index__row--on"));
+    });
+  }
+
+  function renderRail() {
     var host = byId("tabs");
-    wireTabUnderline(host);
+    wireRailMark(host);
+
     if (host.children.length !== PANELS.length) {
       clear(host);
-      PANELS.forEach(function (panel) {
-        var b = makeTab(panel);
-        b.setAttribute("aria-selected", ui.tab === panel.id ? "true" : "false");
-        setTabDot(b, panelChangeCount(panel.id) > 0);
-        host.appendChild(b);
-      });
-      positionTabUnderline(host);
-      return;
+      PANELS.forEach(function (panel) { host.appendChild(makeTab(panel)); });
     }
 
     PANELS.forEach(function (panel, i) {
       var b = host.children[i];
-      b.firstChild.nodeValue = panel.name;
+      b.querySelector(".tab__name").textContent = panel.name;
+      b.querySelector(".tab__count").textContent = panel.sections().length;
       b.setAttribute("aria-selected", ui.tab === panel.id ? "true" : "false");
       setTabDot(b, panelChangeCount(panel.id) > 0);
     });
-    positionTabUnderline(host);
+
+    positionRailMark(host);
+  }
+
+  /* ── the index ─────────────────────────────── */
+
+  function indexRow(section, current) {
+    var selected = !!(current && current.id === section.id);
+    var row = el("div", "index__row" + (selected ? " index__row--on" : ""));
+    row.setAttribute("data-section", section.id);
+
+    var pick = el("button", "index__pick");
+    pick.type = "button";
+    pick.setAttribute("aria-current", selected ? "true" : "false");
+
+    /* Gold when something inside it is unsaved, maroon when it is the one
+       being edited, pale otherwise. Unsaved wins over selected: the dot is
+       there to find work that is not finished, and the selected row is
+       already obvious from its fill. */
+    pick.appendChild(el("span", "index__dot index__dot--" +
+      (section.changed > 0 ? "dirty" : selected ? "here" : "clean")));
+    pick.appendChild(el("span", "index__label", section.label));
+    if (section.count) pick.appendChild(el("span", "index__count", section.count));
+
+    on(pick, "click", function () {
+      selectSection(ui.tab, section.id);
+      renderAll(true);
+    });
+    row.appendChild(pick);
+
+    if (section.extra) section.extra(row);
+    return row;
+  }
+
+  /* The tan fill under the chosen section slides between rows, the same way
+     the rail's gold wash does — one element positioned from the row's own
+     geometry, through the CSSOM rather than a style attribute. With nothing
+     chosen it has no size, which is how it stays out of an empty list. */
+  function positionIndexMark(host, row) {
+    /* Measuring a pane that is not on screen returns zero for everything, and
+       writing that down would mean the fill grew back from nothing the next
+       time the pane appeared. Leave what it had. */
+    if (!host || host.offsetParent === null) return;
+    if (!row) {
+      host.style.setProperty("--index-mark-h", "0px");
+      host.style.setProperty("--index-mark-o", "0");
+      return;
+    }
+    host.style.setProperty("--index-mark-x", row.offsetLeft + "px");
+    host.style.setProperty("--index-mark-y", row.offsetTop + "px");
+    host.style.setProperty("--index-mark-w", row.offsetWidth + "px");
+    host.style.setProperty("--index-mark-h", row.offsetHeight + "px");
+    host.style.setProperty("--index-mark-o", "1");
+  }
+
+  /* Which area the marker was last placed in. Moving between areas replaces
+     every row in the list, so the fill lands on the new one rather than
+     travelling across a list that is not there any more. */
+  var indexMarkTab = null;
+
+  /* And which area's controls are sitting above the list right now. */
+  var indexHeadPanel = null;
+
+  /* Setting a class that is already on an element restarts nothing. The editor
+     pane gets a brand new node every pass so it never notices, but the index
+     list is one long-lived element — Food → Drinks → Wine would animate once
+     and then quietly stop. The class comes off, the layout is read so the
+     removal actually lands, and it goes back on. */
+  function replayEnter(node, cls) {
+    node.classList.remove(cls);
+    node.offsetWidth;
+    node.classList.add(cls);
+  }
+
+  function renderIndex(panel, sections, current, animateList) {
+    byId("indexTitle").textContent = panel.name;
+
+
+    /* The head is rebuilt only when the area changes. Two reasons: the pill
+       cannot slide between two positions if the element doing the sliding is
+       a different element each time, and the search box keeps what is in it
+       and where the cursor is instead of being replaced underneath the
+       person typing. */
+    var tools = byId("indexTools");
+    if (indexHeadPanel !== panel.id) {
+      clear(tools);
+      indexHeadPanel = panel.id;
+      if (panel.indexHead) panel.indexHead(tools);
+    } else if (panel.refreshHead) {
+      panel.refreshHead(tools);
+    }
+
+    var list = byId("indexList");
+    wireIndexMark(list);
+    clear(list);
+
+    /* It slides only when the rows it is sliding between are the same rows —
+       so within one area, and not on the pass that animates the whole list in
+       from underneath it. */
+    var slide = indexMarkTab === panel.id && !animateList;
+    list.className = "index__list" + (slide ? " index__list--ready" : "");
+
+    var chosen = null;
+    var lastGroup = null;
+    sections.forEach(function (section) {
+      if (section.group && section.group !== lastGroup) {
+        lastGroup = section.group;
+        list.appendChild(el("p", "index__group", section.group));
+      }
+      var row = indexRow(section, current);
+      if (current && current.id === section.id) chosen = row;
+      list.appendChild(row);
+    });
+
+    if (!sections.length) {
+      list.appendChild(el("p", "empty", panel.emptyIndex || "Nothing here yet."));
+    }
+
+    positionIndexMark(list, chosen);
+    indexMarkTab = panel.id;
+    if (animateList) replayEnter(list, "index__list--enter");
+
+    /* A render that had to snap still allows the fill to slide afterwards.
+       Filtering the list with the search box moves rows without re-rendering,
+       and that move should be watchable even if arriving here was not. The
+       class is set fresh by the next render, so this cannot leak into it. */
+    if (!slide) {
+      nextFrame(function () { list.classList.add("index__list--ready"); });
+    }
+
+    var foot = byId("indexFoot");
+    clear(foot);
+    if (panel.indexFoot) panel.indexFoot(foot);
+  }
+
+  /* ── the editor pane ───────────────────────── */
+
+  function renderEditor(panel, section, animate) {
+    var host = byId("panels");
+    clear(host);
+
+    var page = el("div", "editor__page" + (animate ? " editor__page--enter" : ""));
+
+    var head = el("header", "editor__head");
+    var back = el("button", "editor__back");
+    back.type = "button";
+    back.appendChild(el("span", "editor__back-go", "←"));
+    back.appendChild(el("span", null, "All " + panel.name.toLowerCase()));
+    /* Going back is a move, not a redraw. On a narrow screen the index has
+       been off-screen entirely, so it arrives rather than appears. */
+    on(back, "click", function () { ui.editing = false; renderAll("back"); });
+    head.appendChild(back);
+
+    if (section) {
+      if (section.group) head.appendChild(el("p", "editor__eyebrow", section.group));
+      head.appendChild(el("h1", "editor__title", section.label));
+      if (section.describe) head.appendChild(el("p", "editor__lede", section.describe));
+    } else {
+      head.appendChild(el("h1", "editor__title", panel.name));
+    }
+    page.appendChild(head);
+
+    var body = el("div", "editor__body");
+    if (panel.note) body.appendChild(panel.note());
+    if (section) section.render(body);
+    else body.appendChild(el("p", "empty", panel.emptyEditor || "Nothing to edit here yet."));
+    page.appendChild(body);
+
+    host.appendChild(page);
+  }
+
+  function currentPanel() {
+    return PANELS.filter(function (p) { return p.id === ui.tab; })[0] || PANELS[0];
+  }
+
+  function currentSection(sections) {
+    var want = ui.section[ui.tab];
+    var found = sections.filter(function (s) { return s.id === want; })[0];
+    return found || sections[0] || null;
   }
 
   function renderAll(animate, preserveScroll) {
@@ -1112,76 +1354,104 @@ var AROMATI_ADMIN = (function () {
        "a panel is open, in a document that no longer contains it". */
     openPicker = null;
 
-    var scrollY = preserveScroll
-      ? (window.scrollY || window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop)
-      : null;
+    var scroller = byId("panels");
+    var scrollTop = preserveScroll ? scroller.scrollTop : null;
     ui.fields = [];
-    renderTabs();
-    var host = byId("panels");
-    clear(host);
-    var panel = PANELS.filter(function (p) { return p.id === ui.tab; })[0] || PANELS[0];
-    var panelAnimation = animate === true;
-    var menuListAnimation = animate === "menu-list";
-    var node = el("div", "panel" + (panelAnimation ? " panel--enter" : ""));
-    panel.render(node, menuListAnimation);
-    host.appendChild(node);
-    if (preserveScroll && scrollY > 0 && window.scrollY !== scrollY) {
-      window.scrollTo(0, scrollY);
-    }
+
+    var panel = currentPanel();
+    var sections = panel.sections();
+    var section = currentSection(sections);
+
+    /* Which pane is showing is decided before anything is drawn, and not
+       after. Under 900px the one that is not showing is display:none, and an
+       element with no box measures zero — so a pass that drew first and
+       switched panes second would size the sliding pill and the index fill
+       against a pane that was still hidden, and leave both collapsed. */
+    byId("shell").className = "shell" + (ui.editing ? " shell--editing" : "");
+
+    /* Four kinds of move, and each one animates only what actually moved:
+
+         true          a different section — the editor pane changes
+         "tab"         a different area — the index and the editor both change
+         "menu-list"   a different menu page — the index list changes
+         "back"        narrow screens: the index comes back from off-screen  */
+    renderRail();
+    renderIndex(panel, sections, section,
+      animate === "menu-list" || animate === "tab" || animate === "back");
+    renderEditor(panel, section,
+      animate === true || animate === "tab" || animate === "menu-list");
+
+    byId("index").className = "index" + (animate === "back" ? " index--back" : "");
+
+    if (preserveScroll && scrollTop > 0) scroller.scrollTop = scrollTop;
+    if (ui.tab === "menu") applyMenuSearch();
     updateSavebar();
   }
 
 
   /* ── the words ─────────────────────────────── */
 
-  function renderCopyPanel(host) {
-    host.appendChild(el("p", "panel__intro",
-      "Every heading, paragraph and button label on the site. A line break in a " +
-      "box below becomes a line break on the page, and *asterisks around a phrase* " +
-      "make it italic. Anything else you type appears exactly as you typed it. " +
-      "The site never treats it as code."));
+  /* The one rule about how the text is read, said once at the top of the pane
+     rather than repeated under every box. */
+  function copyNote() {
+    return makeNote(function (node) {
+      node.appendChild(el("strong", null, "How your typing is read. "));
+      node.appendChild(document.createTextNode(
+        "A line break in a box below becomes a line break on the page, and " +
+        "*asterisks around a phrase* make it italic. Anything else you type " +
+        "appears exactly as you typed it. The site never treats it as code."));
+    });
+  }
 
+  function copySections() {
     var byPage = {};
     rowsOf("site_copy").forEach(function (row) {
       var page = byPage[row.page] || (byPage[row.page] = {});
       (page[row.section] || (page[row.section] = [])).push(row);
     });
 
+    var out = [];
     Object.keys(PAGE_NAMES).forEach(function (page) {
       if (!byPage[page]) return;
-      host.appendChild(el("h2", "panel__intro", PAGE_NAMES[page]));
 
       Object.keys(byPage[page]).forEach(function (section) {
         var rows = byPage[page][section];
-        var cardId = "copy:" + page + ":" + section;
-        var changed = rows.filter(function (r) { return rowChanged("site_copy", r); }).length;
-        var card = makeCard(cardId, section, {
-          dot: changed > 0,
-          count: rows.length + (rows.length === 1 ? " field" : " fields")
-        });
+        var id = "copy:" + page + ":" + section;
 
-        rows.forEach(function (row) {
-          var multiline = String(row.value).indexOf("\n") >= 0 || String(row.value).length > 90;
-          var f = makeField({
-            table: "site_copy", row: row, col: "value",
-            cardId: cardId, tab: "copy",
-            label: row.label, help: row.help,
-            type: multiline ? "textarea" : "text",
-            rows: Math.min(8, 2 + Math.floor(String(row.value).length / 90)),
-            max: row.max_length || null,
-            value: row.value,
-            onInput: function (value, field) {
-              row.value = value;
-              field.setError(copyProblem(row));
-              if (row.max_length) measureHeadline(row, field);
-            }
-          });
-          card.body.appendChild(f.wrap);
+        out.push({
+          id: id,
+          group: PAGE_NAMES[page],
+          label: section,
+          count: plural(rows.length, "field", "fields"),
+          changed: rows.filter(function (r) { return rowChanged("site_copy", r); }).length,
+          describe: "The wording in the " + section + " block of the " +
+            PAGE_NAMES[page].toLowerCase() + ". Each box below is a piece of " +
+            "text a visitor reads there.",
+          render: function (host) {
+            rows.forEach(function (row) {
+              var value = String(row.value === null || row.value === undefined ? "" : row.value);
+              var multiline = value.indexOf("\n") >= 0 || value.length > 90;
+              host.appendChild(makeField({
+                table: "site_copy", row: row, col: "value",
+                cardId: id, tab: "copy",
+                label: row.label, help: row.help,
+                type: multiline ? "textarea" : "text",
+                rows: Math.min(8, 2 + Math.floor(value.length / 90)),
+                max: row.max_length || null,
+                value: row.value,
+                onInput: function (value2, field) {
+                  row.value = value2;
+                  field.setError(copyProblem(row));
+                  if (row.max_length) measureHeadline(row, field);
+                }
+              }).wrap);
+            });
+          }
         });
-
-        host.appendChild(card.wrap);
       });
     });
+
+    return out;
   }
 
 
@@ -1194,79 +1464,118 @@ var AROMATI_ADMIN = (function () {
     return fields;
   }
 
-  function renderHoursPanel(host) {
-    host.appendChild(el("p", "panel__intro",
-      "The opening hours in one place. They drive the open/closed pill on the " +
-      "home page, the table under Visit, the footer, the mobile menu and what " +
-      "Google is told. Change them here and all five update together."));
-
-    var days = rowsOf("business_hours").slice().sort(function (a, b) {
+  function hoursDays() {
+    return rowsOf("business_hours").slice().sort(function (a, b) {
       return (a.sort_order || 0) - (b.sort_order || 0);
     });
+  }
 
-    var changed = days.filter(function (r) { return rowChanged("business_hours", r); }).length;
-    var card = makeCard("hours:week", "The usual week", {
-      dot: changed > 0, count: "7 days"
+  function hoursExceptions() {
+    return rowsOf("hours_exceptions").slice().sort(function (a, b) {
+      return String(a.on_date) < String(b.on_date) ? -1 : 1;
     });
+  }
 
-    days.forEach(function (row) {
+  /* Closing a day has to clear its times. The database will not accept a
+     closed day that still has them, and neither will the constraint that says
+     so — this is not a convenience, it is the only state that saves. */
+  function setClosed(row, isClosed) {
+    row.is_closed = isClosed;
+    if (isClosed) { row.opens_at = null; row.closes_at = null; }
+    else {
+      if (!row.opens_at) row.opens_at = "07:00:00";
+      if (!row.closes_at) row.closes_at = "22:00:00";
+    }
+    renderAll();
+  }
+
+  function hoursSections() {
+    var days = hoursDays();
+    var exceptions = hoursExceptions();
+
+    return [
+      {
+        id: "hours:week",
+        group: "Opening hours",
+        label: "The usual week",
+        count: plural(days.length, "day", "days"),
+        changed: days.filter(function (r) { return rowChanged("business_hours", r); }).length,
+        describe: "The hours you keep every week. They drive the open/closed " +
+          "pill on the home page, the table under Visit, the footer, the mobile " +
+          "menu and what Google is told — change them here and all five update " +
+          "together.",
+        render: renderWeek
+      },
+      {
+        id: "hours:exceptions",
+        group: "Opening hours",
+        label: "Holidays and one-off days",
+        count: exceptions.length === 0 ? "none" : plural(exceptions.length, "date", "dates"),
+        changed: exceptions.filter(function (r) { return rowChanged("hours_exceptions", r); }).length +
+          (removed.hours_exceptions || []).length,
+        describe: "Single dates that do not follow the usual week. The site uses " +
+          "one on its date and goes back to normal by itself.",
+        render: renderExceptions
+      }
+    ];
+  }
+
+  /* One card, one grid. Opens and Closes are said once along the top instead
+     of seven times down the page; the per-field labels stay in the markup for
+     anyone listening rather than looking. */
+  function renderWeek(host) {
+    var card = makeCard(null);
+    var grid = el("div", "hours");
+
+    var head = el("div", "hours__head");
+    head.appendChild(el("span", "hours__cap", "Day"));
+    head.appendChild(el("span", "hours__cap", "Closed all day"));
+    head.appendChild(el("span", "hours__cap", "Opens"));
+    head.appendChild(el("span", "hours__cap", "Closes"));
+    grid.appendChild(head);
+
+    hoursDays().forEach(function (row) {
       var name = DAY_NAMES[row.day_of_week] || ("Day " + row.day_of_week);
-      var block = el("div", "row row--hours");
+      var line = el("div", "hours__row" + (row.is_closed ? " hours__row--shut" : ""));
+      line.appendChild(el("span", "hours__day", name));
 
       var closed = makeCheck("Closed all day", row.is_closed, function (isClosed) {
-        row.is_closed = isClosed;
-        /* The database will not accept a closed day that still has times on it,
-           and neither will the constraint that says so. Clearing them here is
-           not a convenience — it is the only state that saves. */
-        if (isClosed) { row.opens_at = null; row.closes_at = null; }
-        else {
-          if (!row.opens_at) row.opens_at = "07:00:00";
-          if (!row.closes_at) row.closes_at = "22:00:00";
-        }
-        renderAll();
+        setClosed(row, isClosed);
       });
+      closed.wrap.className = "check check--bare";
+      line.appendChild(closed.wrap);
 
-      var head = el("div", "field");
-      head.appendChild(el("span", "field__label", name));
-      head.appendChild(closed.wrap);
-      block.appendChild(head);
-
-      if (!row.is_closed) {
-        addTimes(block, [
+      if (row.is_closed) {
+        line.appendChild(el("span", "hours__shut", "Closed all day"));
+      } else {
+        addTimes(line, [
           makeField({
             table: "business_hours", row: row, col: "opens_at",
-            cardId: "hours:week", tab: "hours",
-            label: "Opens", type: "time", value: toInputTime(row.opens_at),
+            cardId: "hours:week", tab: "hours", extra: "field--bare",
+            label: "Opens on " + name, type: "time", value: toInputTime(row.opens_at),
             onInput: function (v) { row.opens_at = v ? v + ":00" : null; }
           }),
           makeField({
             table: "business_hours", row: row, col: "closes_at",
-            cardId: "hours:week", tab: "hours",
-            label: "Closes", type: "time", value: toInputTime(row.closes_at),
+            cardId: "hours:week", tab: "hours", extra: "field--bare",
+            label: "Closes on " + name, type: "time", value: toInputTime(row.closes_at),
             onInput: function (v) { row.closes_at = v ? v + ":00" : null; }
           })
         ]);
       }
 
-      card.body.appendChild(block);
+      grid.appendChild(line);
     });
 
+    card.body.appendChild(grid);
     host.appendChild(card.wrap);
+  }
 
-    /* ── one-off days ── */
-    var exceptions = rowsOf("hours_exceptions").slice().sort(function (a, b) {
-      return String(a.on_date) < String(b.on_date) ? -1 : 1;
-    });
-    var exChanged = exceptions.filter(function (r) { return rowChanged("hours_exceptions", r); }).length +
-      (removed.hours_exceptions || []).length;
+  function renderExceptions(host) {
+    var exceptions = hoursExceptions();
+    var card = makeCard(null);
 
-    var exCard = makeCard("hours:exceptions", "Holidays and one-off days", {
-      dot: exChanged > 0,
-      count: exceptions.length === 0 ? "none" :
-        exceptions.length + (exceptions.length === 1 ? " date" : " dates")
-    });
-
-    exCard.body.appendChild(el("p", "field__help",
+    card.body.appendChild(el("p", "card__help",
       "A single date that does not follow the usual week — closed for a holiday, " +
       "or closing early for a private event. The site uses it on that date and " +
       "then goes back to normal by itself. Old dates do no harm; delete them when " +
@@ -1285,13 +1594,7 @@ var AROMATI_ADMIN = (function () {
       var closedWrap = el("div", "field");
       closedWrap.appendChild(el("span", "field__label", "Closed"));
       closedWrap.appendChild(makeCheck("Closed all day", row.is_closed, function (isClosed) {
-        row.is_closed = isClosed;
-        if (isClosed) { row.opens_at = null; row.closes_at = null; }
-        else {
-          if (!row.opens_at) row.opens_at = "07:00:00";
-          if (!row.closes_at) row.closes_at = "22:00:00";
-        }
-        renderAll();
+        setClosed(row, isClosed);
       }).wrap);
       block.appendChild(closedWrap);
 
@@ -1324,8 +1627,12 @@ var AROMATI_ADMIN = (function () {
       del.type = "button";
       on(del, "click", function () { deleteRow("hours_exceptions", row); });
       block.appendChild(del);
-      exCard.body.appendChild(block);
+      card.body.appendChild(block);
     });
+
+    if (!exceptions.length) {
+      card.body.appendChild(el("p", "empty", "No one-off days set."));
+    }
 
     var add = el("button", "btn btn--small btn--add", "Add a date");
     add.type = "button";
@@ -1334,12 +1641,12 @@ var AROMATI_ADMIN = (function () {
         id: tempId(), on_date: "", is_closed: true,
         opens_at: null, closes_at: null, note: null
       });
-      ui.open["hours:exceptions"] = true;
+      selectSection("hours", "hours:exceptions");
       renderAll();
     });
-    exCard.body.appendChild(add);
+    card.body.appendChild(add);
 
-    host.appendChild(exCard.wrap);
+    host.appendChild(card.wrap);
   }
 
 
@@ -1354,47 +1661,57 @@ var AROMATI_ADMIN = (function () {
     3: "How Google files the business"
   };
 
-  function renderContactPanel(host) {
-    host.appendChild(el("p", "panel__intro",
-      "The phone number, email, Instagram and address, each stored once and " +
-      "written into every place on the site that shows them. The phone alone " +
-      "appears in twenty-four places."));
+  /* What each group is for, in the tone the help lines under the fields are
+     already written in. The help lines themselves are the best copy in the
+     product and are not touched. */
+  var SETTING_DESCRIPTIONS = {
+    1: "The phone number, email and Instagram, each stored once and written " +
+       "into every place on the site that shows them. The phone alone appears " +
+       "in twenty-four places.",
+    2: "The address as it is printed on the site and as the map link uses it.",
+    3: "What Google is told about the business when it reads the site."
+  };
 
+  function contactSections() {
     var groups = {};
+    var order = [];
     rowsOf("site_settings").slice().sort(function (a, b) {
       return (a.sort_order || 0) - (b.sort_order || 0);
     }).forEach(function (row) {
       var bucket = Math.floor((row.sort_order || 0) / 10);
-      (groups[bucket] || (groups[bucket] = [])).push(row);
+      if (!groups[bucket]) { groups[bucket] = []; order.push(bucket); }
+      groups[bucket].push(row);
     });
 
-    Object.keys(groups).sort().forEach(function (bucket) {
+    return order.map(function (bucket) {
       var rows = groups[bucket];
-      var cardId = "contact:" + bucket;
-      var changed = rows.filter(function (r) { return rowChanged("site_settings", r); }).length;
-      var card = makeCard(cardId, SETTING_GROUPS[bucket] || "Other settings", {
-        dot: changed > 0,
-        count: rows.length + (rows.length === 1 ? " field" : " fields")
-      });
-
-      rows.forEach(function (row) {
-        var f = makeField({
-          table: "site_settings", row: row, col: "value",
-          cardId: cardId, tab: "contact",
-          label: row.label,
-          help: row.is_editable ? row.help
-            : (row.help ? row.help + " This one is not editable here." : "Not editable here."),
-          disabled: !row.is_editable,
-          value: row.value,
-          onInput: function (value, field) {
-            row.value = value;
-            field.setError(settingProblem(row));
-          }
-        });
-        card.body.appendChild(f.wrap);
-      });
-
-      host.appendChild(card.wrap);
+      var id = "contact:" + bucket;
+      return {
+        id: id,
+        group: "Contact details",
+        label: SETTING_GROUPS[bucket] || "Other settings",
+        count: plural(rows.length, "field", "fields"),
+        changed: rows.filter(function (r) { return rowChanged("site_settings", r); }).length,
+        describe: SETTING_DESCRIPTIONS[bucket] ||
+          "Settings the site reads but does not group anywhere else.",
+        render: function (host) {
+          rows.forEach(function (row) {
+            host.appendChild(makeField({
+              table: "site_settings", row: row, col: "value",
+              cardId: id, tab: "contact",
+              label: row.label,
+              help: row.is_editable ? row.help
+                : (row.help ? row.help + " This one is not editable here." : "Not editable here."),
+              disabled: !row.is_editable,
+              value: row.value,
+              onInput: function (value, field) {
+                row.value = value;
+                field.setError(settingProblem(row));
+              }
+            }).wrap);
+          });
+        }
+      };
     });
   }
 
@@ -1434,21 +1751,83 @@ var AROMATI_ADMIN = (function () {
     rows.forEach(function (row, i) { row.sort_order = i + 1; });
   }
 
+  /* ── reordering, as a swap rather than a jump ──
+     Moving a row up rewrites sort_order and re-renders, which without this
+     would simply produce a different page with no account of how it got
+     there. So: where every row was, then the re-render, then every row that
+     ended up somewhere else starts back where it was and travels.
+
+     Measured rather than calculated. A section that swaps across a group
+     heading, or an item beside one of a different height, moves a distance
+     nothing here would have guessed correctly. */
+
+  var REORDER_MS = 300;
+  var REORDABLE = "[data-section],[data-item]";
+
+  function reorderKey(node) {
+    return node.getAttribute("data-section") ||
+      ("item:" + node.getAttribute("data-item"));
+  }
+
+  /* A row the search has hidden has no box to measure, and measuring it
+     anyway would give every visible row a journey of several hundred pixels
+     from the top of the document. Only what is on screen is recorded, and
+     only what was recorded is animated. */
+  function onScreen(node) { return node.offsetParent !== null; }
+
+  function whereRowsAre() {
+    var seen = {};
+    var nodes = document.querySelectorAll(REORDABLE), i;
+    for (i = 0; i < nodes.length; i++) {
+      if (!onScreen(nodes[i])) continue;
+      seen[reorderKey(nodes[i])] = nodes[i].getBoundingClientRect().top;
+    }
+    return seen;
+  }
+
+  function playReorder(before) {
+    var nodes = document.querySelectorAll(REORDABLE);
+    var moved = [], i;
+
+    for (i = 0; i < nodes.length; i++) {
+      var node = nodes[i];
+      var key = reorderKey(node);
+      if (!(key in before) || !onScreen(node)) continue;
+      var shift = before[key] - node.getBoundingClientRect().top;
+      if (Math.abs(shift) < 1) continue;
+      node.classList.add("is-shifted");
+      node.style.transform = "translateY(" + shift + "px)";
+      moved.push(node);
+    }
+    if (!moved.length) return;
+
+    nextFrame(function () {
+      moved.forEach(function (node) {
+        node.classList.remove("is-shifted");
+        node.classList.add("is-settling");
+        node.style.transform = "";
+      });
+      window.setTimeout(function () {
+        moved.forEach(function (node) { node.classList.remove("is-settling"); });
+      }, REORDER_MS + 60);
+    });
+  }
+
   function move(rows, row, by) {
     var from = rows.indexOf(row), to = from + by;
     if (from < 0 || to < 0 || to >= rows.length) return;
+
+    var before = prefersReducedMotion() ? null : whereRowsAre();
     rows.splice(from, 1);
     rows.splice(to, 0, row);
     renumber(rows);
     renderAll();
+    if (before) playReorder(before);
   }
 
-  function renderMenuPanel(host, animateResults) {
-    host.appendChild(el("p", "panel__intro",
-      "The three menu pages. A section is a block with its own heading and its " +
-      "own tab, and an item is a line inside one. Type prices without the dollar " +
-      "sign. The site adds it, and 7.50 stays 7.50 instead of becoming 7.5."));
-
+  /* The Food / Drinks / Wine switch and the search sit above the index,
+     because between them they decide what the index lists. */
+  function menuIndexHead(host) {
     var pick = el("div", "pagepick");
     MENU_PAGES.forEach(function (page) {
       var b = el("button", "pagepick__btn", page.name);
@@ -1457,7 +1836,10 @@ var AROMATI_ADMIN = (function () {
       on(b, "click", function () {
         if (ui.menuPage === page.id) return;
         ui.menuPage = page.id;
-        renderAll("menu-list", true);
+        /* A different page means a different section in the editor, so the
+           pane starts at the top rather than wherever the last one was
+           scrolled to. */
+        renderAll("menu-list");
       });
       pick.appendChild(b);
     });
@@ -1470,23 +1852,46 @@ var AROMATI_ADMIN = (function () {
     input.value = ui.search;
     on(input, "input", function () {
       ui.search = input.value;
-      applySearch();
+      applyMenuSearch();
     });
     search.appendChild(input);
-    var note = el("span", "search__note");
-    search.appendChild(note);
+    search.appendChild(el("span", "search__note"));
     host.appendChild(search);
 
-    var results = el("div", "menu__results" + (animateResults ? " menu__results--enter" : ""));
-    host.appendChild(results);
+    positionPagePick(pick);
+  }
 
-    var courses = coursesOn(ui.menuPage);
-    if (!courses.length) results.appendChild(el("p", "empty", "This page has no sections yet."));
-
-    courses.forEach(function (course) {
-      results.appendChild(renderCourse(course, courses).wrap);
+  /* The head survives a re-render, so what it says has to be brought up to
+     date rather than rebuilt. The search box is left exactly alone — it may
+     have a cursor in it. */
+  function menuRefreshHead(host) {
+    var pick = host.querySelector(".pagepick");
+    if (!pick) return;
+    MENU_PAGES.forEach(function (page, i) {
+      var b = pick.children[i];
+      if (b) b.setAttribute("aria-pressed", ui.menuPage === page.id ? "true" : "false");
     });
+    positionPagePick(pick);
+  }
 
+  /* The maroon pill under the chosen page, as one element that travels. Same
+     arrangement as the rail and the index: geometry from the button itself,
+     set through the CSSOM, transitions off until the first position has been
+     painted so a reload does not slide it in from the left edge. */
+  function positionPagePick(pick) {
+    if (!pick || pick.offsetParent === null) return;   // hidden pane, see above
+    var active = pick.querySelector('[aria-pressed="true"]');
+    if (!active) return;
+    pick.style.setProperty("--pick-x", active.offsetLeft + "px");
+    pick.style.setProperty("--pick-w", active.offsetWidth + "px");
+    if (!pick._markReady) {
+      pick.offsetWidth;
+      pick.classList.add("pagepick--ready");
+      pick._markReady = true;
+    }
+  }
+
+  function menuIndexFoot(host) {
     var add = el("button", "btn btn--small btn--add", "Add a section");
     add.type = "button";
     on(add, "click", function () {
@@ -1496,52 +1901,78 @@ var AROMATI_ADMIN = (function () {
         sort_order: coursesOn(ui.menuPage).length + 1
       };
       draft.menu_courses.push(row);
-      ui.open["course:" + row.id] = true;
+      selectSection("menu", "course:" + row.id);
       renderAll();
     });
-    results.appendChild(add);
-
-    applySearch();
-
-    function applySearch() {
-      var shown = 0, total = 0;
-      rowsOf("menu_items").forEach(function (item) {
-        var node = document.querySelector('[data-item="' + item.id + '"]');
-        if (!node) return;
-        total += 1;
-        var ok = matchesSearch(item);
-        node.hidden = !ok;
-        if (ok) shown += 1;
-      });
-      note.textContent = ui.search
-        ? shown + " of " + total + " items on this page match “" + ui.search + "”"
-        : "";
-      /* A search that matches something inside a collapsed section is a search
-         that found nothing, as far as the person doing it can tell. */
-      if (ui.search) {
-        coursesOn(ui.menuPage).forEach(function (course) {
-          var any = itemsIn(course.id).some(matchesSearch);
-          var body = document.querySelector('[data-course-body="' + course.id + '"]');
-          if (body && any) setDisclosure(body, true);
-        });
-      }
-    }
+    host.appendChild(add);
   }
 
-  function renderCourse(course, siblings) {
-    var items = itemsIn(course.id);
-    var cardId = "course:" + course.id;
-    var changed = rowChanged("menu_courses", course) ||
-      items.some(function (i) { return rowChanged("menu_items", i); });
-
-    var card = makeCard(cardId, course.heading || "(untitled section)", {
-      dot: changed,
-      count: course.is_static ? "built in" :
-        items.length + (items.length === 1 ? " item" : " items")
+  /* Only the section on screen has its items in the document, so a search that
+     matched inside another one would find nothing a person could see. Two
+     passes: hide the item rows that do not match in the section on screen, and
+     dim the index rows whose sections hold no match at all. The count is over
+     the whole page either way, because that is the question being asked. */
+  function applyMenuSearch() {
+    rowsOf("menu_items").forEach(function (item) {
+      var node = document.querySelector('[data-item="' + item.id + '"]');
+      if (node) node.hidden = !!ui.search && !matchesSearch(item);
     });
-    card.shell.setAttribute("data-course-body", course.id);
 
-    var moves = el("span", "item__moves");
+    var total = 0, matched = 0;
+    coursesOn(ui.menuPage).forEach(function (course) {
+      var items = itemsIn(course.id);
+      var hits = items.filter(matchesSearch).length;
+      total += items.length;
+      matched += hits;
+      var row = document.querySelector('[data-section="course:' + course.id + '"]');
+      if (row) row.hidden = !!ui.search && hits === 0;
+    });
+
+    var note = document.querySelector(".search__note");
+    if (note) {
+      note.textContent = ui.search
+        ? matched + " of " + total + " items on this page match “" + ui.search + "”"
+        : "";
+    }
+
+    /* Hiding rows moves every row below them, so the fill has to be told
+       where its row went. This runs on every keystroke and at the end of
+       every menu render — the render positions the fill against the whole
+       list, and this is what puts it right once the list has been filtered.
+       A chosen section the search has hidden leaves nothing to fill. */
+    var list = byId("indexList");
+    var chosen = list.querySelector(".index__row--on");
+    positionIndexMark(list, chosen && !chosen.hidden ? chosen : null);
+  }
+
+  function menuSections() {
+    var courses = coursesOn(ui.menuPage);
+    var pageName = PAGE_NAMES[ui.menuPage] || "Menu";
+
+    return courses.map(function (course) {
+      var items = itemsIn(course.id);
+      return {
+        id: "course:" + course.id,
+        group: pageName,
+        label: course.heading || "(untitled section)",
+        count: course.is_static ? "built in" : plural(items.length, "item", "items"),
+        changed: (rowChanged("menu_courses", course) ? 1 : 0) +
+          items.filter(function (i) { return rowChanged("menu_items", i); }).length,
+        describe: course.is_static
+          ? "A block the page builds for itself. Where it sits on the menu can be " +
+            "changed with the arrows beside it in the list; what is in it cannot " +
+            "be edited here."
+          : "One block on the " + pageName.toLowerCase() + ", with its own heading " +
+            "and its own filter tab. Type prices without the dollar sign — the " +
+            "site adds it, and 7.50 stays 7.50 instead of becoming 7.5.",
+        extra: function (row) { row.appendChild(courseMoves(course, courses)); },
+        render: function (host) { renderCourse(host, course); }
+      };
+    });
+  }
+
+  function courseMoves(course, siblings) {
+    var moves = el("span", "index__moves");
     [["▲", -1], ["▼", 1]].forEach(function (pair) {
       var b = el("button", "mini", pair[0]);
       b.type = "button";
@@ -1551,14 +1982,22 @@ var AROMATI_ADMIN = (function () {
       on(b, "click", function (e) { e.stopPropagation(); move(siblings, course, pair[1]); });
       moves.appendChild(b);
     });
-    card.head.appendChild(moves);
+    return moves;
+  }
+
+  function renderCourse(host, course) {
+    var items = itemsIn(course.id);
+    var cardId = "course:" + course.id;
+
+    var card = makeCard(null);
+    host.appendChild(card.wrap);
 
     if (course.is_static) {
       card.body.appendChild(el("p", "static",
         "Build Your Own Breakfast is built into the page rather than stored here. " +
-        "Its position on the menu can be moved with the arrows above; its contents " +
-        "are not editable — ask a developer."));
-      return card;
+        "Its position on the menu can be moved with the arrows beside it in the " +
+        "list; its contents are not editable — ask a developer."));
+      return;
     }
 
     card.body.appendChild(makeField({
@@ -1630,9 +2069,17 @@ var AROMATI_ADMIN = (function () {
       card.body.appendChild(sizeRow);
     }
 
+    /* The lines on the menu are their own card. A section's own settings are
+       four fields; its items are however many there are, and reading one while
+       looking for the other is the whole reason the two are separated. */
+    var list = makeCard("Items");
+    host.appendChild(list.wrap);
+
     items.forEach(function (item) {
-      card.body.appendChild(renderItem(item, course, items));
+      list.body.appendChild(renderItem(item, course, items));
     });
+
+    if (!items.length) list.body.appendChild(el("p", "empty", "No items in this section yet."));
 
     var tools = el("div", "tools");
 
@@ -1659,8 +2106,7 @@ var AROMATI_ADMIN = (function () {
     });
     tools.appendChild(delCourse);
 
-    card.body.appendChild(tools);
-    return card;
+    list.body.appendChild(tools);
   }
 
   function firstPrice(item) {
@@ -1698,7 +2144,7 @@ var AROMATI_ADMIN = (function () {
     head.type = "button";
     var openId = "item:" + item.id;
     head.appendChild(el("span", null, item.name || "(new item)"));
-    if (rowChanged("menu_items", item)) head.appendChild(el("span", "card__dot"));
+    if (rowChanged("menu_items", item)) head.appendChild(el("span", "item__dot"));
     head.appendChild(el("span", "item__price", summarisePrice(item, course)));
 
     var moves = el("span", "item__moves");
@@ -1729,14 +2175,14 @@ var AROMATI_ADMIN = (function () {
 
     body.appendChild(makeField({
       table: "menu_items", row: item, col: "name",
-      cardId: "course:" + course.id, tab: "menu",
+      cardId: "course:" + course.id, openId: "item:" + item.id, tab: "menu",
       label: "Name", value: item.name,
       onInput: function (v) { item.name = v; }
     }).wrap);
 
     body.appendChild(makeField({
       table: "menu_items", row: item, col: "tag",
-      cardId: "course:" + course.id, tab: "menu",
+      cardId: "course:" + course.id, openId: "item:" + item.id, tab: "menu",
       label: "Qualifier", value: item.tag || "",
       placeholder: "2022 · 750 ml · 7 toppings",
       help: "The small note beside the name, if there is one. Leave empty for none.",
@@ -1745,7 +2191,7 @@ var AROMATI_ADMIN = (function () {
 
     body.appendChild(makeField({
       table: "menu_items", row: item, col: "description",
-      cardId: "course:" + course.id, tab: "menu",
+      cardId: "course:" + course.id, openId: "item:" + item.id, tab: "menu",
       label: "Description", type: "textarea", rows: 3,
       value: item.description || "",
       help: "Leave empty and the item shows as a name and a price alone.",
@@ -1762,7 +2208,7 @@ var AROMATI_ADMIN = (function () {
 
     var shapeField = makeField({
       table: "menu_items", row: item, col: "no_price",
-      cardId: "course:" + course.id, tab: "menu",
+      cardId: "course:" + course.id, openId: "item:" + item.id, tab: "menu",
       label: "How it is priced", type: "select",
       value: priceShape(item), options: options,
       onInput: function (shape) {
@@ -1784,7 +2230,7 @@ var AROMATI_ADMIN = (function () {
     if (shape === "one") {
       body.appendChild(makeField({
         table: "menu_items", row: item, col: "price",
-        cardId: "course:" + course.id, tab: "menu",
+        cardId: "course:" + course.id, openId: "item:" + item.id, tab: "menu",
         label: "Price", value: item.price || "", placeholder: "21",
         help: "Without the dollar sign. 7.50 and 21 both stay exactly as typed.",
         onInput: function (v) { item.price = v; }
@@ -1792,7 +2238,7 @@ var AROMATI_ADMIN = (function () {
     } else if (shape === "all") {
       body.appendChild(makeField({
         table: "menu_items", row: item, col: "price_all_sizes",
-        cardId: "course:" + course.id, tab: "menu",
+        cardId: "course:" + course.id, openId: "item:" + item.id, tab: "menu",
         label: "Price, across both columns", value: item.price_all_sizes || "",
         onInput: function (v) { item.price_all_sizes = v; }
       }).wrap);
@@ -1801,7 +2247,7 @@ var AROMATI_ADMIN = (function () {
       (course.sizes || []).forEach(function (size, n) {
         var f = makeField({
           table: "menu_items", row: item, col: "prices",
-          cardId: "course:" + course.id, tab: "menu",
+          cardId: "course:" + course.id, openId: "item:" + item.id, tab: "menu",
           label: size, value: (item.prices && item.prices[n]) || "", extra: "field--narrow",
           onInput: function (v) {
             var next = (item.prices || []).slice();
@@ -1826,13 +2272,13 @@ var AROMATI_ADMIN = (function () {
       var row = el("div", "pour");
       row.appendChild(makeField({
         table: "menu_item_pours", row: pour, col: "label",
-        cardId: "course:" + course.id, tab: "menu",
+        cardId: "course:" + course.id, openId: "item:" + item.id, tab: "menu",
         label: "Label", value: pour.label, placeholder: "Bottle",
         onInput: function (v) { pour.label = v; }
       }).wrap);
       row.appendChild(makeField({
         table: "menu_item_pours", row: pour, col: "price",
-        cardId: "course:" + course.id, tab: "menu",
+        cardId: "course:" + course.id, openId: "item:" + item.id, tab: "menu",
         label: "Price", value: pour.price, placeholder: "60",
         onInput: function (v) { pour.price = v; }
       }).wrap);
@@ -1961,32 +2407,14 @@ var AROMATI_ADMIN = (function () {
     return seed ? seed.src : "";
   }
 
-  function photoSectionBreak(label) {
-    var divider = el("div", "photo__section-break");
-    divider.setAttribute("role", "separator");
-    divider.setAttribute("aria-label", label);
-    divider.appendChild(el("span", "photo__section-break__label", label));
-    return divider;
-  }
-
-  function renderPhotosPanel(host) {
-    host.appendChild(el("p", "panel__intro",
-      "Every photograph on the site, listed in the order you would meet them " +
-      "walking down the page. Choosing a new one does not change the site until " +
-      "you press Save. “Put the original back” is always available, so the " +
-      "photographs the site was built with stay in place whatever you upload."));
-
+  /* The prefix of a slot is the block of the site it belongs to, and the order
+     the rows arrive in is the order a visitor meets them walking down the
+     page. Both are the markup's, not this file's — a slot added in a later
+     migration lands in the right group without anything here being edited. */
+  function photoSections() {
     var rows = rowsOf("photos").slice().sort(function (a, b) {
       return (a.sort_order || 0) - (b.sort_order || 0);
     });
-
-    if (!rows.length) {
-      host.appendChild(el("p", "empty",
-        "No photograph slots in the database yet. The site is showing the pictures " +
-        "in its own markup, which is correct — but nothing here can be changed " +
-        "until the photographs migration has been run."));
-      return;
-    }
 
     var order = [];
     var groups = {};
@@ -1996,27 +2424,25 @@ var AROMATI_ADMIN = (function () {
       groups[prefix].push(row);
     });
 
-    var hasHomePhotos = order.some(function (prefix) {
-      return !!HOME_PHOTO_GROUPS[prefix];
-    });
-    if (hasHomePhotos) host.appendChild(photoSectionBreak("Home page"));
-
-    var innerPageBreakShown = false;
-    order.forEach(function (prefix) {
-      if (!HOME_PHOTO_GROUPS[prefix] && !innerPageBreakShown) {
-        host.appendChild(photoSectionBreak("Other pages"));
-        innerPageBreakShown = true;
-      }
-
+    return order.map(function (prefix) {
       var group = groups[prefix];
-      var cardId = "photos:" + prefix;
-      var changed = group.filter(function (r) { return rowChanged("photos", r); }).length;
-      var card = makeCard(cardId, PHOTO_GROUPS[prefix] || prefix, {
-        dot: changed > 0,
-        count: group.length + (group.length === 1 ? " photo" : " photos")
-      });
-      group.forEach(function (row) { card.body.appendChild(renderPhoto(row, cardId)); });
-      host.appendChild(card.wrap);
+      var id = "photos:" + prefix;
+      var where = HOME_PHOTO_GROUPS[prefix] ? "Home page" : "Other pages";
+      return {
+        id: id,
+        group: where,
+        label: PHOTO_GROUPS[prefix] || prefix,
+        count: plural(group.length, "photo", "photos"),
+        changed: group.filter(function (r) { return rowChanged("photos", r); }).length,
+        describe: "The photographs in the " + (PHOTO_GROUPS[prefix] || prefix) +
+          " block. Choosing a new one does not change the site until you press " +
+          "Save, and “Put the original back” is always available.",
+        render: function (host) {
+          var card = makeCard(null);
+          group.forEach(function (row) { card.body.appendChild(renderPhoto(row, id)); });
+          host.appendChild(card.wrap);
+        }
+      };
     });
   }
 
@@ -2436,69 +2862,26 @@ var AROMATI_ADMIN = (function () {
 
   /* ── the FAQ ───────────────────────────────── */
 
-  function renderFaqPanel(host) {
-    var entries = rowsOf("faq_entries").slice().sort(function (a, b) {
+  function faqEntries() {
+    return rowsOf("faq_entries").slice().sort(function (a, b) {
       return (a.sort_order || 0) - (b.sort_order || 0);
     });
+  }
 
-    var notice = el("p", "notice");
-    notice.appendChild(el("strong", null, "The FAQ page is still undecided. "));
-    notice.appendChild(document.createTextNode(
-      "The eighteen questions on it today are placeholder text written by the " +
-      "studio, and the page itself carries a notice saying so. Nothing has been " +
-      "moved into the editor yet. Dropping the page would waste the work, and " +
-      "rewriting it would waste it twice. Say the word and the questions get " +
-      "transcribed, or the page gets removed. Until then, anything added below " +
-      "goes live on the site as soon as it is saved."));
-    host.appendChild(notice);
-
-    entries.forEach(function (entry) {
-      var cardId = "faq:" + entry.id;
-      var card = makeCard(cardId, entry.question || "(new question)", {
-        dot: rowChanged("faq_entries", entry),
-        count: entry.is_published ? null : "hidden"
-      });
-
-      card.body.appendChild(makeField({
-        table: "faq_entries", row: entry, col: "question",
-        cardId: cardId, tab: "faq",
-        label: "Question", value: entry.question,
-        onInput: function (v) { entry.question = v; }
-      }).wrap);
-
-      card.body.appendChild(makeField({
-        table: "faq_entries", row: entry, col: "answer",
-        cardId: cardId, tab: "faq",
-        label: "Answer", type: "textarea", rows: 4, value: entry.answer,
-        onInput: function (v) { entry.answer = v; }
-      }).wrap);
-
-      card.body.appendChild(makeCheck("Show this on the site", entry.is_published,
-        function (checked) { entry.is_published = checked; renderAll(); }).wrap);
-
-      var tools = el("div", "tools");
-      [["▲", -1], ["▼", 1]].forEach(function (pair) {
-        var b = el("button", "mini", pair[0]);
-        b.type = "button";
-        var at = entries.indexOf(entry);
-        b.disabled = pair[1] < 0 ? at === 0 : at === entries.length - 1;
-        on(b, "click", function () { move(entries, entry, pair[1]); });
-        tools.appendChild(b);
-      });
-      var del = el("button", "btn btn--small btn--danger", "Delete");
-      del.type = "button";
-      on(del, "click", function () {
-        if (!window.confirm("Delete this question?")) return;
-        deleteRow("faq_entries", entry);
-      });
-      tools.appendChild(del);
-      card.body.appendChild(tools);
-
-      host.appendChild(card.wrap);
+  function faqNote() {
+    return makeNote(function (node) {
+      node.appendChild(el("strong", null, "The FAQ page is still undecided. "));
+      node.appendChild(document.createTextNode(
+        "The eighteen questions on it today are placeholder text written by the " +
+        "studio, and the page itself carries a notice saying so. Nothing has been " +
+        "moved into the editor yet. Dropping the page would waste the work, and " +
+        "rewriting it would waste it twice. Say the word and the questions get " +
+        "transcribed, or the page gets removed. Until then, anything added here " +
+        "goes live on the site as soon as it is saved."));
     });
+  }
 
-    if (!entries.length) host.appendChild(el("p", "empty", "No questions yet."));
-
+  function faqIndexFoot(host) {
     var add = el("button", "btn btn--small btn--add", "Add a question");
     add.type = "button";
     on(add, "click", function () {
@@ -2507,10 +2890,71 @@ var AROMATI_ADMIN = (function () {
         sort_order: rowsOf("faq_entries").length + 1
       };
       draft.faq_entries.push(row);
-      ui.open["faq:" + row.id] = true;
+      selectSection("faq", "faq:" + row.id);
       renderAll();
     });
     host.appendChild(add);
+  }
+
+  function faqSections() {
+    var entries = faqEntries();
+
+    return entries.map(function (entry) {
+      return {
+        id: "faq:" + entry.id,
+        group: "Questions",
+        label: entry.question || "(new question)",
+        count: entry.is_published ? null : "hidden",
+        changed: rowChanged("faq_entries", entry) ? 1 : 0,
+        describe: entry.is_published
+          ? "One question and its answer, as they appear on the FAQ page."
+          : "One question and its answer. It is hidden, so nobody visiting the " +
+            "site can see it yet.",
+        render: function (host) { renderFaqEntry(host, entry, entries); }
+      };
+    });
+  }
+
+  function renderFaqEntry(host, entry, entries) {
+    var cardId = "faq:" + entry.id;
+    var card = makeCard(null);
+    host.appendChild(card.wrap);
+
+    card.body.appendChild(makeField({
+      table: "faq_entries", row: entry, col: "question",
+      cardId: cardId, tab: "faq",
+      label: "Question", value: entry.question,
+      onInput: function (v) { entry.question = v; }
+    }).wrap);
+
+    card.body.appendChild(makeField({
+      table: "faq_entries", row: entry, col: "answer",
+      cardId: cardId, tab: "faq",
+      label: "Answer", type: "textarea", rows: 4, value: entry.answer,
+      onInput: function (v) { entry.answer = v; }
+    }).wrap);
+
+    card.body.appendChild(makeCheck("Show this on the site", entry.is_published,
+      function (checked) { entry.is_published = checked; renderAll(); }).wrap);
+
+    var tools = el("div", "tools");
+    [["▲", -1], ["▼", 1]].forEach(function (pair) {
+      var b = el("button", "mini", pair[0]);
+      b.type = "button";
+      b.title = pair[1] < 0 ? "Move this question up" : "Move this question down";
+      var at = entries.indexOf(entry);
+      b.disabled = pair[1] < 0 ? at === 0 : at === entries.length - 1;
+      on(b, "click", function () { move(entries, entry, pair[1]); });
+      tools.appendChild(b);
+    });
+    var del = el("button", "btn btn--small btn--danger", "Delete");
+    del.type = "button";
+    on(del, "click", function () {
+      if (!window.confirm("Delete this question?")) return;
+      deleteRow("faq_entries", entry);
+    });
+    tools.appendChild(del);
+    card.body.appendChild(tools);
   }
 
 
@@ -2819,13 +3263,16 @@ var AROMATI_ADMIN = (function () {
   function showSavebar(bar) {
     savebarExitToken += 1;
     bar.classList.remove("savebar--leaving");
-    bar.hidden = false;
+    bar.classList.remove("savebar--clean");
   }
 
+  /* The bar stays where it is and goes quiet, rather than sliding away and
+     taking the foot of the pane with it. Something that moves out from under
+     the pointer as the last edit is undone is worse than something that
+     changes what it says. */
   function hideSavebarAnimated(bar) {
-    if (bar.hidden) {
+    if (bar.classList.contains("savebar--clean")) {
       bar.classList.remove("savebar--leaving");
-      byId("saveCount").textContent = "0 changes not yet saved";
       return;
     }
     if (bar.classList.contains("savebar--leaving")) return;
@@ -2835,25 +3282,42 @@ var AROMATI_ADMIN = (function () {
     function finish() {
       if (savebarExitToken !== token) return;
       bar.classList.remove("savebar--leaving");
-      bar.hidden = true;
-      byId("saveCount").textContent = "0 changes not yet saved";
+      bar.classList.add("savebar--clean");
     }
     if (prefersReducedMotion()) finish();
     else window.setTimeout(finish, STATUS_EXIT_MS);
   }
 
+  /* "3 unsaved changes in Hero" beats "3 changes not yet saved", because the
+     second one leaves the owner to go and find them. The section named is the
+     one the editor is showing, and only when the changes are in fact in it. */
+  function saveSentence(total) {
+    if (total === 0) return savedSomething ? "All changes saved" : "No changes yet";
+
+    var here = panelChangeCount(ui.tab);
+    var panel = currentPanel();
+    var section = currentSection(panel.sections());
+    var word = total === 1 ? "1 unsaved change" : total + " unsaved changes";
+
+    if (section && here === total && section.changed === total) {
+      return word + " in " + section.label;
+    }
+    return word;
+  }
+
   function updateSavebar() {
     var n = changeCount();
     var bar = byId("savebar");
+
     if (n === 0) {
       hideSavebarAnimated(bar);
       byId("problems").hidden = true;
     } else {
       showSavebar(bar);
-      byId("saveCount").textContent = n === 1
-        ? "1 change not yet saved"
-        : n + " changes not yet saved";
     }
+    byId("saveCount").textContent = saveSentence(n);
+    byId("saveBtn").disabled = saving || n === 0;
+    byId("discardBtn").disabled = saving || n === 0;
 
     /* A tab shows a dot when something under it has changed, and the count in
        the savebar is the only number that matters — so both are rebuilt from
@@ -3014,6 +3478,10 @@ var AROMATI_ADMIN = (function () {
       byId("savebar").className = "savebar";
       byId("saveBtn").disabled = false;
       byId("discardBtn").disabled = false;
+      /* Even a save that failed halfway wrote what it wrote. Setting this on
+         `done` rather than on success is the difference between a label that
+         reports and one that congratulates. */
+      if (done > 0) savedSomething = true;
       renderAll();
 
       if (error) {
@@ -3332,10 +3800,22 @@ var AROMATI_ADMIN = (function () {
     });
 
     restoreTab();
+    restoreSections();
     wireGate();
     on(byId("signOut"), "click", signOut);
     on(byId("saveBtn"), "click", save);
     on(byId("discardBtn"), "click", discard);
+
+    /* ⌘S and Ctrl+S. The browser's own Save-page dialog is never what anybody
+       pressing it in here wanted. */
+    on(document, "keydown", function (e) {
+      if (e.key !== "s" && e.key !== "S") return;
+      if (!e.metaKey && !e.ctrlKey) return;
+      if (e.altKey) return;
+      if (byId("app").hidden) return;
+      e.preventDefault();
+      if (changeCount() > 0) save();
+    });
 
     /* Closing the tab with unsaved work in it is the one mistake this page can
        actually prevent, so it does. */
