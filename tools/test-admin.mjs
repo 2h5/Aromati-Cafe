@@ -261,7 +261,7 @@ async function boot(opts) {
   window.scrollTo = () => {};
   window.HTMLElement.prototype.scrollIntoView = () => {};
   window.matchMedia = (query) => ({
-    matches: query === "(min-width: 641px)"
+    matches: query.includes("(min-width: 641px)")
       ? opts.mobile !== true
       : query === "(prefers-reduced-motion: reduce)" && opts.reducedMotion === true,
     media: query,
@@ -841,6 +841,22 @@ console.log("\nhours");
   const toggles = r.all(".timefield__toggle");
   const first = r.q("#" + toggles[0].getAttribute("aria-controls"));
   const second = r.q("#" + toggles[1].getAttribute("aria-controls"));
+  const input = r.all("#panels input[type=time]")[0];
+  let focusCalls = 0;
+  input.focus = () => { focusCalls += 1; };
+
+  const clickClock = () => toggles[0].dispatchEvent(
+    new r.window.MouseEvent("click", { bubbles: true, cancelable: true })
+  );
+  check("the clock click cancels label activation", clickClock(), false);
+  await settle();
+  check("the custom picker opens", first.hidden, false);
+  check("closing with the clock also cancels label activation", clickClock(), false);
+  await wait(360);
+  await settle();
+  check("the custom picker closes", first.hidden, true);
+  check("closing with the clock does not refocus the native time input",
+        focusCalls, 0);
 
   toggles[0].click();
   await settle();

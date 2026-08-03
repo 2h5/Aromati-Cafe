@@ -539,7 +539,7 @@ var AROMATI_ADMIN = (function () {
 
   function desktopTimePicker() {
     return !!(window.matchMedia &&
-      window.matchMedia("(min-width: 641px)").matches);
+      window.matchMedia("(min-width: 641px) and (hover: hover) and (pointer: fine)").matches);
   }
 
   function wirePickerViewport() {
@@ -907,8 +907,13 @@ var AROMATI_ADMIN = (function () {
       }
     };
 
-    on(toggle, "click", function () {
-      if (showing) api.close(true);
+    on(toggle, "click", function (e) {
+      /* The clock lives inside makeField's <label>. Cancel the label's default
+         activation so iOS cannot pass this click through to the time input.
+         When the owner is closing our picker, do not focus that input either:
+         focusing a time input is itself enough to open iOS's native picker. */
+      e.preventDefault();
+      if (showing) api.close(false);
       else api.open();
     });
 
@@ -1046,6 +1051,30 @@ var AROMATI_ADMIN = (function () {
     else window.setTimeout(remove, STATUS_EXIT_MS);
   }
 
+  function positionTabUnderline(host) {
+    if (!host) return;
+    var active = host.querySelector('.tab[aria-selected="true"]');
+    if (!active) return;
+    var firstPosition = !host._tabUnderlineReady;
+    host.style.setProperty("--tab-underline-x", active.offsetLeft + "px");
+    host.style.setProperty("--tab-underline-y",
+      (active.offsetTop + active.offsetHeight - 3) + "px");
+    host.style.setProperty("--tab-underline-width", active.offsetWidth + "px");
+    if (firstPosition) {
+      /* Force the initial geometry to be painted before enabling transitions;
+         otherwise a reload animates the indicator from the top of the bar. */
+      host.offsetWidth;
+      host.classList.add("tabs--ready");
+      host._tabUnderlineReady = true;
+    }
+  }
+
+  function wireTabUnderline(host) {
+    if (host._tabUnderlineWired) return;
+    host._tabUnderlineWired = true;
+    on(window, "resize", function () { positionTabUnderline(host); });
+  }
+
   function makeTab(panel) {
     var b = el("button", "tab", panel.name);
     b.type = "button";
@@ -1055,6 +1084,7 @@ var AROMATI_ADMIN = (function () {
 
   function renderTabs() {
     var host = byId("tabs");
+    wireTabUnderline(host);
     if (host.children.length !== PANELS.length) {
       clear(host);
       PANELS.forEach(function (panel) {
@@ -1063,6 +1093,7 @@ var AROMATI_ADMIN = (function () {
         setTabDot(b, panelChangeCount(panel.id) > 0);
         host.appendChild(b);
       });
+      positionTabUnderline(host);
       return;
     }
 
@@ -1072,6 +1103,7 @@ var AROMATI_ADMIN = (function () {
       b.setAttribute("aria-selected", ui.tab === panel.id ? "true" : "false");
       setTabDot(b, panelChangeCount(panel.id) > 0);
     });
+    positionTabUnderline(host);
   }
 
   function renderAll(animate, preserveScroll) {
@@ -1877,17 +1909,22 @@ var AROMATI_ADMIN = (function () {
      no entry falls back to the prefix itself, so a slot added later lands
      somewhere sensible without this having to be edited first. */
   var PHOTO_GROUPS = {
-    hero:        "The home page — the opening",
-    story:       "The home page — The Idea",
-    kitchen:     "The home page — The Kitchen",
-    cafe:        "The home page — The Café",
-    wine:        "The home page — The Wine Bar",
-    gallery:     "The home page — The Room",
-    visit:       "The home page — Visit",
-    faq:         "The FAQ page",
-    menuFood:    "The food menu",
-    menuDrinks:  "The drinks menu",
-    menuWine:    "The wine list"
+    hero:        "Opening",
+    story:       "Idea",
+    kitchen:     "Kitchen",
+    cafe:        "Café",
+    wine:        "Wine Bar",
+    gallery:     "Room",
+    visit:       "Visit",
+    faq:         "FAQ",
+    menuFood:    "Food",
+    menuDrinks:  "Drinks",
+    menuWine:    "Wine"
+  };
+
+  var HOME_PHOTO_GROUPS = {
+    hero: true, story: true, kitchen: true, cafe: true,
+    wine: true, gallery: true, visit: true
   };
 
   /* The migration raises this sentence; the editor says it first. Same rule,
@@ -1924,6 +1961,14 @@ var AROMATI_ADMIN = (function () {
     return seed ? seed.src : "";
   }
 
+  function photoSectionBreak(label) {
+    var divider = el("div", "photo__section-break");
+    divider.setAttribute("role", "separator");
+    divider.setAttribute("aria-label", label);
+    divider.appendChild(el("span", "photo__section-break__label", label));
+    return divider;
+  }
+
   function renderPhotosPanel(host) {
     host.appendChild(el("p", "panel__intro",
       "Every photograph on the site, listed in the order you would meet them " +
@@ -1951,7 +1996,18 @@ var AROMATI_ADMIN = (function () {
       groups[prefix].push(row);
     });
 
+    var hasHomePhotos = order.some(function (prefix) {
+      return !!HOME_PHOTO_GROUPS[prefix];
+    });
+    if (hasHomePhotos) host.appendChild(photoSectionBreak("Home page"));
+
+    var innerPageBreakShown = false;
     order.forEach(function (prefix) {
+      if (!HOME_PHOTO_GROUPS[prefix] && !innerPageBreakShown) {
+        host.appendChild(photoSectionBreak("Other pages"));
+        innerPageBreakShown = true;
+      }
+
       var group = groups[prefix];
       var cardId = "photos:" + prefix;
       var changed = group.filter(function (r) { return rowChanged("photos", r); }).length;
@@ -3185,8 +3241,11 @@ var AROMATI_ADMIN = (function () {
     byId("who").textContent = "Signed in as " + (user.email || "the owner");
     bootMessage("Loading the site’s content…");
     return load().then(function () {
+      var app = byId("app");
+      app.classList.remove("app--enter");
       show("app");
       renderAll();
+      nextFrame(function () { app.classList.add("app--enter"); });
     }).catch(function (err) {
       bootMessage("Signed in, but the content would not load: " +
                   ((err && err.message) || err) +

@@ -53,9 +53,10 @@ body{
   background: var(--paper);
   color: var(--ink);
   font: 400 16px/1.55 var(--sans);
+  min-width: 0;
   /* The savebar is fixed to the bottom; without this the last card on a long
      panel sits underneath it and cannot be reached on a phone. */
-  padding-bottom: 96px;
+  padding-bottom: calc(96px + env(safe-area-inset-bottom));
 }
 
 h1,h2,h3{ margin: 0; font-weight: 600; letter-spacing: -.01em; }
@@ -107,7 +108,8 @@ h1,h2,h3{ margin: 0; font-weight: 600; letter-spacing: -.01em; }
 
 .topbar{
   display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-  padding: 14px var(--pad);
+  padding: 14px max(var(--pad), env(safe-area-inset-left))
+    14px max(var(--pad), env(safe-area-inset-right));
   background: var(--oxblood); color: var(--cream);
 }
 .topbar__brand{
@@ -115,14 +117,67 @@ h1,h2,h3{ margin: 0; font-weight: 600; letter-spacing: -.01em; }
 }
 .topbar__who{ font-size: 13px; opacity: .8; }
 .topbar__spacer{ flex: 1 1 auto; }
-.topbar__link{ color: var(--gold); font-size: 14px; text-decoration: none; }
-.topbar__link:hover{ text-decoration: underline; }
+.topbar__link{
+  display: inline-flex; align-items: baseline; gap: 5px;
+  color: var(--gold); font-size: 14px; text-decoration: none;
+  transition: color 300ms ease;
+}
+.topbar__link:hover{ text-decoration: none; }
+.topbar__link-go{
+  display: inline-block; font-size: .82em;
+  opacity: 0; transform: translate(-4px, 4px);
+  transition: opacity 400ms ease, transform 400ms cubic-bezier(.22,.61,.36,1);
+}
+.topbar__link:hover .topbar__link-go,
+.topbar__link:focus-visible .topbar__link-go{
+  opacity: .75; transform: none;
+}
+
+#signOut{
+  position: relative; isolation: isolate; overflow: hidden;
+  transition: color 450ms cubic-bezier(.22,.61,.36,1),
+    border-color 450ms cubic-bezier(.22,.61,.36,1);
+}
+#signOut::before{
+  content: ""; position: absolute; inset: 0; z-index: 0;
+  border-radius: inherit; background: var(--cream);
+  transform: scaleX(0); transform-origin: right;
+  transition: transform 550ms cubic-bezier(.22,.61,.36,1);
+}
+#signOut span{ position: relative; z-index: 1; }
+#signOut:hover:not(:disabled){ color: var(--ink); border-color: var(--cream); }
+#signOut:hover:not(:disabled)::before{ transform: scaleX(1); transform-origin: left; }
+
+@keyframes admin-topbar-in{
+  from{ opacity: 0; transform: translateY(-6px); }
+  to{ opacity: 1; transform: translateY(0); }
+}
+.app--enter .topbar__link,
+.app--enter #signOut{
+  animation: admin-topbar-in 280ms cubic-bezier(.22,.61,.36,1) both;
+}
+.app--enter #signOut{ animation-delay: 70ms; }
 
 .tabs{
   display: flex; gap: 2px; flex-wrap: wrap;
-  padding: 0 var(--pad);
+  padding: 0 max(var(--pad), env(safe-area-inset-left))
+    0 max(var(--pad), env(safe-area-inset-right));
   background: var(--oxblood-deep);
   position: sticky; top: 0; z-index: 5;
+}
+.tabs::after{
+  content: "";
+  position: absolute; left: 0; top: 0;
+  width: var(--tab-underline-width, 0px); height: 3px;
+  background: var(--gold); pointer-events: none;
+  transform: translate(var(--tab-underline-x, 0px), var(--tab-underline-y, 0px));
+  transition: none;
+  will-change: transform, width;
+}
+.tabs--ready::after{
+  transition:
+    transform 360ms cubic-bezier(.22,.61,.36,1),
+    width 260ms cubic-bezier(.22,.61,.36,1);
 }
 .tab{
   appearance: none; border: 0; cursor: pointer;
@@ -133,7 +188,7 @@ h1,h2,h3{ margin: 0; font-weight: 600; letter-spacing: -.01em; }
   transition: color 180ms ease, background-color 180ms ease, border-color 180ms ease;
 }
 .tab:hover{ color: var(--cream); }
-.tab[aria-selected="true"]{ color: var(--cream); border-bottom-color: var(--gold); }
+.tab[aria-selected="true"]{ color: var(--cream); border-bottom-color: transparent; }
 .tab__dot{
   display: inline-block; width: 7px; height: 7px; margin-left: 7px;
   border-radius: 50%; background: var(--gold);
@@ -145,7 +200,11 @@ h1,h2,h3{ margin: 0; font-weight: 600; letter-spacing: -.01em; }
   pointer-events: none;
 }
 
-.panels{ padding: var(--pad); max-width: 900px; margin: 0 auto; }
+.panels{
+  padding: var(--pad) max(var(--pad), env(safe-area-inset-right))
+    var(--pad) max(var(--pad), env(safe-area-inset-left));
+  max-width: 900px; margin: 0 auto;
+}
 .panel[hidden]{ display: none; }
 .panel--enter{
   animation: admin-panel-in 260ms cubic-bezier(.22,.61,.36,1) both;
@@ -444,7 +503,8 @@ h1,h2,h3{ margin: 0; font-weight: 600; letter-spacing: -.01em; }
 .savebar{
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
   display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-  padding: 12px var(--pad);
+  padding: 12px max(var(--pad), env(safe-area-inset-left))
+    max(12px, env(safe-area-inset-bottom)) max(var(--pad), env(safe-area-inset-right));
   background: var(--oxblood-deep); color: var(--cream);
   box-shadow: 0 -8px 24px rgba(0,0,0,.22);
 }
@@ -461,9 +521,11 @@ h1,h2,h3{ margin: 0; font-weight: 600; letter-spacing: -.01em; }
 .savebar--busy{ opacity: .8; }
 
 .problems{
-  position: fixed; left: 0; right: 0; bottom: 62px; z-index: 19;
+  position: fixed; left: 0; right: 0;
+  bottom: calc(62px + env(safe-area-inset-bottom)); z-index: 19;
   max-height: 42vh; overflow-y: auto;
-  padding: 14px var(--pad);
+  padding: 14px max(var(--pad), env(safe-area-inset-left))
+    14px max(var(--pad), env(safe-area-inset-right));
   background: var(--danger-bg);
   border-top: 3px solid var(--danger);
 }
@@ -535,7 +597,9 @@ h1,h2,h3{ margin: 0; font-weight: 600; letter-spacing: -.01em; }
 .mini:disabled{ opacity: .3; cursor: not-allowed; }
 
 @media (prefers-reduced-motion: reduce){
-  .tab{ transition: none; }
+  .tab, .tabs::after{ transition: none; }
+  .app--enter .topbar__link, .app--enter #signOut{ animation: none; }
+  .topbar__link-go, #signOut, #signOut::before{ transition: none; }
   .tab__dot, .tab__dot--leaving,
   .field--edited > .field__label::after, .field--edited-leaving > .field__label::after,
   .savebar:not([hidden]), .savebar:not([hidden]).savebar--leaving{ animation: none; }
@@ -586,6 +650,27 @@ h1,h2,h3{ margin: 0; font-weight: 600; letter-spacing: -.01em; }
 .photo__state--new{ color: var(--cognac); font-weight: 600; }
 .photo__state--busy{ font-style: italic; }
 
+.photo__section-break{
+  display: flex; align-items: center; gap: 12px;
+  margin: 28px 0 14px;
+  color: var(--ink-soft);
+}
+.photo__section-break::before,
+.photo__section-break::after{
+  content: ""; flex: 1 1 auto; height: 1px;
+  background: var(--hairline);
+}
+.photo__section-break__label{
+  display: inline-flex; align-items: center; gap: 8px;
+  color: var(--cognac);
+  font-size: 11px; font-weight: 700; letter-spacing: .12em;
+  line-height: 1; text-transform: uppercase; white-space: nowrap;
+}
+.photo__section-break__label::before{
+  content: ""; width: 6px; height: 6px;
+  border-radius: 50%; background: var(--gold);
+}
+
 .photo__problem{
   font-size: 13px; margin: 8px 0 0; padding: 10px 12px;
   border-radius: 6px; background: var(--danger-bg); color: var(--danger);
@@ -620,11 +705,26 @@ h1,h2,h3{ margin: 0; font-weight: 600; letter-spacing: -.01em; }
   width: 1280px; height: 900px; border: 0; visibility: hidden;
 }
 
-@media (max-width: 640px){
+@media (max-width: 900px), (max-width: 1024px) and (orientation: landscape){
   /* The editor has no intentional horizontal scrollers. Keep a sideways
      swipe from pulling the whole page out of alignment on a phone. */
   html{ overflow-x: hidden; overflow-x: clip; }
   body{ overflow-x: hidden; overflow-x: clip; overscroll-behavior-x: none; }
+  /* A two-line sticky tab bar covers the beginning of a panel after the owner
+     scrolls past the topbar. Keep the phone nav compact and let it travel with
+     the page instead, so the Hours introduction and first card are never
+     hidden underneath it. The tab row is its own small scroller only when a
+     very narrow phone cannot fit every label; the document never moves. */
+  .tabs{
+    position: relative; top: auto; flex-wrap: nowrap;
+    overflow-x: auto; overflow-y: hidden;
+    scrollbar-width: none; -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    padding-left: max(8px, env(safe-area-inset-left));
+    padding-right: max(8px, env(safe-area-inset-right));
+  }
+  .tabs::-webkit-scrollbar{ display: none; width: 0; height: 0; }
+  .tab{ flex: 0 0 auto; padding: 14px 10px; white-space: nowrap; }
   /* iOS Safari zooms controls smaller than 16px when they receive focus. */
   .field__input, .field__area, .field__select, .search__input{ font-size: 16px; }
   .row--hours{
