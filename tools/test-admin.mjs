@@ -310,6 +310,21 @@ async function boot(opts) {
   window.URL.createObjectURL = (blob) => "blob:fake/" + (blob && blob.type);
   window.URL.revokeObjectURL = () => {};
 
+  /* Reopening the framing box on a photograph that is already in a slot fetches
+     it back — off this site when it is the built-in one, out of the bucket when
+     it was uploaded. Which URL it asks for is the whole question, so every one
+     is recorded. */
+  const fetched = [];
+  window.fetch = (url) => {
+    fetched.push(String(url));
+    if (opts.fetchFails) return Promise.resolve({ ok: false, status: 404 });
+    return Promise.resolve({
+      ok: true,
+      blob: () => Promise.resolve(
+        new window.Blob([opts.fetchBytes || jpeg()], { type: "image/jpeg" }))
+    });
+  };
+
   const errors = [];
   window.console.error = (...a) => errors.push(a.join(" "));
 
@@ -394,6 +409,8 @@ async function boot(opts) {
       return field.querySelector(".field__input, .field__area, .field__select");
     },
 
+    fetched() { return fetched; },
+
     lastCard() { return all(".card").slice(-1)[0]; },
 
     type(node, value) {
@@ -426,11 +443,60 @@ async function boot(opts) {
 
     /* Choosing a file, as far as the page can tell. `files` is read-only and
        jsdom has no file picker, so it is defined onto the element and the same
-       change event is dispatched. */
-    async pick(block, file) {
+       change event is dispatched.
+
+       Every picked file goes through the framing box before it becomes an
+       upload, so this walks through it too. `how` says with which button:
+       "use" is the default because that is what a person does, "cancel" backs
+       out, and "leave" stops with the box still open for a test that is about
+       the box itself. */
+    async pick(block, file, how) {
       const input = block.querySelector(".photo__file");
       Object.defineProperty(input, "files", { value: [file], configurable: true });
       input.dispatchEvent(new window.Event("change", { bubbles: true }));
+      await settle();
+      if (how !== "leave") await this.frame(how || "use");
+    },
+
+    /* The framing box, if it is open. */
+    framer() { return q(".framer"); },
+
+    /* Reopen the framing box on the photograph already in a slot. */
+    async adjust(block, how) {
+      const button = [...block.querySelectorAll("button")]
+        .find((b) => b.textContent === "Adjust framing");
+      if (!button) throw new Error("no Adjust framing button on that photograph");
+      button.click();
+      await settle();
+      if (how !== "leave") await this.frame(how || "use");
+    },
+
+    /* Come out of the framing box: "use" keeps the framing, "cancel" throws it
+       away. Silent when there is no box, so a test about a file that was
+       refused before the box could open does not have to know that. */
+    async frame(how) {
+      const box = q(".framer");
+      if (!box) return false;
+      const label = how === "cancel" ? "Cancel" : "Use this framing";
+      const button = [...box.querySelectorAll("button")]
+        .find((b) => b.textContent === label);
+      if (!button) throw new Error(`no ${label} button in the framing box`);
+      button.click();
+      await settle();
+      return true;
+    },
+
+    /* The shape buttons across the top, by the words on them. */
+    shapes() {
+      const box = q(".framer");
+      return box ? [...box.querySelectorAll(".framer__shape")].map((b) => b.textContent) : [];
+    },
+
+    async shape(label) {
+      const button = [...q(".framer").querySelectorAll(".framer__shape")]
+        .find((b) => b.textContent === label);
+      if (!button) throw new Error(`no shape called ${JSON.stringify(label)}`);
+      button.click();
       await settle();
     },
 
@@ -1078,9 +1144,12 @@ console.log("\npicking a photograph");
   const after = r.photo("The photograph behind the opening headline");
   check("and shows the file itself rather than the old photograph",
         after.querySelector(".photo__img").getAttribute("src"), "blob:fake/image/webp");
-  check("resized to fit, and the size said out loud",
+  /* 16:9 rather than the file's own 4:3, because that is the shape the framing
+     box opened on: hero.main is a full-bleed band and the box offers the shape
+     the band is usually closest to first. */
+  check("framed to the shape of the space, and the size said out loud",
         after.querySelector(".photo__state").textContent,
-        "Ready to upload — 2000 × 1500, 146 KB. Nothing has been sent yet.");
+        "Ready to upload — 2000 × 1125, 110 KB. Nothing has been sent yet.");
 
   await r.save();
 
@@ -1095,7 +1164,7 @@ console.log("\npicking a photograph");
   check("and the row records the path and the new size",
         [sent[2].table, sent[2].payload.storage_path === sent[0].path,
          sent[2].payload.width, sent[2].payload.height],
-        ["photos", true, 2000, 1500]);
+        ["photos", true, 2000, 1125]);
   check("and nothing is swept, because nothing was replaced",
         sent.filter((s) => s.what === "remove"), []);
 
@@ -1107,18 +1176,214 @@ console.log("\npicking a photograph");
   check("and the page has nothing left to send", r.sent().length, sent.length);
 }
 
+console.log("\nthe framing box");
+{
+  const r = await boot();
+  await r.signIn();
+  r.tab("Photos");
+
+  await r.pick(r.photo("The photograph behind the opening headline"),
+               r.file("room.jpg", "image/jpeg", jpeg()), "leave");
+
+  check("picking a file opens it", !!r.framer(), true);
+  check("and says which photograph is being framed",
+        r.q(".framer__where").textContent,
+        "The photograph behind the opening headline");
+  check("a space with no fixed shape offers shapes to choose from",
+        r.shapes(),
+        ["As the page has it", "As it is", "Tall", "Square", "Wide"]);
+  check("and says why it cannot be an exact preview",
+        r.q(".framer__help").textContent.includes("changes shape with the window"), true);
+
+  await r.frame("cancel");
+  check("backing out closes it", !!r.framer(), false);
+  check("and leaves nothing outstanding", r.changeCount(), "No changes yet");
+  check("nor anything to send", r.sent(), []);
+  check("the built-in photograph is still what is on screen",
+        r.photo("The photograph behind the opening headline")
+          .querySelector(".photo__img").getAttribute("src"),
+        "assets/web/hero-dining.jpg");
+}
+
+{
+  /* A slot whose container really is one shape in styles.css. The shape is not
+     a choice there, because offering one would be offering to store something
+     the page is going to crop again. */
+  const data = fixture();
+  data.photos.push({
+    id: "ph3", slot: "story.a", label: "The Idea — the upper photograph",
+    storage_path: null, source_path: null, alt: "A wall", width: 1023, height: 1537,
+    is_decorative: false, sort_order: 15
+  });
+
+  const r = await boot({ data, seedPhotos: Object.assign({}, SEED_PHOTOS, {
+    "story.a": { src: "assets/web/idea-a.jpg", alt: "A wall", width: 1023, height: 1537 }
+  }) });
+  await r.signIn();
+  r.tab("Photos");
+
+  await r.pick(r.photo("The Idea — the upper photograph"),
+               r.file("wall.jpg", "image/jpeg", jpeg()), "leave");
+
+  check("a fixed frame offers no shape at all", r.shapes(), []);
+  check("and says the box is showing what the site will show",
+        r.q(".framer__help").textContent.includes("What you see here is what the site shows"),
+        true);
+
+  await r.frame("use");
+  check("what comes out is in the frame's own ratio, 3:2",
+        r.photo("The Idea — the upper photograph").querySelector(".photo__state").textContent,
+        "Ready to upload — 2000 × 1333, 130 KB. Nothing has been sent yet.");
+}
+
+console.log("\nframing a photograph that is already in the slot");
+{
+  /* Nothing uploaded, so the slot is showing the file the site was built with.
+     That file is in git and served from this same origin, so it is as unframed
+     as it has ever been and the box can open it. */
+  const r = await boot();
+  await r.signIn();
+  r.tab("Photos");
+
+  await r.adjust(r.photo("The photograph behind the opening headline"));
+
+  check("the built-in photograph is what was reopened",
+        r.fetched(), ["assets/web/hero-dining.jpg"]);
+  check("and framing it makes an upload out of it",
+        r.photo("The photograph behind the opening headline")
+          .querySelector(".photo__state").textContent
+          .startsWith("Ready to upload"), true);
+
+  await r.save();
+  const sent = r.sent();
+  check("which is kept as its own original, so it can be widened again later",
+        [sent.filter((s) => s.what === "upload").length,
+         sent[1].path.endsWith("-original.jpg")], [2, true]);
+  check("and nothing is swept, because the built-in file is not in the bucket",
+        sent.filter((s) => s.what === "remove"), []);
+}
+
+{
+  /* An upload whose original was kept. The box opens *that*, not the copy on
+     the site, so a framing chosen once can always be widened back out. */
+  const data = fixture();
+  data.photos[0].storage_path = "hero.main/1700000000000.webp";
+  data.photos[0].source_path = "hero.main/1700000000000-original.jpg";
+
+  const r = await boot({ data });
+  await r.signIn();
+  r.tab("Photos");
+
+  await r.adjust(r.photo("The photograph behind the opening headline"));
+
+  check("the original is what was reopened, not the framed copy",
+        r.fetched(),
+        ["https://yofoiqgknsqzsuwtlqvh.supabase.co/storage/v1/object/public/" +
+         "site-photos/hero.main/1700000000000-original.jpg"]);
+
+  await r.save();
+  const sent = r.sent();
+  check("only the new framing goes up — the original is already there",
+        sent.filter((s) => s.what === "upload").length, 1);
+  check("and the row still names it",
+        sent.find((s) => s.what === "update").payload.source_path,
+        "hero.main/1700000000000-original.jpg");
+  check("so only the framed copy it replaces is swept",
+        sent.find((s) => s.what === "remove").paths, ["hero.main/1700000000000.webp"]);
+}
+
+{
+  /* An upload with no original kept — the state a photograph would be in if
+     its original had been too big for the bucket. Framing still works, but
+     only inwards, and the panel says so before the button is pressed. */
+  const data = fixture();
+  data.photos[0].storage_path = "hero.main/1700000000000.webp";
+  data.photos[0].source_path = null;
+
+  const r = await boot({ data });
+  await r.signIn();
+  r.tab("Photos");
+
+  const helps = [...r.photo("The photograph behind the opening headline")
+                   .querySelectorAll(".field__help")].map((n) => n.textContent);
+  check("the panel warns that this one cannot be widened back out",
+        helps.some((t) => t.includes("cannot widen back out")), true);
+
+  await r.adjust(r.photo("The photograph behind the opening headline"));
+  check("so the copy on the site is what gets reopened",
+        r.fetched(),
+        ["https://yofoiqgknsqzsuwtlqvh.supabase.co/storage/v1/object/public/" +
+         "site-photos/hero.main/1700000000000.webp"]);
+
+  await r.save();
+  check("and nothing pretends to be an original afterwards",
+        [r.uploads().length,
+         r.sent().find((s) => s.what === "update").payload.source_path], [1, null]);
+}
+
+{
+  /* Framing a file that was picked a moment ago and not saved. It is still in
+     memory, so nothing is fetched, and the original queued behind it goes up
+     once rather than twice. */
+  const r = await boot();
+  await r.signIn();
+  r.tab("Photos");
+
+  await r.pick(r.photo("The photograph behind the opening headline"),
+               r.file("room.jpg", "image/jpeg", jpeg()));
+  await r.adjust(r.photo("The photograph behind the opening headline"), "leave");
+
+  check("nothing is fetched — the picture never left the browser", r.fetched(), []);
+  await r.shape("Square");
+  await r.frame("use");
+
+  check("the new framing is what the slot is holding",
+        r.photo("The photograph behind the opening headline")
+          .querySelector(".photo__state").textContent
+          .startsWith("Ready to upload — 1950 × 1950"), true);
+
+  await r.save();
+  const uploads = r.uploads();
+  check("one framed copy and one original, not two of either", uploads.length, 2);
+  check("and the row names the original that really went up",
+        r.sent().find((s) => s.what === "update").payload.source_path,
+        uploads[1].path);
+}
+
+{
+  const data = fixture();
+  data.photos[0].storage_path = "hero.main/1700000000000.webp";
+
+  const r = await boot({ data, fetchFails: true });
+  await r.signIn();
+  r.tab("Photos");
+
+  await r.adjust(r.photo("The photograph behind the opening headline"));
+
+  check("a photograph that cannot be read back says so",
+        r.photo("The photograph behind the opening headline")
+          .querySelector(".photo__problem").textContent,
+        "The photograph already in this slot could not be reopened for framing. " +
+        "Choose it again from your device instead.");
+  check("and nothing is outstanding as a result", r.changeCount(), "No changes yet");
+}
+
 console.log("\na photograph of a very different shape");
 {
-  /* hero.main is 1535 × 1024 — a landscape slot in a full-bleed band. A phone
-     photograph held upright goes into it and loses its top and bottom, and
-     nothing anywhere errors: the editor's own thumbnail is cropped to the same
-     shape, so it looks fine right up until it is on the page. */
+  /* hero.main is 1535 × 1024 — a landscape band. Framing is what stops a phone
+     photograph held upright from losing its top and bottom there, but the box
+     lets the owner choose a tall shape for it anyway, and a tall picture in a
+     wide band is cropped by the page with nothing anywhere reporting a problem.
+     So the shapes are still compared after the framing, not before it. */
   const r = await boot({ decoded: { width: 3000, height: 4000 } });
   await r.signIn();
   r.tab("Photos");
 
   await r.pick(r.photo("The photograph behind the opening headline"),
-               r.file("IMG_9001.jpg", "image/jpeg", jpeg({ width: 3000, height: 4000 })));
+               r.file("IMG_9001.jpg", "image/jpeg", jpeg({ width: 3000, height: 4000 })),
+               "leave");
+  await r.shape("Tall");
+  await r.frame("use");
 
   const said = r.photo("The photograph behind the opening headline")
                 .querySelector(".photo__problem").textContent;
@@ -1131,13 +1396,15 @@ console.log("\na photograph of a very different shape");
 }
 
 {
-  const r = await boot({ decoded: { width: 3000, height: 2000 } });
+  /* The same upright photograph, framed the way the box offers it first. There
+     is now nothing to warn about — which is the point of the whole feature. */
+  const r = await boot({ decoded: { width: 3000, height: 4000 } });
   await r.signIn();
   r.tab("Photos");
   await r.pick(r.photo("The photograph behind the opening headline"),
-               r.file("similar.jpg", "image/jpeg", jpeg({ width: 3000, height: 2000 })));
+               r.file("IMG_9002.jpg", "image/jpeg", jpeg({ width: 3000, height: 4000 })));
 
-  check("a similar shape is not remarked on",
+  check("framed to the shape of the space, nothing is remarked on",
         r.photo("The photograph behind the opening headline")
           .querySelector(".photo__problem").hidden, true);
 }
@@ -1289,17 +1556,23 @@ console.log("\na photograph taken with the phone on its side");
   await r.signIn();
   r.tab("Photos");
 
+  /* Framed as it is, so the shape that comes out of the box is the shape the
+     turn produced and the rotation is what the numbers are about. */
   await r.pick(r.photo("The photograph behind the opening headline"),
-               r.file("IMG_2201.jpg", "image/jpeg", jpeg({ orientation: 6 })));
+               r.file("IMG_2201.jpg", "image/jpeg", jpeg({ orientation: 6 })), "leave");
+  await r.shape("As it is");
+  await r.frame("use");
 
   check("it comes out the right way up",
         r.photo("The photograph behind the opening headline")
           .querySelector(".photo__state").textContent
           .startsWith("Ready to upload — 1500 × 2000"), true);
 
+  /* 2600 is the working edge, not the published one: the turn is applied when
+     the file is decoded, and the framing box works on that copy. */
   const transform = r.drawn().find((d) => d.what === "setTransform");
   check("drawn through the quarter turn the tag asked for",
-        transform.m, [0, 1, -1, 0, 2000, 0]);
+        transform.m, [0, 1, -1, 0, 2600, 0]);
 
   /* The raw pixels were asked for deliberately. A browser that hands back an
      already-rotated bitmap is caught by the swap test instead — checked below

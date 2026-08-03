@@ -42,6 +42,14 @@ the features around it, not adding a new architecture.
   numbers or rely on database order.
 - A photo is not uploaded until the owner saves. Discard must remain safe, and
   restoring the original photo must remain possible.
+- Framing is baked into the uploaded file. The public site must keep doing
+  nothing but cover-fit a picture into its container — no focal-point columns,
+  no new CSS on the public pages.
+- Every upload keeps an unframed copy as its `source_path`. That file is what
+  makes framing undoable, and nothing a visitor loads ever touches it.
+- `FRAME_BY_SLOT` and `FRAME_BY_PREFIX` in `admin.js` mirror the `aspect-ratio`
+  rules in `styles.css`. Change one and change the other, or the framing box
+  crops to a different shape than the page does.
 
 ## Main pieces
 
@@ -129,6 +137,29 @@ browser's dropdown is replaced: its indicator is hidden and a clock button opens
 the editor's own three-column panel. The panel is placed on the row rather than
 inside the field, because the row bottom-aligns its boxes and a field that grew
 would drag its neighbour down.
+
+## Framing a photograph
+
+Every picked file goes through a framing box before it becomes an upload, and
+`Adjust framing` reopens it on a photograph already in a slot. The frame holds
+still and the picture moves behind it: drag or arrow-key to pan, a slider or
+`+`/`-` to zoom to 4×, Escape to back out. The crop is written into the file
+that gets uploaded, which is why nothing on the public site had to change.
+
+Where the box gets its unframed pixels from decides what can be done next, and
+this is the part that is easy to get wrong:
+
+| The slot is showing | The box opens | Afterwards |
+| --- | --- | --- |
+| A file picked this sitting | the copy held in memory | its queued original goes up once, unchanged |
+| An upload with a `source_path` | that original, out of the bucket | the original stays where it is; only the framed copy is replaced and swept |
+| The photograph the site was built with | the committed file under `assets/`, same origin | the crop gets an original of its own, so it can be widened again |
+| An upload with no `source_path` | the framed copy on the site | framing works inwards only, and the panel says so before the button is pressed |
+
+The last row is the one that cannot be fixed after the fact, and today it is
+empty: `photos` has no row with a `storage_path`, so every slot is still on its
+built-in file and every future upload keeps an original. It can only be reached
+by an upload whose 2600px original came out over the bucket's 3 MB limit.
 
 Do not treat a CMS-to-files sync tool as current work. The CMS is the editing
 surface. Revisit that only if the project later needs offline fallback files to

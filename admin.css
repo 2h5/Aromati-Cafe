@@ -955,9 +955,11 @@ button{ font-family: inherit; }
 .photo:first-child{ border-top: 0; padding-top: 0; }
 .photo--edited{ box-shadow: inset 3px 0 0 var(--gold); padding-left: 14px; }
 
+/* The shape of the hole this photograph goes into, set per slot from
+   admin.js — so the thumbnail crops the way the page crops. */
 .photo__shot{
-  aspect-ratio: 4 / 3; border-radius: 10px; overflow: hidden;
-  background: var(--line);
+  aspect-ratio: var(--shot-ratio, 4 / 3); border-radius: 10px; overflow: hidden;
+  background: var(--line); align-self: start;
 }
 .photo__img{ width: 100%; height: 100%; object-fit: cover; display: block; }
 
@@ -987,6 +989,89 @@ button{ font-family: inherit; }
 .photo__file{
   position: absolute; width: 1px; height: 1px;
   opacity: 0; overflow: hidden; clip-path: inset(50%);
+}
+
+/* Choose, frame, put back — three things you can do to one photograph, on one
+   line while there is room for one. */
+.photo__acts{
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px;
+}
+.photo__acts .photo__pick{ margin-top: 0; }
+
+/* ── framing the photograph ───────────────────
+   The frame holds still and the picture moves behind it. Everything about the
+   stage's size is set from JavaScript through the custom properties below,
+   because its shape is a promise about what the site will show — an
+   aspect-ratio box that a max-height silently overrode would crop to something
+   other than what was framed. */
+
+/* The editor's own shell never scrolls, but iOS will still rubber-band the
+   document under a modal while a finger is dragging the photograph. */
+body.is-framing{ overflow: hidden; }
+
+.framer{
+  position: fixed; inset: 0; z-index: 60;
+  display: grid; place-items: center; padding: 16px;
+  background: rgba(42, 26, 21, .55);
+  backdrop-filter: blur(3px);
+}
+
+.framer__panel{
+  width: min(560px, 100%); max-height: 94vh; overflow-y: auto;
+  background: var(--card); border-radius: 14px;
+  box-shadow: 0 24px 60px rgba(42, 26, 21, .28);
+  padding: clamp(16px, 3vw, 26px);
+  opacity: 0; transform: translateY(10px) scale(.99);
+  transition: opacity 240ms ease, transform 240ms ease;
+}
+.framer__panel.is-in{ opacity: 1; transform: none; }
+
+.framer__title{
+  font-family: var(--serif); font-weight: 500;
+  font-size: 22px; margin: 0;
+}
+.framer__where{
+  font-size: 12px; color: var(--ink-faint); margin: 4px 0 0;
+}
+.framer__help{
+  font-size: 13px; line-height: 1.5; color: var(--ink-soft); margin: 10px 0 14px;
+}
+
+.framer__shapes{ display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.framer__shape[aria-pressed="true"]{
+  background: var(--maroon-600); color: var(--cream); border-color: var(--maroon-600);
+}
+
+.framer__hold{ display: flex; justify-content: center; }
+
+.framer__stage{
+  position: relative; overflow: hidden; border-radius: 10px;
+  width: var(--stage-w, 320px); height: var(--stage-h, 240px);
+  background: var(--field); box-shadow: inset 0 0 0 1px var(--line);
+  cursor: grab; touch-action: none;
+}
+.framer__stage:focus-visible{ outline: 2px solid var(--gold); outline-offset: 3px; }
+.framer__stage.is-dragging{ cursor: grabbing; }
+
+.framer__img{
+  position: absolute; left: 0; top: 0; display: block;
+  width: var(--framer-w); height: var(--framer-h);
+  transform: translate(var(--framer-x, 0px), var(--framer-y, 0px));
+  user-select: none; -webkit-user-drag: none;
+}
+
+.framer__zoom{
+  display: flex; align-items: center; gap: 12px; margin: 16px 0 0;
+  font-size: 12px; color: var(--ink-soft);
+}
+.framer__slider{ flex: 1; accent-color: var(--maroon-600); }
+
+.framer__actions{
+  display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px;
+}
+
+@media (prefers-reduced-motion: reduce){
+  .framer__panel{ transition: none; }
 }
 
 /* The hidden frame the headline check measures in. Off-screen rather than

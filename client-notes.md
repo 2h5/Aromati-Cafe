@@ -144,11 +144,24 @@ photograph** button under each one.
   built with cannot be lost, so you can always undo.
 - The site resizes and re-compresses what you pick, so a photo straight off a
   phone is fine. Photos taken sideways come out the right way up.
-- **The shape matters more than the size.** Each space on the page is a fixed
-  shape and the picture is cropped to fill it. Put a tall phone photo into a
-  wide space and the top and bottom are cut off — it looks right in the editor
-  and wrong on the page. The editor warns you when the shapes are very
-  different. It is a warning, not a refusal.
+- **You choose what part of the photo shows.** Pick a file and a framing box
+  opens: drag the photo to move it, and use the slider to zoom in closer. The
+  box is the shape of the space on the page, so what you see there is what the
+  site shows. Press **Use this framing** when it looks right, or **Cancel** to
+  throw the whole thing away.
+- Some spaces — the big photo at the top of the home page, the banner on a menu
+  page — change shape with the size of the window, so those offer you a few
+  shapes to choose from and the box says it cannot be an exact preview. Keep
+  anything that matters away from the edges there.
+- **Adjust framing** reopens that box on a photo already on the site, so a
+  badly-placed one does not have to be found on your phone and uploaded again.
+  It opens the photo as it was *before* any framing, so you can always widen
+  back out. If a photo ever cannot be widened, the editor tells you so under
+  the buttons rather than letting you find out by pressing one.
+- **The shape still matters.** Each space on the page is cropped to fill, so if
+  you deliberately frame a tall photo for a wide space the top and bottom are
+  still cut off. The editor warns you when the shapes are very different. It is
+  a warning, not a refusal.
 - **Every photograph needs a short description** — one sentence saying what is
   in it. It is read aloud to people using a screen reader, and it is what
   appears if the picture ever fails to load. A few images are background texture

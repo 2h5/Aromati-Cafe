@@ -2351,6 +2351,61 @@ var AROMATI_ADMIN = (function () {
   var MAX_EDGE = 2000;
   var WEBP_QUALITY = 0.86;
 
+  /* The copy the framing box pans around, and the copy kept in the bucket as
+     the photograph's source. Larger than what the site is given, because
+     framing in means throwing pixels away: cropping to the middle third of a
+     2000px picture would otherwise store a 660px one.
+
+     Kept at a higher quality than the published file because it is a master
+     rather than a download. No visitor ever loads it — it is read by this
+     editor and by nothing else, only when the framing box is reopened. */
+  var WORK_EDGE = 2600;
+  var SOURCE_QUALITY = 0.92;
+
+  /* The shape of the hole each photograph goes into.
+
+     `fixed` is the difference between a promise and a hint. A fixed frame is a
+     container on the page with a real aspect-ratio in styles.css: what the
+     framing box shows is exactly what the site shows, so the shape is not
+     offered as a choice. The rest are spaces whose shape follows the window —
+     a full-bleed hero band, a masthead, a panel that stretches to match the
+     column beside it — and for those the ratio below is the shape the space is
+     usually closest to, offered as a starting point rather than as a preview.
+
+     These are read off styles.css and have to be kept in step with it. Getting
+     one wrong is not a crash: it is a framing box that crops to one shape while
+     the page crops to another, which looks like the editor lying. */
+  var FRAME_BY_SLOT = {
+    "story.a":          { w: 3,  h: 2,    fixed: true },   /* .story__img--a */
+    "story.b":          { w: 16, h: 10,   fixed: true },   /* .story__img--b */
+    "gallery.g1":       { w: 16, h: 10,   fixed: true },   /* .g1 */
+    "gallery.g2":       { w: 3,  h: 3.34, fixed: true },   /* .g2 */
+    "gallery.g3":       { w: 3,  h: 3.8,  fixed: true },   /* .g3 */
+    "gallery.g4":       { w: 16, h: 9.4,  fixed: true },   /* .g4 */
+    "gallery.g5":       { w: 16, h: 11,   fixed: true },   /* .g5 */
+    "gallery.g6":       { w: 16, h: 11,   fixed: true },   /* .g6 */
+
+    "hero.main":        { w: 16, h: 9,  fixed: false },    /* the full-bleed band */
+    "wine.backdrop":    { w: 16, h: 9,  fixed: false },    /* behind the section */
+    "wine.board":       { w: 1,  h: 1,  fixed: false },    /* stretches to the list */
+    "visit.storefront": { w: 4,  h: 5,  fixed: false }     /* a full-height column */
+  };
+
+  var FRAME_BY_PREFIX = {
+    kitchen:    { w: 4, h: 3.2, fixed: true },   /* .plate img */
+    cafe:       { w: 3, h: 4.1, fixed: true },   /* .cafe__card */
+    faq:        { w: 2, h: 1,   fixed: false },  /* .mhead, a wide banner */
+    menuFood:   { w: 2, h: 1,   fixed: false },
+    menuDrinks: { w: 2, h: 1,   fixed: false },
+    menuWine:   { w: 2, h: 1,   fixed: false }
+  };
+
+  function slotFrame(slot) {
+    return FRAME_BY_SLOT[slot] ||
+      FRAME_BY_PREFIX[String(slot).split(".")[0]] ||
+      { w: 4, h: 3, fixed: false };
+  }
+
   /* Section names, keyed by the part of the slot before the dot. A prefix with
      no entry falls back to the prefix itself, so a slot added later lands
      somewhere sensible without this having to be edited first. */
@@ -2450,7 +2505,14 @@ var AROMATI_ADMIN = (function () {
     var wrap = el("div", "photo");
     if (rowChanged("photos", row)) wrap.className = "photo photo--edited";
 
+    /* The thumbnail is cropped the way the page crops it. A 4:3 box showing an
+       upright photograph uncropped would be the editor telling the owner
+       something untrue about their own page — and it is the same lie that made
+       framing necessary in the first place. */
     var figure = el("div", "photo__shot");
+    var frame = slotFrame(row.slot);
+    figure.style.setProperty("--shot-ratio", frame.w + " / " + frame.h);
+
     var img = el("img", "photo__img");
     img.src = previewSrc(row);
     /* The description is in a box directly beside this, being read and edited.
@@ -2515,7 +2577,21 @@ var AROMATI_ADMIN = (function () {
       if (picked) prepare(picked, row, view);
     });
     pick.appendChild(file);
-    side.appendChild(pick);
+
+    var acts = el("div", "photo__acts");
+    acts.appendChild(pick);
+
+    /* ── frame the one already there ──
+       So a badly placed photograph does not have to be hunted down on a phone
+       and uploaded again. It opens the picture as it was *before* any framing
+       wherever that picture can still be had, so framing can always be undone
+       by coming back here. */
+    if (row._upload || row.storage_path || builtIn(row.slot)) {
+      var adjust = el("button", "btn btn--small", "Adjust framing");
+      adjust.type = "button";
+      on(adjust, "click", function () { reframe(row, view); });
+      acts.appendChild(adjust);
+    }
 
     /* ── put it back ──
        Always offered, because the built-in photograph is in the markup and
@@ -2533,7 +2609,19 @@ var AROMATI_ADMIN = (function () {
         row.height = seed ? (seed.height || null) : null;
         renderAll();
       });
-      side.appendChild(revert);
+      acts.appendChild(revert);
+    }
+
+    side.appendChild(acts);
+
+    /* A photograph whose original was never kept can still be framed, but only
+       from the copy that is on the site — so say so here, rather than letting
+       the owner find out by pressing the button and finding no way back out. */
+    if (row.storage_path && !row.source_path && !(row._upload && row._upload.source)) {
+      side.appendChild(el("p", "field__help",
+        "The original of this one was not kept, so adjusting its framing works " +
+        "from the copy that is on the site and cannot widen back out. Choosing " +
+        "the photograph again from your device fixes that for good."));
     }
 
     /* ── the description ── */
@@ -2764,77 +2852,10 @@ var AROMATI_ADMIN = (function () {
       return;
     }
 
-    file.arrayBuffer().then(function (buffer) {
-      var orientation = readOrientation(buffer);
-      var raw = rawSize(buffer);
-      /* "none" is a request for the pixels as stored. A browser that ignores it
-         is caught by orientationToApply rather than trusted. */
-      return makeBitmap(file, { imageOrientation: "none" }).then(function (bitmap) {
-        return { bitmap: bitmap, orientation: orientationToApply(bitmap, raw, orientation) };
-      });
-    }).then(function (decoded) {
-      var bitmap = decoded.bitmap;
-      var turn = decoded.orientation;
-
-      var fit = fitInside(bitmap.width, bitmap.height, MAX_EDGE);
-      var out = swapsAxes(turn)
-        ? { width: fit.height, height: fit.width }
-        : { width: fit.width, height: fit.height };
-
-      var canvas = document.createElement("canvas");
-      canvas.width = out.width;
-      canvas.height = out.height;
-      var ctx = canvas.getContext("2d");
-      var m = ORIENT[turn] || ORIENT[1];
-      /* The matrix is written in units of the source, so the translate terms
-         are multiplied up by the size it is being drawn at. */
-      ctx.setTransform(m[0], m[1], m[2], m[3],
-                       m[4] * fit.width, m[5] * fit.height);
-      ctx.drawImage(bitmap, 0, 0, fit.width, fit.height);
-      if (bitmap.close) bitmap.close();
-
-      view.say("Compressing…", "busy");
-      return toBlob(canvas, "image/webp", WEBP_QUALITY).then(function (blob) {
-        return { blob: blob, width: out.width, height: out.height };
-      });
-    }).then(function (made) {
-      if (!made.blob) throw new Error("this browser would not re-encode the photograph");
-      if (made.blob.size > MAX_BYTES) {
-        throw new Error("even after resizing, the photograph is " + kb(made.blob.size) +
-                        " and the limit is " + kb(MAX_BYTES) + ". Try a smaller one.");
-      }
-
-      forgetUpload(row);
-
-      /* The path carries the slot and the moment, so two uploads to the same
-         slot never collide and a file in the bucket says where it belongs
-         without anything having to be looked up. */
-      var stamp = String(Date.now());
-      var base = row.slot + "/" + stamp;
-      var keepOriginal = file.size <= MAX_BYTES && ALLOWED_TYPES.indexOf(file.type) >= 0;
-
-      row._upload = {
-        blob: made.blob,
-        path: base + ".webp",
-        width: made.width,
-        height: made.height,
-        bytes: made.blob.size,
-        preview: window.URL.createObjectURL(made.blob),
-        /* The file exactly as it was picked, so a crop can be undone later
-           against the pixels the owner actually chose. Skipped when it is over
-           the bucket's limit: the site needs the display copy, and failing the
-           whole upload to preserve something nothing reads yet would be the
-           wrong trade. */
-        source: keepOriginal ? file : null,
-        sourcePath: keepOriginal ? base + "-original" + extensionFor(file.type) : null
-      };
-
-      row.storage_path = row._upload.path;
-      row.source_path = row._upload.sourcePath;
-      row.width = made.width;
-      row.height = made.height;
-
-      renderAll();
+    workCopy(file).then(function (work) {
+      /* A new file, so the working copy becomes the photograph's source and
+         whatever source the slot had is on its way out with the old picture. */
+      return frameAndKeep(work, row, view, "new");
     }).catch(function (err) {
       view.say("");
       view.problem("That photograph could not be prepared: " +
@@ -2842,11 +2863,504 @@ var AROMATI_ADMIN = (function () {
     });
   }
 
-  function extensionFor(type) {
-    if (type === "image/png") return ".png";
-    if (type === "image/webp") return ".webp";
-    return ".jpg";
+  /* One image — picked off a phone, fetched off this site, or fetched back out
+     of the bucket — decoded, turned the right way up, and shrunk to the size
+     the framing box works at. */
+  function workCopy(file) {
+    return file.arrayBuffer().then(function (buffer) {
+      var orientation = readOrientation(buffer);
+      var raw = rawSize(buffer);
+      /* "none" is a request for the pixels as stored. A browser that ignores it
+         is caught by orientationToApply rather than trusted. */
+      return window.createImageBitmap(file, { imageOrientation: "none" })
+        .then(function (bitmap) {
+          return upright(bitmap, orientationToApply(bitmap, raw, orientation));
+        });
+    });
   }
+
+  function upright(bitmap, turn) {
+    var fit = fitInside(bitmap.width, bitmap.height, WORK_EDGE);
+    var out = swapsAxes(turn)
+      ? { width: fit.height, height: fit.width }
+      : { width: fit.width, height: fit.height };
+
+    var canvas = document.createElement("canvas");
+    canvas.width = out.width;
+    canvas.height = out.height;
+    var ctx = canvas.getContext("2d");
+    var m = ORIENT[turn] || ORIENT[1];
+    /* The matrix is written in units of the source, so the translate terms are
+       multiplied up by the size it is being drawn at. */
+    ctx.setTransform(m[0], m[1], m[2], m[3],
+                     m[4] * fit.width, m[5] * fit.height);
+    ctx.drawImage(bitmap, 0, 0, fit.width, fit.height);
+    if (bitmap.close) bitmap.close();
+    return canvas;
+  }
+
+  /* Open the framing box on a working copy, and if the owner comes out of it
+     with a picture, make that the slot's pending upload.
+
+     `plan` is what to do about the source, and it is the whole of the
+     difference between the three ways in:
+
+       "new"   this working copy is the photograph's original — keep it
+       "keep"  the original is already kept and is what this was framed from,
+               so leave it exactly where it is
+       "none"  there was no original to open, so this was framed from the copy
+               on the site and there is nothing honest to store as one
+
+     Nothing is sent anywhere here. As everywhere else in this panel, a picture
+     reaches the bucket when the owner saves and not before. */
+  function frameAndKeep(work, row, view, plan) {
+    view.say("", null);
+
+    return openFramer(work, row).then(function (out) {
+      if (!out) { view.redraw(); return; }
+
+      view.say("Compressing…", "busy");
+      return toBlob(out, "image/webp", WEBP_QUALITY).then(function (blob) {
+        if (!blob) throw new Error("this browser would not re-encode the photograph");
+        if (blob.size > MAX_BYTES) {
+          throw new Error("even after framing, the photograph is " + kb(blob.size) +
+                          " and the limit is " + kb(MAX_BYTES) + ". Try a smaller one.");
+        }
+
+        /* The path carries the slot and the moment, so two uploads to the same
+           slot never collide and a file in the bucket says where it belongs
+           without anything having to be looked up. */
+        var stem = row.slot + "/" + String(Date.now());
+
+        return sourceFor(work, row, plan, stem).then(function (kept) {
+          forgetUpload(row);
+
+          row._upload = {
+            blob: blob,
+            path: stem + ".webp",
+            width: out.width,
+            height: out.height,
+            bytes: blob.size,
+            preview: window.URL.createObjectURL(blob),
+            /* The picture before it was framed, so the framing can be widened
+               back out later. Null when there is nothing truthful to keep. */
+            source: kept.blob,
+            sourcePath: kept.path,
+            /* Held for the rest of this sitting so a second trip through the
+               framing box costs nothing and needs no network at all. */
+            work: work
+          };
+
+          row.storage_path = row._upload.path;
+          row.source_path = kept.path;
+          row.width = out.width;
+          row.height = out.height;
+
+          renderAll();
+        });
+      });
+    }).catch(function (err) {
+      view.say("");
+      view.problem("That photograph could not be prepared: " +
+                   ((err && err.message) || err) + ".");
+    });
+  }
+
+  var NO_SOURCE = { blob: null, path: null };
+
+  function sourceFor(work, row, plan, stem) {
+    /* An upload that has not been saved yet already has its source sitting in
+       memory waiting to go up. Re-framing it must send that same file to that
+       same path rather than making a second one nothing points at. */
+    var pending = row._upload;
+    if (pending && pending.source && pending.sourcePath) {
+      return Promise.resolve({ blob: pending.source, path: pending.sourcePath });
+    }
+    if (plan === "keep" && row.source_path) {
+      return Promise.resolve({ blob: null, path: row.source_path });
+    }
+    if (plan !== "new") return Promise.resolve(NO_SOURCE);
+
+    return toBlob(work, "image/jpeg", SOURCE_QUALITY).then(function (blob) {
+      /* Losing the original is not worth losing the photograph over. The site
+         needs the display copy; the original is only ever read by the framing
+         box, and the panel says plainly when a slot has none. */
+      if (!blob || blob.size > MAX_BYTES) return NO_SOURCE;
+      return { blob: blob, path: stem + "-original.jpg" };
+    }, function () { return NO_SOURCE; });
+  }
+
+  /* Framing a photograph that is already in place. Where its unframed pixels
+     come from decides what can be done with them afterwards. */
+  function reframe(row, view) {
+    view.problem("");
+
+    if (typeof window.createImageBitmap !== "function") {
+      view.problem("This browser cannot open a photograph for framing. " +
+                   "Chrome, Safari and Firefox all can — try one of those.");
+      return;
+    }
+
+    if (row._upload && row._upload.work) {
+      frameAndKeep(row._upload.work, row, view, "keep");
+      return;
+    }
+
+    var from = reframeSource(row);
+    if (!from) return;
+
+    view.say("Opening the photograph…", "busy");
+    fetchWorkCopy(from.url).then(function (work) {
+      return frameAndKeep(work, row, view, from.plan);
+    }).catch(function () {
+      view.say("");
+      view.problem("The photograph already in this slot could not be reopened " +
+                   "for framing. Choose it again from your device instead.");
+    });
+  }
+
+  function reframeSource(row) {
+    /* The original, kept for exactly this. */
+    if (row.source_path) return { url: storageUrl(row.source_path), plan: "keep" };
+
+    /* Nothing uploaded, so the slot is showing the photograph the site was
+       built with — a committed file, served from this same origin, and as
+       unframed as it has ever been. Its crop does get a source of its own:
+       once an upload is in the slot, nothing records that it started here. */
+    if (!row.storage_path) {
+      var seed = builtIn(row.slot);
+      return seed && seed.src ? { url: seed.src, plan: "new" } : null;
+    }
+
+    /* An upload whose original was not kept. Framing works, but only inwards —
+       which the panel has already said in as many words. */
+    return { url: storageUrl(row.storage_path), plan: "none" };
+  }
+
+  function fetchWorkCopy(url) {
+    if (typeof window.fetch !== "function") {
+      return Promise.reject(new Error("no fetch"));
+    }
+    return window.fetch(url).then(function (res) {
+      if (!res.ok) throw new Error("that photograph could not be read back");
+      return res.blob();
+    }).then(workCopy);
+  }
+
+  /* ═══════════════════════════════════════════════
+     4c. framing
+     ═══════════════════════════════════════════════
+
+     What a photograph looks like on this site is decided by two things: its
+     shape, and what sits in the middle of it. Uploading straight off a phone
+     leaves both to chance — the Café cards are a 3:4.1 hole and the page cuts a
+     centred 3:4.1 out of whatever arrives, which is how a cup ends up half out
+     of frame with nothing anywhere reporting a problem.
+
+     So the crop is chosen here and baked into the file that goes up. The
+     alternative — storing a focal point and letting the page position the
+     picture around it — was turned down: it needs new columns, new CSS on five
+     public pages, and it still cannot rescue a photograph whose subject is at
+     the edge. Framing at upload changes nothing about how the site renders.
+     render.js still writes a src into a container that cover-fits it; the
+     picture is simply the right shape when it gets there.
+
+     The frame holds still and the photograph moves behind it, rather than a
+     resizable rectangle dragged over a picture. One thing to hold, no handles
+     to miss on a touchscreen, and the box on screen is the hole on the page. */
+
+  var MIN_ZOOM = 1;
+  var MAX_ZOOM = 4;
+
+  /* Offered when the space on the page has no fixed shape. Its usual shape
+     comes first: it asks nothing of an owner who is happy to be guided. */
+  function shapeChoices(work, frame) {
+    if (frame.fixed) return [{ label: "The shape on the page", w: frame.w, h: frame.h }];
+    return [
+      { label: "As the page has it", w: frame.w, h: frame.h },
+      { label: "As it is", w: work.width, h: work.height },
+      { label: "Tall", w: 3, h: 4 },
+      { label: "Square", w: 1, h: 1 },
+      { label: "Wide", w: 4, h: 3 }
+    ];
+  }
+
+  /* Resolves the finished canvas, or nothing at all if the owner backed out. */
+  function openFramer(work, row) {
+    return new Promise(function (resolve) {
+      var frame = slotFrame(row.slot);
+      var choices = shapeChoices(work, frame);
+      var shape = choices[0];
+
+      var zoom = 1;
+      var ox = 0, oy = 0;          /* the picture's top-left, in stage pixels */
+      var stageW = 0, stageH = 0;
+      var cover = 1;               /* the scale at which it just fills the frame */
+
+      var returnFocus = document.activeElement;
+
+      var root = el("div", "framer");
+      root.setAttribute("role", "dialog");
+      root.setAttribute("aria-modal", "true");
+      root.setAttribute("aria-label", "Frame the photograph");
+
+      var panel = el("div", "framer__panel");
+      root.appendChild(panel);
+
+      panel.appendChild(el("h2", "framer__title", "Frame the photograph"));
+      panel.appendChild(el("p", "framer__where", row.label));
+      panel.appendChild(el("p", "framer__help", frame.fixed
+        ? "This space is part of the page's layout, so its shape is fixed. Drag " +
+          "the photograph to choose what sits inside it, and zoom in to crop " +
+          "closer. What you see here is what the site shows."
+        : "This space changes shape with the window, so nothing here can be an " +
+          "exact preview — the shape offered first is the one it is usually " +
+          "closest to. Drag the photograph to move it, zoom in to crop closer, " +
+          "and keep anything that matters away from the edges."));
+
+      if (choices.length > 1) {
+        var shapes = el("div", "framer__shapes");
+        var buttons = [];
+        choices.forEach(function (choice) {
+          var b = el("button", "btn btn--small framer__shape", choice.label);
+          b.type = "button";
+          b.setAttribute("aria-pressed", choice === shape ? "true" : "false");
+          on(b, "click", function () {
+            shape = choice;
+            buttons.forEach(function (other) {
+              other.setAttribute("aria-pressed", other === b ? "true" : "false");
+            });
+            /* Zoom goes back to 1 rather than carrying over: the new shape has
+               a different "just fills" scale, so keeping the number would keep
+               a framing the owner never chose. */
+            zoom = 1;
+            slider.value = "1";
+            layout(true);
+          });
+          buttons.push(b);
+          shapes.appendChild(b);
+        });
+        panel.appendChild(shapes);
+      }
+
+      var hold = el("div", "framer__hold");
+      var stage = el("div", "framer__stage");
+      stage.tabIndex = 0;
+      stage.setAttribute("aria-label",
+        "The photograph inside its frame. Drag it, or use the arrow keys to move it.");
+      hold.appendChild(stage);
+      panel.appendChild(hold);
+
+      /* The decoded picture goes in as the canvas element itself rather than
+         being redrawn every frame: the browser scales and moves it on the
+         compositor, so dragging stays smooth on a phone. */
+      work.className = "framer__img";
+      stage.appendChild(work);
+
+      var zoomWrap = el("label", "framer__zoom");
+      zoomWrap.appendChild(el("span", null, "Zoom"));
+      var slider = el("input", "framer__slider");
+      slider.type = "range";
+      slider.min = String(MIN_ZOOM);
+      slider.max = String(MAX_ZOOM);
+      slider.step = "0.01";
+      slider.value = "1";
+      zoomWrap.appendChild(slider);
+      panel.appendChild(zoomWrap);
+
+      var actions = el("div", "framer__actions");
+      var cancel = el("button", "btn btn--ghost", "Cancel");
+      cancel.type = "button";
+      on(cancel, "click", function () { close(null); });
+      var use = el("button", "btn btn--primary", "Use this framing");
+      use.type = "button";
+      on(use, "click", function () { close(cut()); });
+      actions.appendChild(cancel);
+      actions.appendChild(use);
+      panel.appendChild(actions);
+
+      /* ── geometry ──
+         Everything here is in stage pixels: the picture is drawn at
+         cover × zoom, and (ox, oy) is where its top-left corner sits relative
+         to the frame. Both are always negative or zero, and clamp() is what
+         guarantees the frame is never left showing a gap. */
+
+      function scale() { return cover * zoom; }
+
+      function clamp() {
+        var dw = work.width * scale(), dh = work.height * scale();
+        ox = Math.min(0, Math.max(stageW - dw, ox));
+        oy = Math.min(0, Math.max(stageH - dh, oy));
+      }
+
+      function paint() {
+        var s = scale();
+        work.style.setProperty("--framer-w", (work.width * s) + "px");
+        work.style.setProperty("--framer-h", (work.height * s) + "px");
+        work.style.setProperty("--framer-x", ox + "px");
+        work.style.setProperty("--framer-y", oy + "px");
+      }
+
+      /* The stage is measured and sized here rather than left to CSS, because
+         its shape is a promise: an aspect-ratio box that a max-height quietly
+         overrode would crop to something other than what was framed. */
+      function layout(recentre) {
+        var room = hold.clientWidth || 320;
+        var tall = window.innerHeight || 700;
+        var maxH = Math.max(220, tall * 0.5);
+
+        stageW = Math.min(room, maxH * shape.w / shape.h);
+        stageH = stageW * shape.h / shape.w;
+        stage.style.setProperty("--stage-w", stageW + "px");
+        stage.style.setProperty("--stage-h", stageH + "px");
+
+        var before = scale();
+        cover = Math.max(stageW / work.width, stageH / work.height);
+
+        if (recentre) {
+          ox = (stageW - work.width * scale()) / 2;
+          oy = (stageH - work.height * scale()) / 2;
+        } else if (before) {
+          /* keep whatever is in the middle of the frame in the middle of it */
+          var ratio = scale() / before;
+          ox = stageW / 2 - (stageW / 2 - ox) * ratio;
+          oy = stageH / 2 - (stageH / 2 - oy) * ratio;
+        }
+
+        clamp();
+        paint();
+      }
+
+      function setZoom(next) {
+        next = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, next));
+        var before = scale();
+        zoom = next;
+        var ratio = scale() / before;
+        /* zoom around the middle of the frame, not the picture's corner */
+        ox = stageW / 2 - (stageW / 2 - ox) * ratio;
+        oy = stageH / 2 - (stageH / 2 - oy) * ratio;
+        clamp();
+        paint();
+      }
+
+      on(slider, "input", function () {
+        setZoom(parseFloat(slider.value) || 1);
+      });
+
+      /* ── dragging ── */
+
+      var dragging = false, lastX = 0, lastY = 0;
+
+      on(stage, "pointerdown", function (e) {
+        dragging = true;
+        lastX = e.clientX;
+        lastY = e.clientY;
+        if (stage.setPointerCapture) stage.setPointerCapture(e.pointerId);
+        stage.classList.add("is-dragging");
+        e.preventDefault();
+      });
+
+      on(stage, "pointermove", function (e) {
+        if (!dragging) return;
+        ox += e.clientX - lastX;
+        oy += e.clientY - lastY;
+        lastX = e.clientX;
+        lastY = e.clientY;
+        clamp();
+        paint();
+      });
+
+      function endDrag() {
+        dragging = false;
+        stage.classList.remove("is-dragging");
+      }
+      on(stage, "pointerup", endDrag);
+      on(stage, "pointercancel", endDrag);
+
+      /* Dragging is a mouse gesture and a touch gesture and nothing else, so
+         the arrow keys are given the same job. */
+      on(stage, "keydown", function (e) {
+        var step = e.shiftKey ? 48 : 12;
+        if (e.key === "ArrowLeft") ox -= step;
+        else if (e.key === "ArrowRight") ox += step;
+        else if (e.key === "ArrowUp") oy -= step;
+        else if (e.key === "ArrowDown") oy += step;
+        else if (e.key === "+" || e.key === "=") {
+          setZoom(zoom + 0.15); slider.value = String(zoom); e.preventDefault(); return;
+        } else if (e.key === "-" || e.key === "_") {
+          setZoom(zoom - 0.15); slider.value = String(zoom); e.preventDefault(); return;
+        } else return;
+        e.preventDefault();
+        clamp();
+        paint();
+      });
+
+      /* ── the finished picture ── */
+
+      function cut() {
+        var s = scale();
+        var sx = -ox / s, sy = -oy / s;
+        var sw = stageW / s, sh = stageH / s;
+
+        /* rounding can push the source rectangle a fraction past the edge */
+        sx = Math.max(0, Math.min(work.width - 1, sx));
+        sy = Math.max(0, Math.min(work.height - 1, sy));
+        sw = Math.min(sw, work.width - sx);
+        sh = Math.min(sh, work.height - sy);
+
+        var out = document.createElement("canvas");
+        var fit = Math.min(1, MAX_EDGE / Math.max(sw, sh));
+        out.width = Math.max(1, Math.round(sw * fit));
+        /* The height comes from the chosen shape rather than from the measured
+           rectangle, so a fixed frame is handed a file in exactly its ratio and
+           the page has nothing left to crop. */
+        out.height = Math.max(1, Math.round(out.width * shape.h / shape.w));
+
+        out.getContext("2d").drawImage(work, sx, sy, sw, sh, 0, 0, out.width, out.height);
+        return out;
+      }
+
+      /* ── open and close ── */
+
+      function onKey(e) {
+        if (e.key === "Escape") { e.preventDefault(); close(null); }
+      }
+
+      function onResize() { layout(false); }
+
+      var done = false;
+      function close(result) {
+        if (done) return;
+        done = true;
+        document.removeEventListener("keydown", onKey, true);
+        window.removeEventListener("resize", onResize);
+        if (root.parentNode) root.parentNode.removeChild(root);
+        document.body.classList.remove("is-framing");
+        /* The canvas is handed back to the caller, which keeps it for the rest
+           of the sitting — so it has to stop carrying the box's layout. */
+        work.className = "";
+        work.removeAttribute("style");
+        if (returnFocus && returnFocus.focus) returnFocus.focus();
+        resolve(result);
+      }
+
+      document.addEventListener("keydown", onKey, true);
+      window.addEventListener("resize", onResize);
+      document.body.classList.add("is-framing");
+      document.body.appendChild(root);
+
+      /* Measured once the panel is in the page, so hold.clientWidth is a real
+         width rather than zero. */
+      layout(true);
+      stage.focus();
+      if (!prefersReducedMotion()) {
+        nextFrame(function () { panel.classList.add("is-in"); });
+      } else {
+        panel.classList.add("is-in");
+      }
+    });
+  }
+
 
   /* canvas.toBlob is callback-based and predates promises everywhere. */
   function toBlob(canvas, type, quality) {
