@@ -130,6 +130,7 @@ h1,h2,h3{ margin: 0; font-weight: 600; letter-spacing: -.01em; }
   font: 600 14px/1 var(--sans);
   padding: 14px 16px;
   border-bottom: 3px solid transparent;
+  transition: color 180ms ease, background-color 180ms ease, border-color 180ms ease;
 }
 .tab:hover{ color: var(--cream); }
 .tab[aria-selected="true"]{ color: var(--cream); border-bottom-color: var(--gold); }
@@ -137,10 +138,42 @@ h1,h2,h3{ margin: 0; font-weight: 600; letter-spacing: -.01em; }
   display: inline-block; width: 7px; height: 7px; margin-left: 7px;
   border-radius: 50%; background: var(--gold);
   vertical-align: middle;
+  animation: admin-status-in 220ms cubic-bezier(.22,.61,.36,1) both;
+}
+.tab__dot--leaving{
+  animation: admin-status-out 220ms cubic-bezier(.22,.61,.36,1) both;
+  pointer-events: none;
 }
 
 .panels{ padding: var(--pad); max-width: 900px; margin: 0 auto; }
 .panel[hidden]{ display: none; }
+.panel--enter{
+  animation: admin-panel-in 260ms cubic-bezier(.22,.61,.36,1) both;
+}
+.menu__results--enter{
+  animation: admin-panel-in 260ms cubic-bezier(.22,.61,.36,1) both;
+}
+
+@keyframes admin-panel-in{
+  from{ opacity: 0; transform: translateY(8px); }
+  to{ opacity: 1; transform: translateY(0); }
+}
+@keyframes admin-status-in{
+  from{ opacity: 0; transform: translateY(-3px) scale(.82); }
+  to{ opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes admin-status-out{
+  from{ opacity: 1; transform: translateY(0) scale(1); }
+  to{ opacity: 0; transform: translateY(-3px) scale(.82); }
+}
+@keyframes admin-savebar-in{
+  from{ opacity: 0; transform: translateY(12px); }
+  to{ opacity: 1; transform: translateY(0); }
+}
+@keyframes admin-savebar-out{
+  from{ opacity: 1; transform: translateY(0); }
+  to{ opacity: 0; transform: translateY(12px); }
+}
 
 .panel__intro{
   margin: 0 0 22px; max-width: 62ch;
@@ -171,8 +204,30 @@ h1,h2,h3{ margin: 0; font-weight: 600; letter-spacing: -.01em; }
 .card__dot{
   width: 7px; height: 7px; border-radius: 50%; background: var(--gold); flex: 0 0 auto;
 }
-.card__body{ padding: 4px 18px 20px; border-top: 1px solid var(--hairline); }
-.card__body[hidden]{ display: none; }
+.card__body{
+  display: grid;
+  grid-template-rows: 0fr;
+  padding: 0;
+  border-top: 1px solid transparent;
+  opacity: 0;
+  transition:
+    grid-template-rows 240ms cubic-bezier(.22,.61,.36,1),
+    padding 240ms cubic-bezier(.22,.61,.36,1),
+    border-top-color 180ms ease,
+    opacity 160ms ease;
+}
+.card__body.is-open{
+  grid-template-rows: 1fr;
+  padding: 4px 18px 20px;
+  border-top-color: var(--hairline);
+  opacity: 1;
+}
+.card__body-inner,
+.item__body-inner{
+  min-height: 0;
+  overflow: hidden;
+}
+.card__body[hidden], .item__body[hidden]{ display: none; }
 
 /* ── fields ──────────────────────────────────── */
 
@@ -193,10 +248,14 @@ h1,h2,h3{ margin: 0; font-weight: 600; letter-spacing: -.01em; }
   background: var(--paper);
   border: 1px solid var(--hairline); border-radius: 8px;
   padding: 9px 11px;
+  box-shadow: inset 0 0 0 0 transparent;
+  transition: border-color 180ms ease, box-shadow 220ms ease, background-color 180ms ease;
 }
 .field__area{ resize: vertical; min-height: 84px; }
 .field__input:focus, .field__area:focus, .field__select:focus{
-  outline: 2px solid var(--cognac); outline-offset: 1px; border-color: transparent;
+  outline: none;
+  border-color: var(--cognac);
+  box-shadow: inset 0 0 0 2px var(--cognac);
 }
 .field__input:disabled, .field__area:disabled{
   background: #f0ece5; color: var(--ink-soft); cursor: not-allowed;
@@ -204,6 +263,7 @@ h1,h2,h3{ margin: 0; font-weight: 600; letter-spacing: -.01em; }
 .field--bad .field__input, .field--bad .field__area{
   border-color: var(--danger); background: var(--danger-bg);
 }
+
 .field__error{
   display: block; margin: 5px 0 0;
   font-size: 13px; line-height: 1.45; color: var(--danger); font-weight: 500;
@@ -215,16 +275,127 @@ h1,h2,h3{ margin: 0; font-weight: 600; letter-spacing: -.01em; }
 .field__note--warn{ color: var(--danger); }
 .field__count{ float: right; font-weight: 400; font-size: 13px; color: var(--ink-soft); }
 .field__count--over{ color: var(--danger); font-weight: 600; }
-.field--edited > .field__label::after{
+.field--edited > .field__label::after,
+.field--edited-leaving > .field__label::after{
   content: "edited";
+  display: inline-block;
   margin-left: 8px; padding: 1px 6px;
   font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
   color: var(--oxblood); background: rgba(201,163,92,.28); border-radius: 20px;
+}
+.field--edited > .field__label::after{
+  animation: admin-status-in 220ms cubic-bezier(.22,.61,.36,1) both;
+}
+.field--edited-leaving > .field__label::after{
+  animation: admin-status-out 220ms cubic-bezier(.22,.61,.36,1) both;
+}
+
+/* ── the time picker ──────────────────────────
+   The input is still the browser's, and still holds the value; only the
+   dropdown it hangs off is replaced. Chrome's indicator goes, because two
+   pickers on one field is worse than either. */
+
+.timefield{ position: relative; }
+.timefield__control{ position: relative; }
+.field__input--time{ padding-right: 42px; }
+.field__input--time::-webkit-calendar-picker-indicator{ display: none; }
+.field__input--time::-webkit-inner-spin-button{ display: none; }
+
+.timefield__toggle{
+  position: absolute; right: 5px; top: 50%;
+  transform: translateY(-50%);
+  display: flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px;
+  appearance: none; cursor: pointer;
+  border: 0; border-radius: 7px;
+  background: transparent; color: var(--ink-soft);
+  transition: background-color 160ms ease, color 160ms ease;
+}
+.timefield__toggle:hover{ background: rgba(176,122,74,.14); color: var(--oxblood); }
+.timefield__toggle[aria-expanded="true"]{ background: rgba(176,122,74,.18); color: var(--oxblood); }
+.timefield__toggle:focus-visible{ outline: 2px solid var(--cognac); outline-offset: 1px; }
+.timefield__glyph{
+  width: 17px; height: 17px;
+  fill: none; stroke: currentColor; stroke-width: 1.7;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+
+/* Opened in the flow, not over it: .card__body-inner clips its overflow, so a
+   panel floating above the field would be cut off at the card's edge. Same
+   0fr → 1fr row the cards animate on, so it reads as the same gesture. */
+.tpick{
+  --tpick-width: min(330px, 100%);
+  display: grid;
+  grid-template-rows: 0fr;
+  width: var(--tpick-width);
+  margin-top: 0;
+  opacity: 0;
+  transition:
+    grid-template-rows 240ms cubic-bezier(.22,.61,.36,1),
+    margin-top 240ms cubic-bezier(.22,.61,.36,1),
+    opacity 160ms ease;
+}
+.tpick.is-open{ grid-template-rows: 1fr; margin-top: 8px; opacity: 1; }
+.tpick[hidden]{ display: none; }
+.tpick__clip{ min-height: 0; overflow: hidden; }
+
+.tpick__cols{
+  display: flex; gap: 6px;
+  /* Three narrow columns of numbers. Given the whole row's width they would
+     stretch into three wide ones, which is harder to read, not easier. */
+  width: 100%; max-width: none;
+  padding: 8px;
+  background: var(--card);
+  border: 1px solid var(--hairline); border-radius: 10px;
+  box-shadow: 0 8px 20px rgba(29,19,16,.06);
+  transform: translateY(-6px);
+  transition: transform 240ms cubic-bezier(.22,.61,.36,1);
+}
+.tpick.is-open .tpick__cols{ transform: none; }
+
+.tpick__group{ display: flex; flex-direction: column; flex: 1 1 0; min-width: 0; }
+.tpick__cap{
+  display: block; height: 23px; box-sizing: border-box;
+  padding: 0 0 6px; text-align: center; line-height: 17px;
+  font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.tpick__col{
+  position: relative;
+  height: 160px; overflow-x: hidden; overflow-y: auto;
+  padding: 64px 0; box-sizing: border-box;
+  overscroll-behavior: contain; scroll-snap-type: y mandatory;
+  scrollbar-width: none; -ms-overflow-style: none;
+}
+.tpick__col--ap{ overflow-y: auto; }
+.tpick__col::-webkit-scrollbar{ display: none; width: 0; height: 0; }
+.tpick__opt{
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; height: 32px; box-sizing: border-box;
+  appearance: none; cursor: pointer;
+  border: 0; border-radius: 7px;
+  padding: 0; margin: 0;
+  background: transparent; color: var(--ink-soft);
+  font: 500 14px/1 var(--sans); text-align: center;
+  scroll-snap-align: center;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+.tpick__opt:hover{ background: rgba(176,122,74,.14); color: var(--ink); }
+.tpick__opt--on{
+  background: var(--wine); color: var(--cream); font-weight: 600;
+  animation: admin-pick-in 200ms cubic-bezier(.22,.61,.36,1);
+}
+.tpick__opt:focus-visible{ outline: 2px solid var(--cognac); outline-offset: -2px; }
+
+@keyframes admin-pick-in{
+  from{ transform: scale(.9); }
+  to{ transform: scale(1); }
 }
 
 .row{ display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
 .row > .field{ flex: 1 1 160px; margin-top: 12px; }
 .row > .field--narrow{ flex: 0 1 130px; }
+.row--hours{ min-width: 0; align-items: flex-start; }
 
 .check{ display: flex; align-items: center; gap: 8px; font-size: 15px; margin-top: 12px; }
 .check input{ width: 18px; height: 18px; accent-color: var(--wine); }
@@ -278,6 +449,13 @@ h1,h2,h3{ margin: 0; font-weight: 600; letter-spacing: -.01em; }
   box-shadow: 0 -8px 24px rgba(0,0,0,.22);
 }
 .savebar[hidden]{ display: none; }
+.savebar:not([hidden]){
+  animation: admin-savebar-in 240ms cubic-bezier(.22,.61,.36,1) both;
+}
+.savebar:not([hidden]).savebar--leaving{
+  animation: admin-savebar-out 220ms cubic-bezier(.22,.61,.36,1) both;
+  pointer-events: none;
+}
 .savebar__count{ font-size: 14px; }
 .savebar__spacer{ flex: 1 1 auto; }
 .savebar--busy{ opacity: .8; }
@@ -330,8 +508,21 @@ h1,h2,h3{ margin: 0; font-weight: 600; letter-spacing: -.01em; }
   padding: 11px 14px; font: 500 15px/1.3 var(--sans); color: var(--ink);
 }
 .item__price{ margin-left: auto; color: var(--ink-soft); font-size: 14px; }
-.item__body{ padding: 0 14px 16px; }
-.item__body[hidden]{ display: none; }
+.item__body{
+  display: grid;
+  grid-template-rows: 0fr;
+  padding: 0;
+  opacity: 0;
+  transition:
+    grid-template-rows 240ms cubic-bezier(.22,.61,.36,1),
+    padding 240ms cubic-bezier(.22,.61,.36,1),
+    opacity 160ms ease;
+}
+.item__body.is-open{
+  grid-template-rows: 1fr;
+  padding: 0 14px 16px;
+  opacity: 1;
+}
 .item__moves{ display: flex; gap: 4px; margin-left: 8px; }
 
 .mini{
@@ -342,6 +533,18 @@ h1,h2,h3{ margin: 0; font-weight: 600; letter-spacing: -.01em; }
 }
 .mini:hover:not(:disabled){ color: var(--ink); border-color: var(--cognac); }
 .mini:disabled{ opacity: .3; cursor: not-allowed; }
+
+@media (prefers-reduced-motion: reduce){
+  .tab{ transition: none; }
+  .tab__dot, .tab__dot--leaving,
+  .field--edited > .field__label::after, .field--edited-leaving > .field__label::after,
+  .savebar:not([hidden]), .savebar:not([hidden]).savebar--leaving{ animation: none; }
+  .panel--enter, .menu__results--enter{ animation: none; }
+  .card__body, .item__body, .tpick, .tpick__cols{ transition: none; }
+  .tpick__cols{ transform: none; }
+  .tpick__opt{ transition: none; }
+  .tpick__opt--on{ animation: none; }
+}
 
 .pours{ margin-top: 14px; }
 .pours__title{ font-size: 14px; font-weight: 600; }
@@ -396,9 +599,15 @@ h1,h2,h3{ margin: 0; font-weight: 600; letter-spacing: -.01em; }
   display: inline-block; margin-top: 12px; cursor: pointer;
   padding: 8px 14px; border: 1px solid var(--hairline); border-radius: 6px;
   font-size: 14px; background: var(--card);
+  box-shadow: inset 0 0 0 0 transparent;
+  transition: border-color 180ms ease, box-shadow 220ms ease, color 180ms ease;
 }
 .photo__pick:hover{ border-color: var(--cognac); color: var(--ink); }
-.photo__pick:focus-within{ outline: 2px solid var(--cognac); outline-offset: 2px; }
+.photo__pick:focus-within{
+  outline: none;
+  border-color: var(--cognac);
+  box-shadow: inset 0 0 0 2px var(--cognac);
+}
 .photo__file{
   position: absolute; width: 1px; height: 1px;
   opacity: 0; overflow: hidden; clip-path: inset(50%);
@@ -412,6 +621,24 @@ h1,h2,h3{ margin: 0; font-weight: 600; letter-spacing: -.01em; }
 }
 
 @media (max-width: 640px){
+  /* The editor has no intentional horizontal scrollers. Keep a sideways
+     swipe from pulling the whole page out of alignment on a phone. */
+  html{ overflow-x: hidden; overflow-x: clip; }
+  body{ overflow-x: hidden; overflow-x: clip; overscroll-behavior-x: none; }
+  /* iOS Safari zooms controls smaller than 16px when they receive focus. */
+  .field__input, .field__area, .field__select, .search__input{ font-size: 16px; }
+  .row--hours{
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+    align-items: stretch;
+  }
+  .row--hours > .field{
+    min-width: 0;
+    width: 100%;
+    flex: none;
+  }
+  .row--hours > .btn{ display: block; width: 100%; }
   .topbar__who{ width: 100%; order: 3; }
   .card__head{ font-size: 15px; }
   .photo{ grid-template-columns: 1fr; }

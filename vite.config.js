@@ -65,6 +65,25 @@ function copyClassicScripts() {
       root = config.root;
       outDir = config.build.outDir;
     },
+    configureServer(server) {
+      /* Vite normally transforms .js requests in dev. The vendored Supabase
+         browser build is already a complete classic script, but it contains an
+         optional dynamic telemetry import that is intentionally not installed.
+         Serve this one third-party file as-is so the optional import can fail
+         quietly in the browser instead of making Vite return a 500. */
+      server.middlewares.use((req, res, next) => {
+        const pathname = (req.url || "").split("?", 1)[0];
+        if (pathname !== "/vendor/supabase.js") return next();
+
+        const file = resolve(root, "vendor/supabase.js");
+        if (!existsSync(file)) return next();
+
+        res.statusCode = 200;
+        res.setHeader("Content-Type", "text/javascript");
+        res.setHeader("Cache-Control", "no-cache");
+        res.end(readFileSync(file));
+      });
+    },
     closeBundle() {
       const missing = [];
 

@@ -234,6 +234,7 @@ function fakeSupabase(data, log, opts) {
 const settle = async (turns = 12) => {
   for (let i = 0; i < turns; i++) await new Promise((r) => setTimeout(r, 0));
 };
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /* Async because admin.js waits for DOMContentLoaded before it wires anything
    up. Dispatching a submit at a form whose handler has not been attached yet
@@ -259,6 +260,15 @@ async function boot(opts) {
   window.confirm = () => opts.confirm !== false;    // jsdom has none; the editor asks before deleting
   window.scrollTo = () => {};
   window.HTMLElement.prototype.scrollIntoView = () => {};
+  window.matchMedia = (query) => ({
+    matches: query === "(min-width: 641px)"
+      ? opts.mobile !== true
+      : query === "(prefers-reduced-motion: reduce)" && opts.reducedMotion === true,
+    media: query,
+    addListener() {}, removeListener() {},
+    addEventListener() {}, removeEventListener() {},
+    dispatchEvent() { return false; }
+  });
 
   /* admin.html loads data/seed-photos.js as a classic script, which jsdom does
      not fetch. Declared here so the photo panel has a built-in picture to show,
@@ -302,6 +312,13 @@ async function boot(opts) {
 
   const errors = [];
   window.console.error = (...a) => errors.push(a.join(" "));
+
+  /* What a previous visit left behind. Written before the script runs, because
+     that is when the editor reads it — each JSDOM has its own localStorage, so
+     a reload has to be staged rather than performed. */
+  Object.keys(opts.remember || {}).forEach((key) => {
+    window.localStorage.setItem(key, opts.remember[key]);
+  });
 
   const script = window.document.createElement("script");
   script.textContent = opts.source || ADMIN_JS;
@@ -542,6 +559,18 @@ console.log("\nediting a paragraph");
   check("one change is counted", r.changeCount(), "1 change not yet saved");
   check("and nothing has been sent yet", r.writes(), []);
 
+  r.type(field, "Aromati, from the Georgian word for *aroma*.");
+  check("undoing a field starts its exit", field.parentElement.classList.contains("field--edited-leaving"), true);
+  check("undoing a tab change starts its exit", r.q(".tab__dot").classList.contains("tab__dot--leaving"), true);
+  check("undoing the last change starts the savebar exit",
+        r.q("#savebar").classList.contains("savebar--leaving"), true);
+  await wait(260);
+  await settle();
+  check("the field marker finishes leaving", field.parentElement.classList.contains("field--edited"), false);
+  check("the savebar finishes leaving", r.q("#savebar").hidden, true);
+
+  r.type(field, "Aromati, from the Georgian word for *aroma*, in Murray Hill.");
+
   await r.save();
   const writes = r.writes();
   check("saving sends exactly one update", writes.length, 1);
@@ -729,6 +758,130 @@ console.log("\nhours");
   check("a closed day shows no times to fill in", r.all("#panels input[type=time]").length, 2);
 }
 
+/* The picker replaces the browser's dropdown, so the field it writes into has
+   to keep holding what the row saves — 24-hour, which is not what the columns
+   show. These are about that translation as much as about the clicking. */
+{
+  const r = await boot();
+  await r.signIn();
+  r.tab("Hours");
+
+  const toggle = r.all(".timefield__toggle")[0];
+  const panel = r.q("#" + toggle.getAttribute("aria-controls"));
+  const field = r.all("#panels input[type=time]")[0];
+  const column = (n) => [...panel.querySelectorAll(".tpick__col")[n].querySelectorAll(".tpick__opt")];
+  const opt = (n, text) => column(n).find((b) => b.textContent === text);
+
+  check("the picker starts closed", panel.hidden, true);
+  check("the picker belongs to its own time field",
+        panel.parentElement.classList.contains("timefield"), true);
+  check("the clock stays in the field header",
+        toggle.parentElement.classList.contains("timefield__control"), true);
+  toggle.click();
+  await settle();
+  check("the clock button opens it", panel.hidden, false);
+  check("the hour wheel repeats for rolling", column(0).length, 108);
+  check("the minute wheel repeats for rolling", column(1).length, 108);
+  check("AM and PM stay as one short stack", column(2).length, 2);
+  check("and it opens on the time the field already holds",
+        column(0).filter((b) => b.className.includes("--on")).map((b) => b.textContent), ["7"]);
+  check("read as morning, not as 07 on a 24-hour clock",
+        column(2).filter((b) => b.className.includes("--on")).map((b) => b.textContent), ["AM"]);
+
+  opt(2, "PM").click();
+  check("the afternoon is written back in the format the row saves", field.value, "19:00");
+  opt(0, "9").click();
+  opt(1, "30").click();
+  check("and so is an hour and a minute", field.value, "21:30");
+  check("the field says it has been edited",
+        !!r.q(".field--edited .field__input--time"), true);
+
+  await r.save();
+  check("what reaches the database is the seconds-bearing time",
+        r.writes()[0].payload.opens_at, "21:30:00");
+}
+
+{
+  const r = await boot({ mobile: true });
+  await r.signIn();
+  r.tab("Hours");
+  check("mobile keeps the native time inputs", r.all("#panels input[type=time]").length, 2);
+  check("mobile does not add the desktop picker", r.all(".timefield__toggle").length, 0);
+  check("mobile has no desktop picker panels", r.all(".tpick").length, 0);
+}
+
+{
+  const r = await boot();
+  await r.signIn();
+  r.tab("Hours");
+
+  const toggle = r.all(".timefield__toggle")[0];
+  const panel = r.q("#" + toggle.getAttribute("aria-controls"));
+
+  /* Typing is still the fast way in, and 07:12 is a time no five-minute step
+     lands on. The column has to show it rather than quietly disagree. */
+  r.type(r.all("#panels input[type=time]")[0], "07:12");
+  toggle.click();
+  await settle();
+  const minutes = [...panel.querySelectorAll(".tpick__col")[1].querySelectorAll(".tpick__opt")];
+  check("a typed minute off the step is in the column too",
+        minutes.filter((b) => b.className.includes("--on")).map((b) => b.textContent), ["12"]);
+
+  r.doc.dispatchEvent(new r.window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  await wait(360);
+  await settle();
+  check("Escape puts it away again", panel.hidden, true);
+}
+
+{
+  const r = await boot();
+  await r.signIn();
+  r.tab("Hours");
+
+  const toggles = r.all(".timefield__toggle");
+  const first = r.q("#" + toggles[0].getAttribute("aria-controls"));
+  const second = r.q("#" + toggles[1].getAttribute("aria-controls"));
+
+  toggles[0].click();
+  await settle();
+  toggles[1].click();
+  await settle();
+  check("opening Closes puts Opens away", first.hidden, false);   // still closing
+  check("the second one is open", second.hidden, false);
+  await wait(360);
+  await settle();
+  check("and only one panel is left showing", first.hidden, true);
+}
+
+
+/* ═══ 7b. the tab the editor comes back to ══════════════════════════════════ */
+
+console.log("\nwhere a reload lands");
+{
+  const r = await boot();
+  await r.signIn();
+  r.tab("Hours");
+  check("the tab that was opened is written down",
+        r.window.localStorage.getItem("aromati.admin.tab"), "hours");
+}
+
+{
+  const r = await boot({ remember: { "aromati.admin.tab": "menu" } });
+  await r.signIn();
+  const showing = r.all(".tab").find((b) => b.getAttribute("aria-selected") === "true");
+  check("a reload comes back to it rather than to Words",
+        showing.textContent.trim().startsWith("Menus"), true);
+}
+
+{
+  /* A tab id that no longer exists — a panel renamed between deploys, or a
+     value somebody typed into devtools. The editor has to open on something. */
+  const r = await boot({ remember: { "aromati.admin.tab": "whatever" } });
+  await r.signIn();
+  const showing = r.all(".tab").find((b) => b.getAttribute("aria-selected") === "true");
+  check("a tab that is not there any more falls back to the first",
+        showing.textContent.trim().startsWith("Words"), true);
+}
 
 /* ═══ 8. discard, after a save ══════════════════════════════════════════════ */
 
@@ -745,6 +898,9 @@ console.log("\ndiscard, after a save");
   check("a second edit is outstanding", r.changeCount(), "1 change not yet saved");
 
   r.q("#discardBtn").click();
+  await settle();
+  check("discard starts the savebar exit", r.q("#savebar").classList.contains("savebar--leaving"), true);
+  await wait(260);
   await settle();
 
   check("discarding goes back to what was saved, not to what was loaded",
@@ -1038,6 +1194,8 @@ console.log("\ndiscarding a picked photograph");
   check("something is outstanding", r.changeCount(), "1 change not yet saved");
 
   r.q("#discardBtn").click();
+  await settle();
+  await wait(260);
   await settle();
 
   check("discarding leaves nothing outstanding", r.changeCount(), "0 changes not yet saved");

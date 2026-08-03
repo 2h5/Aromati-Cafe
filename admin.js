@@ -61,6 +61,66 @@ var AROMATI_ADMIN = (function () {
 
   function on(node, type, fn) { node.addEventListener(type, fn); }
 
+  var DISCLOSURE_MS = 240;
+  var STATUS_EXIT_MS = 220;
+
+  function prefersReducedMotion() {
+    return window.matchMedia &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }
+
+  function nextFrame(fn) {
+    if (window.requestAnimationFrame) window.requestAnimationFrame(fn);
+    else window.setTimeout(fn, 0);
+  }
+
+  /* Keep the hidden attribute for real absence from the accessibility tree,
+     but let the CSS grid row animate while a body is entering or leaving. */
+  function setDisclosure(node, shouldOpen) {
+    node._disclosureToken = (node._disclosureToken || 0) + 1;
+    var token = node._disclosureToken;
+
+    if (shouldOpen) {
+      if (!node.hidden && node.classList.contains("is-open")) return;
+      node.hidden = false;
+      node.classList.remove("is-open");
+      if (prefersReducedMotion()) {
+        node.classList.add("is-open");
+        return;
+      }
+      nextFrame(function () {
+        if (node._disclosureToken === token && !node.hidden) {
+          node.classList.add("is-open");
+        }
+      });
+      return;
+    }
+
+    if (node.hidden) return;
+    node.classList.remove("is-open");
+    if (prefersReducedMotion()) {
+      node.hidden = true;
+      return;
+    }
+
+    var finished = false;
+    var timer = 0;
+    function finish() {
+      if (finished) return;
+      finished = true;
+      window.clearTimeout(timer);
+      node.removeEventListener("transitionend", onEnd);
+      if (node._disclosureToken === token) node.hidden = true;
+    }
+    function onEnd(event) {
+      if (event.target === node && event.propertyName === "grid-template-rows") {
+        finish();
+      }
+    }
+    node.addEventListener("transitionend", onEnd);
+    timer = window.setTimeout(finish, DISCLOSURE_MS + 80);
+  }
+
   /* Trim for comparison, never for storage. An owner who typed a trailing
      space meant to; an owner who left one by accident cannot tell either way,
      and silently rewriting what someone typed is its own small betrayal. */
@@ -334,7 +394,24 @@ var AROMATI_ADMIN = (function () {
       if (spec.placeholder) input.placeholder = spec.placeholder;
     }
     if (spec.disabled) input.disabled = true;
-    wrap.appendChild(input);
+
+    var picker = null;
+    if (spec.type === "time" && !spec.disabled) {
+      wirePickerViewport();
+    }
+    if (spec.type === "time" && !spec.disabled && desktopTimePicker()) {
+      picker = makeTimePicker(input, function (value) {
+        input.value = value;
+        if (spec.onInput) spec.onInput(value, f);
+        refreshMark();
+        updateSavebar();
+      });
+      wrap.appendChild(picker.shell);
+      /* The shell owns both the input and its panel, which keeps Opens and
+         Closes anchored to their respective controls. */
+    } else {
+      wrap.appendChild(input);
+    }
 
     var counter = null;
     if (spec.max) {
@@ -352,8 +429,11 @@ var AROMATI_ADMIN = (function () {
     error.hidden = true;
     wrap.appendChild(error);
 
+    var editedExitToken = 0;
+
     f.wrap = wrap;
     f.input = input;
+    f.picker = picker;
 
     f.setError = function (message) {
       error.textContent = message || "";
@@ -370,7 +450,27 @@ var AROMATI_ADMIN = (function () {
 
     function refreshMark() {
       var edited = f.row && f.col && fieldChanged(f.table, f.row, f.col);
-      wrap.className = "field" + (edited ? " field--edited" : "") + extra;
+      var wasEdited = wrap.classList.contains("field--edited") ||
+        wrap.classList.contains("field--edited-leaving");
+      if (edited) {
+        editedExitToken += 1;
+        wrap.className = "field field--edited" + extra;
+      } else if (wasEdited) {
+        var token = ++editedExitToken;
+        wrap.className = "field field--edited-leaving" + extra;
+        if (prefersReducedMotion()) {
+          wrap.className = "field" + extra;
+        } else {
+          window.setTimeout(function () {
+            if (editedExitToken === token &&
+                !(f.row && f.col && fieldChanged(f.table, f.row, f.col))) {
+              wrap.className = "field" + extra;
+            }
+          }, STATUS_EXIT_MS);
+        }
+      } else {
+        wrap.className = "field" + extra;
+      }
       if (counter) {
         var len = String(input.value).length;
         counter.textContent = len + " / " + spec.max;
@@ -419,6 +519,412 @@ var AROMATI_ADMIN = (function () {
     return null;
   }
 
+  /* ── the desktop time picker ─────────────────
+     The field stays a real <input type="time"> and holds the value in the one
+     format the row wants. Desktop gets the branded rolling dial below; mobile
+     never creates this control, so the operating system owns the time picker.
+
+     The panel opens in the flow rather than over it. .card__body-inner clips
+     what overflows it — that is what makes the card's open animation work — so
+     anything floating above the field would be cut off at the card's edge. */
+
+  var MINUTE_STEP = 5;
+  var DIAL_CYCLES = 9;
+  var DIAL_MIDDLE_CYCLE = 4;
+  var pickerCount = 0;
+  var openPicker = null;        // the one panel showing, if any
+  var pickerDocWired = false;
+  var pickerViewportWired = false;
+  var pickerViewportDesktop = null;
+
+  function desktopTimePicker() {
+    return !!(window.matchMedia &&
+      window.matchMedia("(min-width: 641px)").matches);
+  }
+
+  function wirePickerViewport() {
+    if (pickerViewportWired) return;
+    pickerViewportWired = true;
+    pickerViewportDesktop = desktopTimePicker();
+    on(window, "resize", function () {
+      var next = desktopTimePicker();
+      if (next === pickerViewportDesktop) return;
+      pickerViewportDesktop = next;
+      if (openPicker) openPicker.close(false);
+      if (account) renderAll(false, true);
+    });
+  }
+
+  function pad2(n) { return (n < 10 ? "0" : "") + n; }
+
+  function parseTime(v) {
+    var m = /^(\d{1,2}):(\d{2})/.exec(String(v === null || v === undefined ? "" : v));
+    if (!m) return null;
+    var h = Number(m[1]), min = Number(m[2]);
+    if (h > 23 || min > 59) return null;
+    return { h: h, m: min };
+  }
+
+  function clockGlyph() {
+    var NS = "http://www.w3.org/2000/svg";
+    var svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("class", "timefield__glyph");
+    svg.setAttribute("aria-hidden", "true");
+    var face = document.createElementNS(NS, "circle");
+    face.setAttribute("cx", "12");
+    face.setAttribute("cy", "12");
+    face.setAttribute("r", "8.5");
+    var hands = document.createElementNS(NS, "path");
+    hands.setAttribute("d", "M12 7.3V12l3.3 2");
+    svg.appendChild(face);
+    svg.appendChild(hands);
+    return svg;
+  }
+
+  function wirePickerDismissal() {
+    if (pickerDocWired) return;
+    pickerDocWired = true;
+    /* mousedown rather than click: a click that lands outside should close the
+       panel before whatever it landed on does its own work. */
+    document.addEventListener("mousedown", function (e) {
+      if (openPicker && !openPicker.holds(e.target)) openPicker.close(false);
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && openPicker) openPicker.close(true);
+    });
+  }
+
+  function makeTimePicker(input, onPick) {
+    var panelId = "tpick" + (pickerCount += 1);
+    var opts = [];              // every option button now on the page
+    var selected = { h: null, m: null, ap: null };
+    var api;
+
+    input.classList.add("field__input--time");
+
+    var shell = el("div", "timefield");
+    var control = el("div", "timefield__control");
+    control.appendChild(input);
+
+    var toggle = el("button", "timefield__toggle");
+    toggle.type = "button";
+    toggle.setAttribute("aria-label", "Choose a time");
+    toggle.setAttribute("aria-expanded", "false");
+    toggle.setAttribute("aria-controls", panelId);
+    toggle.appendChild(clockGlyph());
+    control.appendChild(toggle);
+    shell.appendChild(control);
+
+    var panel = el("div", "tpick");
+    panel.id = panelId;
+    panel.hidden = true;
+    var clip = el("div", "tpick__clip");
+    var cols = el("div", "tpick__cols");
+    clip.appendChild(cols);
+    panel.appendChild(clip);
+    shell.appendChild(panel);
+
+    /* An empty field still has to offer somewhere to start, but nothing is
+       written until something is picked — `empty` is what keeps the columns
+       from showing 7:00 AM as though it were already the answer. */
+    function parts() {
+      var p = parseTime(input.value);
+      var v = p || { h: 7, m: 0 };
+      var h12 = v.h % 12;
+      return {
+        h12: h12 === 0 ? 12 : h12,
+        m: v.m,
+        ap: v.h < 12 ? "AM" : "PM",
+        empty: !p
+      };
+    }
+
+    function recordFor(kind, value, cycle) {
+      var found = opts.filter(function (rec) {
+        return rec.kind === kind && rec.value === value &&
+          (cycle === undefined || rec.cycle === cycle);
+      });
+      if (found.length) return found[0];
+      return opts.filter(function (rec) {
+        return rec.kind === kind && rec.value === value;
+      })[0] || null;
+    }
+
+    function syncSelection() {
+      var now = parts();
+      if (now.empty) {
+        selected.h = null;
+        selected.m = null;
+        selected.ap = null;
+        return;
+      }
+      selected.h = recordFor("h", now.h12, DIAL_MIDDLE_CYCLE);
+      selected.m = recordFor("m", now.m, DIAL_MIDDLE_CYCLE);
+      selected.ap = recordFor("ap", now.ap, DIAL_MIDDLE_CYCLE);
+    }
+
+    function commit(next, rec, centreChoice) {
+      var h = next.h12 % 12;
+      if (next.ap === "PM") h += 12;
+      onPick(pad2(h) + ":" + pad2(next.m));
+      ["h", "m", "ap"].forEach(function (kind) {
+        if (kind === rec.kind) selected[kind] = rec;
+      });
+      var now = parts();
+      selected.h = selected.h || recordFor("h", now.h12, DIAL_MIDDLE_CYCLE);
+      selected.m = selected.m || recordFor("m", now.m, DIAL_MIDDLE_CYCLE);
+      selected.ap = selected.ap || recordFor("ap", now.ap, DIAL_MIDDLE_CYCLE);
+      if (centreChoice) {
+        selected[rec.kind] = recordFor(rec.kind, rec.value, DIAL_MIDDLE_CYCLE) || rec;
+      }
+      mark();
+      if (centreChoice) centre(selected[rec.kind]);
+    }
+
+    function choose(rec, centreChoice) {
+      var now = parts();
+      commit({
+        h12: rec.kind === "h" ? rec.value : now.h12,
+        m:   rec.kind === "m" ? rec.value : now.m,
+        ap:  rec.kind === "ap" ? rec.value : now.ap
+      }, rec, centreChoice);
+    }
+
+    function mark() {
+      var reachable = {};
+      opts.forEach(function (rec) {
+        var on_ = selected[rec.kind] === rec;
+        rec.node.className = "tpick__opt" + (on_ ? " tpick__opt--on" : "");
+        rec.node.setAttribute("aria-selected", on_ ? "true" : "false");
+        rec.node.tabIndex = on_ ? 0 : -1;
+        if (on_) reachable[rec.kind] = true;
+      });
+      /* Every column keeps one tab stop, so a column with nothing chosen in it
+         is still reachable from the keyboard. */
+      ["h", "m", "ap"].forEach(function (kind) {
+        if (reachable[kind]) return;
+        var first = opts.filter(function (rec) { return rec.kind === kind; })[0];
+        if (first) first.node.tabIndex = 0;
+      });
+    }
+
+    function centre(rec) {
+      var list = rec.list;
+      var height = list.clientHeight || 160;
+      var rowHeight = rec.node.offsetHeight || 32;
+      list.scrollTop = Math.max(0, rec.node.offsetTop - (height - rowHeight) / 2);
+    }
+
+    function keys(e, rec) {
+      var order = ["h", "m", "ap"];
+      var sibs = opts.filter(function (o) { return o.kind === rec.kind; });
+      var i = sibs.indexOf(rec);
+
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        var direction = e.key === "ArrowDown" ? 1 : -1;
+        var nextIndex = (i + direction + sibs.length) % sibs.length;
+        var step = sibs[nextIndex];
+        e.preventDefault();
+        choose(step, true);
+        step.node.focus();
+        centre(step);
+      } else if (e.key === "Home" || e.key === "End") {
+        e.preventDefault();
+        var edge = e.key === "Home" ? sibs[0] : sibs[sibs.length - 1];
+        choose(edge, true);
+        edge.node.focus();
+        centre(edge);
+      } else if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+        var k = order.indexOf(rec.kind) + (e.key === "ArrowRight" ? 1 : -1);
+        if (k < 0 || k >= order.length) return;
+        e.preventDefault();
+        var over = opts.filter(function (o) {
+          return o.kind === order[k] && o.node.tabIndex === 0;
+        })[0];
+        if (over) over.node.focus();
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        choose(rec, true);
+        api.close(true);
+      }
+    }
+
+    function keepDialInRange(list) {
+      var cycle = list._cycleHeight;
+      var max = list.scrollHeight - list.clientHeight;
+      if (!cycle || max <= 0) return;
+      if (list.scrollTop < cycle) list.scrollTop += cycle * 3;
+      else if (list.scrollTop > max - cycle) list.scrollTop -= cycle * 3;
+    }
+
+    function nearestDialOption(list) {
+      var centrePoint = list.scrollTop + (list.clientHeight || 160) / 2;
+      var best = null;
+      var distance = Infinity;
+      (list._records || []).forEach(function (rec) {
+        var rowCentre = rec.node.offsetTop + (rec.node.offsetHeight || 32) / 2;
+        var nextDistance = Math.abs(rowCentre - centrePoint);
+        if (nextDistance < distance) {
+          best = rec;
+          distance = nextDistance;
+        }
+      });
+      return best;
+    }
+
+    function wireDialScroll(list) {
+      on(list, "scroll", function () {
+        keepDialInRange(list);
+        if (list._scrollTimer) window.clearTimeout(list._scrollTimer);
+        list._scrollTimer = window.setTimeout(function () {
+          var nearest = nearestDialOption(list);
+          if (nearest) choose(nearest, false);
+        }, 80);
+      });
+    }
+
+    function wireStackScroll(list) {
+      on(list, "scroll", function () {
+        if (list._scrollTimer) window.clearTimeout(list._scrollTimer);
+        list._scrollTimer = window.setTimeout(function () {
+          var nearest = nearestDialOption(list);
+          if (nearest) choose(nearest, true);
+        }, 80);
+      });
+    }
+
+    /* Rebuilt on every open rather than once, because a minute typed straight
+       into the field — 07:12, which no five-minute step lands on — should be in
+       the column the owner is about to look at. Nine repeated cycles make the
+       wheel feel continuous; the scroll handler quietly moves it back toward
+       the middle before the user can reach an edge. */
+    function build() {
+      clear(cols);
+      opts.length = 0;
+
+      var now = parts();
+      var hours = [12];
+      var h;
+      for (h = 1; h <= 11; h++) hours.push(h);
+
+      var minutes = [];
+      var m;
+      for (m = 0; m < 60; m += MINUTE_STEP) minutes.push(m);
+      if (!now.empty && minutes.indexOf(now.m) < 0) {
+        minutes.push(now.m);
+        minutes.sort(function (a, b) { return a - b; });
+      }
+
+      [
+        { cap: "Hour", kind: "h", values: hours },
+        { cap: "Min", kind: "m", values: minutes },
+        { cap: "", kind: "ap", values: ["AM", "PM"] }
+      ].forEach(function (col) {
+        var group = el("div", "tpick__group");
+        /* Keep the blank AM/PM heading the same height as Hour and Min so its
+           centered two-choice stack shares their selection line. */
+        group.appendChild(el("span", "tpick__cap", col.cap || "\u00a0"));
+
+        var list = el("div", "tpick__col" + (col.kind === "ap" ? " tpick__col--ap" : ""));
+        list._records = [];
+        list.setAttribute("role", "listbox");
+        list.setAttribute("aria-label", col.cap === "Hour" ? "Hour"
+          : col.cap === "Min" ? "Minute" : "Morning or afternoon");
+
+        var cycles = col.kind === "ap" ? 1 : DIAL_CYCLES;
+        var cycle;
+        for (cycle = 0; cycle < cycles; cycle++) {
+          col.values.forEach(function (value) {
+            var b = el("button", "tpick__opt", col.kind === "m" ? pad2(value) : String(value));
+            b.type = "button";
+            b.setAttribute("role", "option");
+            b.tabIndex = -1;
+            var rec = {
+              node: b, kind: col.kind, value: value, list: list, cycle: cycle
+            };
+            opts.push(rec);
+            list._records.push(rec);
+            on(b, "click", function () { choose(rec, true); });
+            on(b, "keydown", function (e) { keys(e, rec); });
+            list.appendChild(b);
+          });
+        }
+
+        group.appendChild(list);
+        cols.appendChild(group);
+        var first = list._records[0];
+        var nextCycle = list._records[col.values.length];
+        var measuredCycle = nextCycle && first
+          ? nextCycle.node.offsetTop - first.node.offsetTop : 0;
+        if (col.kind === "ap") {
+          /* AM/PM is a short, two-choice stack. It follows the same centered
+             selection as the dials, but never repeats or wraps around. */
+          list._cycleHeight = 0;
+          wireStackScroll(list);
+        } else {
+          list._cycleHeight = measuredCycle || col.values.length * 32;
+          wireDialScroll(list);
+        }
+      });
+
+      syncSelection();
+      mark();
+    }
+
+    /* Showing is not the same question as `panel.hidden`: a panel on its way
+       out is still in the document for the length of the animation, and a
+       second click in that moment means open it again, not leave it closing. */
+    var showing = false;
+
+    api = {
+      shell: shell,
+      panel: panel,
+      holds: function (node) { return shell.contains(node) || panel.contains(node); },
+      open: function () {
+        if (showing) return;
+        showing = true;
+        if (openPicker && openPicker !== api) openPicker.close(false);
+        build();
+        setDisclosure(panel, true);
+        toggle.setAttribute("aria-expanded", "true");
+        openPicker = api;
+        /* After a frame, so the column has the height the scroll is measured
+           against rather than the zero it opens from. */
+        nextFrame(function () {
+          ["h", "m", "ap"].forEach(function (kind) {
+            if (selected[kind]) centre(selected[kind]);
+          });
+        });
+      },
+      close: function (focusBack) {
+        if (!showing) return;
+        showing = false;
+        setDisclosure(panel, false);
+        toggle.setAttribute("aria-expanded", "false");
+        if (openPicker === api) openPicker = null;
+        if (focusBack) input.focus();
+      }
+    };
+
+    on(toggle, "click", function () {
+      if (showing) api.close(true);
+      else api.open();
+    });
+
+    /* Typed and picked are the same value seen two ways, so the columns follow
+       the field rather than only the other way round. */
+    on(input, "input", function () {
+      if (showing) {
+        syncSelection();
+        mark();
+      }
+    });
+
+    wirePickerDismissal();
+    return api;
+  }
+
   function makeCheck(labelText, checked, onChange) {
     var wrap = el("label", "check");
     var input = el("input");
@@ -447,21 +953,24 @@ var AROMATI_ADMIN = (function () {
       head.appendChild(el("span", "card__count", opts.count));
     }
 
-    var body = el("div", "card__body");
+    var shell = el("div", "card__body");
+    var body = el("div", "card__body-inner");
+    shell.appendChild(body);
     var open = !!ui.open[id];
-    body.hidden = !open;
+    shell.hidden = !open;
+    if (open) shell.classList.add("is-open");
     caret.textContent = open ? "▾" : "▸";
 
     on(head, "click", function () {
-      var nowOpen = body.hidden;
-      body.hidden = !nowOpen;
+      var nowOpen = shell.hidden;
+      setDisclosure(shell, nowOpen);
       caret.textContent = nowOpen ? "▾" : "▸";
       ui.open[id] = nowOpen;
     });
 
     wrap.appendChild(head);
-    wrap.appendChild(body);
-    return { wrap: wrap, body: body, head: head };
+    wrap.appendChild(shell);
+    return { wrap: wrap, body: body, shell: shell, head: head };
   }
 
 
@@ -495,30 +1004,98 @@ var AROMATI_ADMIN = (function () {
     return n;
   }
 
-  function openTab(id) { ui.tab = id; }
+  /* Which tab is open is a place in the editor, not content, so it lives in the
+     browser rather than the database. A reload — after a save, after the laptop
+     woke up, after a wrong click — should put the owner back where they were
+     and not at Words. localStorage throws outright in a locked-down Safari, so
+     both halves are wrapped and both fail to the old behaviour. */
+  var TAB_KEY = "aromati.admin.tab";
+
+  function openTab(id) {
+    ui.tab = id;
+    try { window.localStorage.setItem(TAB_KEY, id); } catch (e) { /* not fatal */ }
+  }
+
+  function restoreTab() {
+    var saved;
+    try { saved = window.localStorage.getItem(TAB_KEY); } catch (e) { return; }
+    var known = PANELS.filter(function (p) { return p.id === saved; }).length > 0;
+    if (known) ui.tab = saved;
+  }
+
+  function setTabDot(tab, hasChange) {
+    var dot = tab.querySelector(".tab__dot");
+    if (hasChange) {
+      if (dot) {
+        dot._exitToken = (dot._exitToken || 0) + 1;
+        dot.classList.remove("tab__dot--leaving");
+      } else {
+        tab.appendChild(el("span", "tab__dot"));
+      }
+      return;
+    }
+    if (!dot || dot.classList.contains("tab__dot--leaving")) return;
+
+    var token = (dot._exitToken || 0) + 1;
+    dot._exitToken = token;
+    dot.classList.add("tab__dot--leaving");
+    function remove() {
+      if (dot._exitToken === token && dot.parentNode === tab) tab.removeChild(dot);
+    }
+    if (prefersReducedMotion()) remove();
+    else window.setTimeout(remove, STATUS_EXIT_MS);
+  }
+
+  function makeTab(panel) {
+    var b = el("button", "tab", panel.name);
+    b.type = "button";
+    on(b, "click", function () { openTab(panel.id); renderAll(true); });
+    return b;
+  }
 
   function renderTabs() {
     var host = byId("tabs");
-    clear(host);
-    PANELS.forEach(function (panel) {
-      var b = el("button", "tab", panel.name);
-      b.type = "button";
+    if (host.children.length !== PANELS.length) {
+      clear(host);
+      PANELS.forEach(function (panel) {
+        var b = makeTab(panel);
+        b.setAttribute("aria-selected", ui.tab === panel.id ? "true" : "false");
+        setTabDot(b, panelChangeCount(panel.id) > 0);
+        host.appendChild(b);
+      });
+      return;
+    }
+
+    PANELS.forEach(function (panel, i) {
+      var b = host.children[i];
+      b.firstChild.nodeValue = panel.name;
       b.setAttribute("aria-selected", ui.tab === panel.id ? "true" : "false");
-      if (panelChangeCount(panel.id) > 0) b.appendChild(el("span", "tab__dot"));
-      on(b, "click", function () { openTab(panel.id); renderAll(); });
-      host.appendChild(b);
+      setTabDot(b, panelChangeCount(panel.id) > 0);
     });
   }
 
-  function renderAll() {
+  function renderAll(animate, preserveScroll) {
+    /* Whatever picker was open belonged to nodes this pass is about to throw
+       away. Forgetting it here is the difference between "no panel is open" and
+       "a panel is open, in a document that no longer contains it". */
+    openPicker = null;
+
+    var scrollY = preserveScroll
+      ? (window.scrollY || window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop)
+      : null;
     ui.fields = [];
     renderTabs();
     var host = byId("panels");
     clear(host);
     var panel = PANELS.filter(function (p) { return p.id === ui.tab; })[0] || PANELS[0];
-    var node = el("div", "panel");
-    panel.render(node);
+    var panelAnimation = animate === true;
+    var menuListAnimation = animate === "menu-list";
+    var node = el("div", "panel" + (panelAnimation ? " panel--enter" : ""));
+    panel.render(node, menuListAnimation);
     host.appendChild(node);
+    if (preserveScroll && scrollY > 0 && window.scrollY !== scrollY) {
+      window.scrollTo(0, scrollY);
+    }
     updateSavebar();
   }
 
@@ -529,8 +1106,8 @@ var AROMATI_ADMIN = (function () {
     host.appendChild(el("p", "panel__intro",
       "Every heading, paragraph and button label on the site. A line break in a " +
       "box below becomes a line break on the page, and *asterisks around a phrase* " +
-      "make it italic. Anything else you type appears exactly as you typed it — " +
-      "the site never treats this as code."));
+      "make it italic. Anything else you type appears exactly as you typed it. " +
+      "The site never treats it as code."));
 
     var byPage = {};
     rowsOf("site_copy").forEach(function (row) {
@@ -578,11 +1155,18 @@ var AROMATI_ADMIN = (function () {
 
   /* ── the hours ─────────────────────────────── */
 
+  /* Time fields stay in their own row columns. The picker is inside the field
+     that owns it, so it can never drift under the neighboring Closes box. */
+  function addTimes(block, fields) {
+    fields.forEach(function (f) { block.appendChild(f.wrap); });
+    return fields;
+  }
+
   function renderHoursPanel(host) {
     host.appendChild(el("p", "panel__intro",
       "The opening hours in one place. They drive the open/closed pill on the " +
       "home page, the table under Visit, the footer, the mobile menu and what " +
-      "Google is told — change them here and all five move together."));
+      "Google is told. Change them here and all five update together."));
 
     var days = rowsOf("business_hours").slice().sort(function (a, b) {
       return (a.sort_order || 0) - (b.sort_order || 0);
@@ -595,7 +1179,7 @@ var AROMATI_ADMIN = (function () {
 
     days.forEach(function (row) {
       var name = DAY_NAMES[row.day_of_week] || ("Day " + row.day_of_week);
-      var block = el("div", "row");
+      var block = el("div", "row row--hours");
 
       var closed = makeCheck("Closed all day", row.is_closed, function (isClosed) {
         row.is_closed = isClosed;
@@ -616,19 +1200,20 @@ var AROMATI_ADMIN = (function () {
       block.appendChild(head);
 
       if (!row.is_closed) {
-        block.appendChild(makeField({
-          table: "business_hours", row: row, col: "opens_at",
-          cardId: "hours:week", tab: "hours",
-          label: "Opens", type: "time", value: toInputTime(row.opens_at),
-          onInput: function (v) { row.opens_at = v ? v + ":00" : null; }
-        }).wrap);
-
-        block.appendChild(makeField({
-          table: "business_hours", row: row, col: "closes_at",
-          cardId: "hours:week", tab: "hours",
-          label: "Closes", type: "time", value: toInputTime(row.closes_at),
-          onInput: function (v) { row.closes_at = v ? v + ":00" : null; }
-        }).wrap);
+        addTimes(block, [
+          makeField({
+            table: "business_hours", row: row, col: "opens_at",
+            cardId: "hours:week", tab: "hours",
+            label: "Opens", type: "time", value: toInputTime(row.opens_at),
+            onInput: function (v) { row.opens_at = v ? v + ":00" : null; }
+          }),
+          makeField({
+            table: "business_hours", row: row, col: "closes_at",
+            cardId: "hours:week", tab: "hours",
+            label: "Closes", type: "time", value: toInputTime(row.closes_at),
+            onInput: function (v) { row.closes_at = v ? v + ":00" : null; }
+          })
+        ]);
       }
 
       card.body.appendChild(block);
@@ -656,7 +1241,7 @@ var AROMATI_ADMIN = (function () {
       "you feel like tidying."));
 
     exceptions.forEach(function (row) {
-      var block = el("div", "row");
+      var block = el("div", "row row--hours");
 
       block.appendChild(makeField({
         table: "hours_exceptions", row: row, col: "on_date",
@@ -679,18 +1264,20 @@ var AROMATI_ADMIN = (function () {
       block.appendChild(closedWrap);
 
       if (!row.is_closed) {
-        block.appendChild(makeField({
-          table: "hours_exceptions", row: row, col: "opens_at",
-          cardId: "hours:exceptions", tab: "hours",
-          label: "Opens", type: "time", value: toInputTime(row.opens_at),
-          onInput: function (v) { row.opens_at = v ? v + ":00" : null; }
-        }).wrap);
-        block.appendChild(makeField({
-          table: "hours_exceptions", row: row, col: "closes_at",
-          cardId: "hours:exceptions", tab: "hours",
-          label: "Closes", type: "time", value: toInputTime(row.closes_at),
-          onInput: function (v) { row.closes_at = v ? v + ":00" : null; }
-        }).wrap);
+        addTimes(block, [
+          makeField({
+            table: "hours_exceptions", row: row, col: "opens_at",
+            cardId: "hours:exceptions", tab: "hours",
+            label: "Opens", type: "time", value: toInputTime(row.opens_at),
+            onInput: function (v) { row.opens_at = v ? v + ":00" : null; }
+          }),
+          makeField({
+            table: "hours_exceptions", row: row, col: "closes_at",
+            cardId: "hours:exceptions", tab: "hours",
+            label: "Closes", type: "time", value: toInputTime(row.closes_at),
+            onInput: function (v) { row.closes_at = v ? v + ":00" : null; }
+          })
+        ]);
       }
 
       block.appendChild(makeField({
@@ -705,7 +1292,6 @@ var AROMATI_ADMIN = (function () {
       del.type = "button";
       on(del, "click", function () { deleteRow("hours_exceptions", row); });
       block.appendChild(del);
-
       exCard.body.appendChild(block);
     });
 
@@ -739,8 +1325,8 @@ var AROMATI_ADMIN = (function () {
   function renderContactPanel(host) {
     host.appendChild(el("p", "panel__intro",
       "The phone number, email, Instagram and address, each stored once and " +
-      "written into every place on the site that shows them — the phone alone " +
-      "appears in twenty-four."));
+      "written into every place on the site that shows them. The phone alone " +
+      "appears in twenty-four places."));
 
     var groups = {};
     rowsOf("site_settings").slice().sort(function (a, b) {
@@ -825,19 +1411,22 @@ var AROMATI_ADMIN = (function () {
     renderAll();
   }
 
-  function renderMenuPanel(host) {
+  function renderMenuPanel(host, animateResults) {
     host.appendChild(el("p", "panel__intro",
       "The three menu pages. A section is a block with its own heading and its " +
-      "own tab; an item is a line inside one. Prices are typed without the " +
-      "dollar sign — the site adds it — and 7.50 stays 7.50 rather than " +
-      "becoming 7.5."));
+      "own tab, and an item is a line inside one. Type prices without the dollar " +
+      "sign. The site adds it, and 7.50 stays 7.50 instead of becoming 7.5."));
 
     var pick = el("div", "pagepick");
     MENU_PAGES.forEach(function (page) {
       var b = el("button", "pagepick__btn", page.name);
       b.type = "button";
       b.setAttribute("aria-pressed", ui.menuPage === page.id ? "true" : "false");
-      on(b, "click", function () { ui.menuPage = page.id; renderAll(); });
+      on(b, "click", function () {
+        if (ui.menuPage === page.id) return;
+        ui.menuPage = page.id;
+        renderAll("menu-list", true);
+      });
       pick.appendChild(b);
     });
     host.appendChild(pick);
@@ -856,11 +1445,14 @@ var AROMATI_ADMIN = (function () {
     search.appendChild(note);
     host.appendChild(search);
 
+    var results = el("div", "menu__results" + (animateResults ? " menu__results--enter" : ""));
+    host.appendChild(results);
+
     var courses = coursesOn(ui.menuPage);
-    if (!courses.length) host.appendChild(el("p", "empty", "This page has no sections yet."));
+    if (!courses.length) results.appendChild(el("p", "empty", "This page has no sections yet."));
 
     courses.forEach(function (course) {
-      host.appendChild(renderCourse(course, courses).wrap);
+      results.appendChild(renderCourse(course, courses).wrap);
     });
 
     var add = el("button", "btn btn--small btn--add", "Add a section");
@@ -875,7 +1467,7 @@ var AROMATI_ADMIN = (function () {
       ui.open["course:" + row.id] = true;
       renderAll();
     });
-    host.appendChild(add);
+    results.appendChild(add);
 
     applySearch();
 
@@ -898,7 +1490,7 @@ var AROMATI_ADMIN = (function () {
         coursesOn(ui.menuPage).forEach(function (course) {
           var any = itemsIn(course.id).some(matchesSearch);
           var body = document.querySelector('[data-course-body="' + course.id + '"]');
-          if (body && any) body.hidden = false;
+          if (body && any) setDisclosure(body, true);
         });
       }
     }
@@ -915,7 +1507,7 @@ var AROMATI_ADMIN = (function () {
       count: course.is_static ? "built in" :
         items.length + (items.length === 1 ? " item" : " items")
     });
-    card.body.setAttribute("data-course-body", course.id);
+    card.shell.setAttribute("data-course-body", course.id);
 
     var moves = el("span", "item__moves");
     [["▲", -1], ["▼", 1]].forEach(function (pair) {
@@ -1088,15 +1680,20 @@ var AROMATI_ADMIN = (function () {
     });
     head.appendChild(moves);
 
-    var body = el("div", "item__body");
-    body.hidden = !ui.open[openId];
+    var shell = el("div", "item__body");
+    var body = el("div", "item__body-inner");
+    shell.appendChild(body);
+    var open = !!ui.open[openId];
+    shell.hidden = !open;
+    if (open) shell.classList.add("is-open");
     on(head, "click", function () {
-      body.hidden = !body.hidden;
-      ui.open[openId] = !body.hidden;
+      var nowOpen = shell.hidden;
+      setDisclosure(shell, nowOpen);
+      ui.open[openId] = nowOpen;
     });
 
     wrap.appendChild(head);
-    wrap.appendChild(body);
+    wrap.appendChild(shell);
 
     body.appendChild(makeField({
       table: "menu_items", row: item, col: "name",
@@ -1331,8 +1928,8 @@ var AROMATI_ADMIN = (function () {
     host.appendChild(el("p", "panel__intro",
       "Every photograph on the site, listed in the order you would meet them " +
       "walking down the page. Choosing a new one does not change the site until " +
-      "you press Save — and “Put the original back” is always there, because the " +
-      "photographs the site was built with stay in the site whatever you upload."));
+      "you press Save. “Put the original back” is always available, so the " +
+      "photographs the site was built with stay in place whatever you upload."));
 
     var rows = rowsOf("photos").slice().sort(function (a, b) {
       return (a.sort_order || 0) - (b.sort_order || 0);
@@ -1793,10 +2390,10 @@ var AROMATI_ADMIN = (function () {
     notice.appendChild(document.createTextNode(
       "The eighteen questions on it today are placeholder text written by the " +
       "studio, and the page itself carries a notice saying so. Nothing has been " +
-      "moved into the editor yet, because if the page is dropped the work is " +
-      "wasted and if it is rewritten it is wasted twice. Say the word and the " +
-      "questions get transcribed — or the page gets removed. Until then anything " +
-      "added below is live on the site as soon as it is saved."));
+      "moved into the editor yet. Dropping the page would waste the work, and " +
+      "rewriting it would waste it twice. Say the word and the questions get " +
+      "transcribed, or the page gets removed. Until then, anything added below " +
+      "goes live on the site as soon as it is saved."));
     host.appendChild(notice);
 
     entries.forEach(function (entry) {
@@ -2161,24 +2758,53 @@ var AROMATI_ADMIN = (function () {
     host.hidden = false;
   }
 
+  var savebarExitToken = 0;
+
+  function showSavebar(bar) {
+    savebarExitToken += 1;
+    bar.classList.remove("savebar--leaving");
+    bar.hidden = false;
+  }
+
+  function hideSavebarAnimated(bar) {
+    if (bar.hidden) {
+      bar.classList.remove("savebar--leaving");
+      byId("saveCount").textContent = "0 changes not yet saved";
+      return;
+    }
+    if (bar.classList.contains("savebar--leaving")) return;
+
+    var token = ++savebarExitToken;
+    bar.classList.add("savebar--leaving");
+    function finish() {
+      if (savebarExitToken !== token) return;
+      bar.classList.remove("savebar--leaving");
+      bar.hidden = true;
+      byId("saveCount").textContent = "0 changes not yet saved";
+    }
+    if (prefersReducedMotion()) finish();
+    else window.setTimeout(finish, STATUS_EXIT_MS);
+  }
+
   function updateSavebar() {
     var n = changeCount();
     var bar = byId("savebar");
-    bar.hidden = n === 0;
-    byId("saveCount").textContent = n === 1
-      ? "1 change not yet saved"
-      : n + " changes not yet saved";
-    if (n === 0) byId("problems").hidden = true;
+    if (n === 0) {
+      hideSavebarAnimated(bar);
+      byId("problems").hidden = true;
+    } else {
+      showSavebar(bar);
+      byId("saveCount").textContent = n === 1
+        ? "1 change not yet saved"
+        : n + " changes not yet saved";
+    }
 
     /* A tab shows a dot when something under it has changed, and the count in
        the savebar is the only number that matters — so both are rebuilt from
        the same derived state rather than incremented anywhere. */
     var tabs = byId("tabs").children, i;
     for (i = 0; i < tabs.length; i++) {
-      var has = panelChangeCount(PANELS[i].id) > 0;
-      var dot = tabs[i].querySelector(".tab__dot");
-      if (has && !dot) tabs[i].appendChild(el("span", "tab__dot"));
-      if (!has && dot) tabs[i].removeChild(dot);
+      setTabDot(tabs[i], panelChangeCount(PANELS[i].id) > 0);
     }
   }
 
@@ -2435,7 +3061,7 @@ var AROMATI_ADMIN = (function () {
 
   function flash(message) {
     var bar = byId("savebar");
-    bar.hidden = false;
+    showSavebar(bar);
     byId("saveCount").textContent = message;
     window.setTimeout(function () { updateSavebar(); }, 2600);
   }
@@ -2646,6 +3272,7 @@ var AROMATI_ADMIN = (function () {
       auth: { persistSession: true, autoRefreshToken: true }
     });
 
+    restoreTab();
     wireGate();
     on(byId("signOut"), "click", signOut);
     on(byId("saveBtn"), "click", save);

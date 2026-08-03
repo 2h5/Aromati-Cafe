@@ -3,16 +3,20 @@
 Marketing site for Aromati Café & Wine Bar — 103 E 34th Street, Murray Hill,
 New York. Five pages, plus an editor the owner uses to change what is on them.
 
-**Status, 2026-08-01: the CMS is built and live.** Hours, contact details, the
+**Status, 2026-08-02: the CMS is built and usable.** Hours, contact details, the
 whole menu across three pages, the section copy and the photographs all come
-from a Supabase project and are edited at `/admin.html`. The FAQ panel exists
-and the FAQ page is still placeholder copy — see *The FAQ page* below.
+from a Supabase project and are edited at `/admin.html`. The next work is
+testing the editor and its browser behavior. The FAQ panel exists, but the FAQ
+page is still placeholder copy — see *The FAQ page* below.
+
+The remaining known visual issue is separate from the CMS: the Wine 04 photo is
+visible on affected iOS portrait sizes but does not currently move with the
+page. The hero and kitchen reel issues are closed.
 
 Two other files matter as much as this one:
 
-- **`memory.md`** — the build plan, every settled decision and why, the phase
-  history, and the security analysis. It is the long version of everything
-  here. Read it before changing anything.
+- **`memory.md`** — the current technical status, rules that must not regress,
+  open decisions and the checks to run before release.
 - **`client-notes.md`** — the same site described for the owner, in the owner's
   language. Nothing technical in it.
 
@@ -104,12 +108,12 @@ a crawler or a reader with no JavaScript gets a complete page. `render.js` then
 overwrites them from the data. The menus are not — their markup was removed and
 the board is built from scratch.
 
-That duplication has a cost, and it is the one open item worth knowing about
-before you start: **nothing yet writes live values back into the markup or the
-seed files.** Today they agree (`node tools/check-live-project.mjs` says so).
-The moment the owner edits a headline, the markup and `data/seed-copy.js` are
-stale, the offline fallback serves the old wording, and that check starts
-reporting it. See `memory.md`, *What's still open*, item 2.
+That duplication is intentional: the public pages keep a complete shipped
+fallback, while current edits live in the CMS. Live edits do not rewrite the
+source files or seed files. Use the CMS for current content; do not add a
+CMS-to-files sync tool unless the offline fallback later needs to include every
+live edit. `node tools/check-live-project.mjs` can compare the live project with
+the committed fallback when that audit is useful.
 
 ---
 
@@ -176,7 +180,7 @@ edits that copy. Nothing reaches the database until **Save changes**, and
   into a hidden frame, puts the candidate text into the real element and counts
   line boxes at 1280px and 390px as the owner types. It warns and names the
   width rather than blocking. A character count was tried first and is the wrong
-  control — `memory.md`, open item 0, has the measurements.
+  control.
 
 ---
 
@@ -211,9 +215,10 @@ enough.
 npm test
 ```
 
-26 harnesses, no network, no Docker. They run the real files — the real pages in
-jsdom, the real renderer, the migrations against Postgres compiled to
-WebAssembly. `memory.md` describes each one and what it is for.
+26 harnesses, no network, no Docker. They run the real files — the real pages
+in jsdom, the real renderer, and the migrations against Postgres
+compiled to WebAssembly. `memory.md` records the current verification workflow;
+the individual commands live in `package.json`.
 
 Two of them drive a real headless Chrome and are in `npm test` like the rest:
 `npm run check:layout`, which measures the nav and the masthead before and after
@@ -352,7 +357,7 @@ checkable.
 **An `href` is the same kind of sink.** `javascript:` in an ordering link would
 run on click. The database refuses anything that is not `https://` and so does
 `render.js` — deliberately both, because either one alone is a single point of
-failure. Phase 6 extended the same rule to `<img src>`.
+failure. The same rule applies to every image source.
 
 ### The other invariants
 
