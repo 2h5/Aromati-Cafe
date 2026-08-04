@@ -3,7 +3,7 @@
    script is a classic script, and nothing here is required to see a change.
    See README.md and memory.md, "Workflow".
 
-   Two things have to be spelled out, and both fail silently without it.
+   Three things have to be spelled out, and all three fail silently without it.
 
    1. Every page, by name. Vite builds one entry by default, so `npm run build`
       quietly produced a dist/ with four pages missing.
@@ -15,12 +15,19 @@
       no menus either, because the items are no longer in the markup to fall
       back to.
 
-   Neither failure raises anything. The build says "✓ built" and the site is
-   broken, which is why the copy step ends by asserting that every <script src>
-   on every page actually landed in dist/. */
+   3. Every photograph the editor names. A path inside a classic script is a
+      string to Vite, so the built-in photographs kept their source-tree paths
+      while the files themselves were emitted under hashed names. The site was
+      perfect and the editor showed a broken thumbnail on every photograph the
+      owner had not yet replaced.
 
-import { copyFileSync, mkdirSync, readFileSync, existsSync } from "node:fs";
+   None of the three raises anything. The build says "✓ built" and something is
+   broken, which is why every step below ends by asserting that what it just
+   did actually landed in dist/. */
+
+import { copyFileSync, mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { runInNewContext } from "node:vm";
 import { defineConfig } from "vite";
 
 /* admin.html is built with the rest. It is not part of the site a visitor
@@ -55,15 +62,109 @@ function classicScripts(root) {
    not they ever reached the build — it cannot catch this, and did not. */
 const ROOT_FILES = ["_headers", "robots.txt"];
 
+/* 3. The built-in photographs, at the path the *editor* asks for them by.
+
+   Vite rewrites every image it finds in markup or CSS, so a visitor's pages
+   get hashed filenames and are fine. data/seed-photos.js carries the same
+   files as plain strings inside a classic script, which Vite has no way to
+   see through — so `assets/web/` existed nowhere in dist/, while admin.js
+   asks for exactly that path whenever a slot is still showing the photograph
+   the site was built with.
+
+   That is every slot, on the owner's first login: a broken thumbnail on every
+   row, and "Adjust framing" reporting that the photograph "could not be
+   reopened" when what actually happened was a 404. It cured itself one row at
+   a time as photographs were replaced, which is how it survived being looked
+   at — the only person who sees the un-replaced state is the owner, once, at
+   the beginning.
+
+   The fix is not to ship the files a second time under the name the seed uses.
+   Vite has already emitted every one of them, and the editor should be looking
+   at the very file the page shows — same bytes, same cache entry, no way for
+   the preview and the site to drift apart. So the seed's `src` strings are
+   rewritten in dist/ to the names Vite gave them.
+
+   The source tree is untouched: `assets/web/…` is still what the pages carry
+   and what opens from file://. Only the built copy is rewritten, and only the
+   `src` — `alt` and the dimensions are the editor's and stay as they are. */
+function seedPhotoSources(file) {
+  const sandbox = {};
+  runInNewContext(readFileSync(file, "utf8"), sandbox);
+  if (!sandbox.SEED_PHOTOS) {
+    throw new Error(`build: ${file} did not define SEED_PHOTOS — the editor's ` +
+                    "built-in photographs cannot be located.");
+  }
+  return [...new Set(
+    Object.values(sandbox.SEED_PHOTOS).map((p) => p && p.src).filter(Boolean)
+  )].sort();
+}
+
+/* dist/ is flat — every page sits at its root — so a path relative to the
+   built page is the emitted name as Rollup reports it. */
+function rewriteSeedPhotos(root, outDir, emitted) {
+  const file = resolve(root, outDir, "data/seed-photos.js");
+  let text = readFileSync(file, "utf8");
+  const unresolved = [];
+
+  for (const src of seedPhotoSources(resolve(root, "data/seed-photos.js"))) {
+    const built = emitted.get(src);
+    if (!built) { unresolved.push(`${src} (no page or stylesheet references it)`); continue; }
+    if (!existsSync(resolve(root, outDir, built))) {
+      unresolved.push(`${src} → ${built} (named by the build, absent from ${outDir}/)`);
+      continue;
+    }
+    text = text.split(`"${src}"`).join(`"${built}"`);
+  }
+
+  if (unresolved.length) {
+    throw new Error(
+      "build: these built-in photographs could not be pointed at their built " +
+      "copy — the editor would show a broken thumbnail for every slot still " +
+      "using one, and could not open them for framing:\n  " +
+      unresolved.join("\n  ") +
+      "\n\nA photograph reaches dist/ by being referenced from a page or a " +
+      "stylesheet. One that only data/seed-photos.js names is never emitted."
+    );
+  }
+
+  writeFileSync(file, text);
+
+  /* Then read the written file back and ask the only question that matters: is
+     every photograph it now names actually there? A rewrite that silently
+     matched nothing leaves a file that parses, loads, and 404s — which is the
+     failure this whole step exists to end, restored in a new spelling. */
+  const missing = seedPhotoSources(file)
+    .filter((src) => !existsSync(resolve(root, outDir, src)));
+
+  if (missing.length) {
+    throw new Error(
+      `build: ${outDir}/data/seed-photos.js still names photographs that are ` +
+      `not in ${outDir}/ — the editor would show them as broken:\n  ` +
+      missing.join("\n  ")
+    );
+  }
+}
+
 function copyClassicScripts() {
   let root = process.cwd();
   let outDir = "dist";
+  /* source path as the seed file spells it → the name Vite emitted it under */
+  const emitted = new Map();
 
   return {
     name: "aromati:copy-classic-scripts",
     configResolved(config) {
       root = config.root;
       outDir = config.build.outDir;
+    },
+    /* The only place the two names are known together. By closeBundle the
+       bundle object is gone and all that is left on disk is a hash. */
+    generateBundle(_options, bundle) {
+      for (const chunk of Object.values(bundle)) {
+        for (const from of chunk.originalFileNames || []) {
+          emitted.set(from.split("\\").join("/"), chunk.fileName);
+        }
+      }
     },
     configureServer(server) {
       /* Vite normally transforms .js requests in dev. The vendored Supabase
@@ -122,6 +223,10 @@ function copyClassicScripts() {
           "normal:\n  " + lost.join("\n  ")
         );
       }
+
+      /* Last, because it rewrites a file the script copy above has just put
+         there — the source seed file, verbatim, source-tree paths and all. */
+      rewriteSeedPhotos(root, outDir, emitted);
     }
   };
 }

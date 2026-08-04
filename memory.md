@@ -208,6 +208,15 @@ include every live edit.
   `README.md` for the current Cloudflare upload workflow.
 - After a deploy, confirm the public pages, `admin.html`, `_headers` and
   `robots.txt` are actually present.
+- A path written inside a classic script is a string Vite cannot see. It emits
+  images under hashed names and rewrites only the markup and CSS that name
+  them, so `assets/web/…` does not exist in `dist/`. `data/seed-photos.js` was
+  pointing there and the editor showed a broken thumbnail for every photograph
+  the owner had not yet replaced — the state of a first login. `vite.config.js`
+  now rewrites that file's `src` values in `dist/` to the names Vite gave them
+  and fails the build if any slot does not resolve. A photograph only reaches
+  `dist/` by being referenced from a page or a stylesheet; one that only the
+  seed file names will stop the build until it is referenced or removed.
 - Safari can hold an old stylesheet. Use a private tab when checking a CSS
   change on iOS.
 
