@@ -2344,10 +2344,26 @@ var AROMATI_ADMIN = (function () {
   var MAX_BYTES = 3 * 1024 * 1024;
   var ALLOWED_TYPES = ["image/webp", "image/jpeg", "image/png"];
 
-  /* The long edge everything is resized down to. The widest a photograph is
-     ever drawn on this site is the full-bleed hero, and 2000 covers that on a
-     2× display with room to spare. Nothing is ever scaled *up*: a small
-     picture stays small rather than being blown up into a soft one. */
+  /* The long edge a photograph is resized down to when no slot asks for less.
+     The widest a photograph is ever drawn on this site is the full-bleed hero,
+     and 2000 covers that on a 2× display with room to spare. Nothing is ever
+     scaled *up*: a small picture stays small rather than being blown up into a
+     soft one.
+
+     This is a ceiling, not a target, and for a while it was the only one — every
+     slot got the hero's number. That is fine for the hero, the story pair and
+     the gallery, which really are drawn 800-900px wide. It is wrong by a wide
+     margin for the small slots, and wrong in the direction that costs a
+     visitor: a plate in the kitchen reel is drawn 320px wide, so a phone
+     photograph framed into one arrived as a 2000×1600 file to be painted into a
+     320px box. Nine of those, decoded at once when the reel scrolls into view,
+     is a visible stall on a laptop — measured on an M2 Air, absent on phones
+     only because mobile browsers quietly decode large images at a reduced size
+     and desktop ones do not.
+
+     So `max` on a frame below overrides this for the slots that need less. The
+     owner sees no difference either way: the resize has always been automatic
+     and has never refused a photograph for being too large. See slotFrame. */
   var MAX_EDGE = 2000;
   var WEBP_QUALITY = 0.86;
 
@@ -2392,14 +2408,32 @@ var AROMATI_ADMIN = (function () {
   };
 
   var FRAME_BY_PREFIX = {
-    kitchen:    { w: 4, h: 3.2, fixed: true },   /* .plate img */
-    cafe:       { w: 3, h: 4.1, fixed: true },   /* .cafe__card */
+    kitchen:    { w: 4, h: 3.2, fixed: true, max: 800 },   /* .plate img */
+    cafe:       { w: 3, h: 4.1, fixed: true, max: 1200 },  /* .cafe__card */
     faq:        { w: 2, h: 1,   fixed: false },  /* .mhead, a wide banner */
     menuFood:   { w: 2, h: 1,   fixed: false },
     menuDrinks: { w: 2, h: 1,   fixed: false },
     menuWine:   { w: 2, h: 1,   fixed: false }
   };
 
+  /* `max` is the long edge for this slot in particular, and it is only ever
+     worth setting where the space on the page is much smaller than MAX_EDGE
+     assumes. Both numbers above are read off styles.css the same way the ratios
+     are, and both leave a 2× display more pixels than it can show:
+
+       kitchen  --plate-w is clamp(220px,22vw,320px), so 320px at its widest
+                and 640 device pixels on a 2× screen. 800 is the ceiling.
+       cafe     .cafe__grid is four columns of the full width; ~620px a card on
+                a very wide monitor, 1240 device pixels. 1200 is the ceiling.
+
+     A slot with no `max` falls through to MAX_EDGE, which is correct for the
+     hero, the story pair, the gallery and the mastheads — those are genuinely
+     drawn 800-900px wide and want the pixels. Leave them alone.
+
+     A number here that is too small is not a crash either: it is a photograph
+     that goes soft on a large screen, and only the published copy is affected.
+     The master kept in the bucket is sized by WORK_EDGE and is untouched by
+     this, so framing can always be redone from the full picture. */
   function slotFrame(slot) {
     return FRAME_BY_SLOT[slot] ||
       FRAME_BY_PREFIX[String(slot).split(".")[0]] ||
@@ -3390,8 +3424,11 @@ var AROMATI_ADMIN = (function () {
         sw = Math.min(sw, work.width - sx);
         sh = Math.min(sh, work.height - sy);
 
+        /* This slot's ceiling, or the site-wide one where it asks for nothing.
+           Math.min(1, …) is what keeps a small picture small: a crop already
+           under the ceiling is never scaled up to meet it. */
         var out = document.createElement("canvas");
-        var fit = Math.min(1, MAX_EDGE / Math.max(sw, sh));
+        var fit = Math.min(1, (frame.max || MAX_EDGE) / Math.max(sw, sh));
         out.width = Math.max(1, Math.round(sw * fit));
         /* The height comes from the chosen shape rather than from the measured
            rectangle, so a fixed frame is handed a file in exactly its ratio and

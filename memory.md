@@ -50,6 +50,18 @@ the features around it, not adding a new architecture.
 - `FRAME_BY_SLOT` and `FRAME_BY_PREFIX` in `admin.js` mirror the `aspect-ratio`
   rules in `styles.css`. Change one and change the other, or the framing box
   crops to a different shape than the page does.
+- A photograph is resized to the slot it goes into, not to one number for the
+  whole site. `MAX_EDGE` (2000) is the default; a frame with a `max` overrides
+  it, and the kitchen plates (800) and cafe cards (1200) both set one. Removing
+  those sends a 2000px file into a 320px box nine times over, which is a visible
+  stall on a laptop and was the reason the reel lagged. The resize stays
+  automatic either way: no upload is ever refused for being too large.
+- Photographs are sized for where they are drawn, not for where they came from.
+  The kitchen plates are 1100px WebP because a plate is drawn at 320px; the
+  gallery and hero keep their full-size files because they are drawn at 800-900.
+  `assets/web/georgian-salad.jpg` and `adjaruli.jpg` are each shared by a small
+  slot and a large one — swapping a file by name alone will quietly shrink the
+  large one too.
 
 ## Main pieces
 
