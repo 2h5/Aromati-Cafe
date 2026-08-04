@@ -1038,9 +1038,52 @@ body.is-framing{ overflow: hidden; }
 }
 
 .framer__shapes{ display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
-.framer__shape[aria-pressed="true"]{
-  background: var(--maroon-600); color: var(--cream); border-color: var(--maroon-600);
+
+/* The chosen shape fills in — the maroon grows out of the point that was
+   pressed until it has taken the whole pill. A pill that is simply maroon
+   already tells you which one is chosen; the fill tells you that it was you
+   who chose it, and it comes out of your own finger.
+
+   The circle is a pseudo-element rather than a background, because a
+   background cannot start at a point and grow. `overflow: hidden` on the
+   button is what makes the circle come out pill-shaped. The resting fill is
+   stated rather than left to the browser: `appearance: none` does not clear
+   the UA's button background, which is what these were getting.
+
+   Geometry — where the press landed and how wide the circle has to be to
+   reach the furthest corner from there — is set by fillFrom, through the
+   CSSOM. A `style` attribute would be dropped by `style-src 'self'` in
+   production and work perfectly on a laptop. */
+.framer__shape{
+  position: relative; z-index: 0; overflow: hidden;
+  background: var(--field); border-color: var(--line-input);
+  /* the label turns cream a beat late, as the fill reaches it */
+  transition: color 200ms ease 110ms, border-color 380ms var(--ease);
 }
+.framer__shape::before{
+  content: "";
+  /* negative, so it paints over the pill's own background and under its
+     label — the button's z-index: 0 is what keeps it from going any further */
+  position: absolute; z-index: -1;
+  left: var(--fill-x, 50%); top: var(--fill-y, 50%);
+  width: var(--fill-d, 0px); height: var(--fill-d, 0px);
+  border-radius: 50%;
+  background: var(--maroon-600);
+  transform: translate(-50%, -50%) scale(0);
+  transition: transform 380ms var(--ease);
+  will-change: transform;
+}
+.framer__shape[aria-pressed="true"]{
+  color: var(--cream); border-color: var(--maroon-600);
+}
+.framer__shape[aria-pressed="true"]::before{
+  transform: translate(-50%, -50%) scale(1);
+}
+/* Letting go is not a decision, so it does not get an animation of its own —
+   the fill goes back into the point it came out of, a little quicker. */
+.framer__shape[aria-pressed="false"]{ transition-delay: 0s; }
+.framer__shape[aria-pressed="false"]::before{ transition-duration: 260ms; }
+.framer__shape:hover:not([aria-pressed="true"]){ border-color: var(--gold); }
 
 .framer__hold{ display: flex; justify-content: center; }
 
@@ -1060,6 +1103,24 @@ body.is-framing{ overflow: hidden; }
   user-select: none; -webkit-user-drag: none;
 }
 
+/* Changing the shape re-cuts the frame and re-centres the photograph inside
+   it, and both are the same numbers arriving at once — so letting them arrive
+   over a third of a second turns a jump-cut into the frame opening out or
+   closing in, which is what actually happened.
+
+   Only ever on for the length of that one change. Dragging and the zoom
+   slider write these same properties on every pointer move, and a transition
+   on those is not a smoother drag, it is a drag that lags behind the finger.
+   is-morphing is added on the shape click and taken off the moment either one
+   starts, or when the change has landed. */
+.framer__stage.is-morphing{
+  transition: width 340ms var(--ease), height 340ms var(--ease);
+}
+.framer__stage.is-morphing .framer__img{
+  transition: width 340ms var(--ease), height 340ms var(--ease),
+    transform 340ms var(--ease);
+}
+
 .framer__zoom{
   display: flex; align-items: center; gap: 12px; margin: 16px 0 0;
   font-size: 12px; color: var(--ink-soft);
@@ -1072,6 +1133,10 @@ body.is-framing{ overflow: hidden; }
 
 @media (prefers-reduced-motion: reduce){
   .framer__panel{ transition: none; }
+  /* The new shape still has to arrive — it just arrives at once. */
+  .framer__shape, .framer__shape::before,
+  .framer__stage.is-morphing,
+  .framer__stage.is-morphing .framer__img{ transition: none; }
 }
 
 /* The hidden frame the headline check measures in. Off-screen rather than

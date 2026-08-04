@@ -127,6 +127,16 @@ Things that are easy to break here:
   attribute instead would be dropped by `style-src 'self'` in production and
   work perfectly on a laptop. The rows themselves stay transparent, so the
   fill and the row can never disagree about what is selected.
+- Same arrangement, same reasons, in `positionPagePick` for the menu page
+  picker.
+- The shape pills in the framing dialog deliberately do *not* use that
+  pattern. One mark travelling between five wrapping pills was tried and
+  looked wrong; each pill fills in instead, the maroon growing out of the
+  point that was pressed, sized by `fillFrom` — same CSSOM rule, same CSP
+  reason. Choosing a shape also animates the frame itself: `is-morphing` on
+  the stage, added on the click and taken off again the instant a drag or the
+  zoom slider starts, because those write the same properties on every pointer
+  move and a transition on them is a picture that lags behind the finger.
 - There is no "last saved" or "last published" anywhere, deliberately. Every
   content table does carry `updated_at`, so if it is ever wanted it is one
   `max()` away and needs no migration.

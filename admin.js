@@ -3072,6 +3072,11 @@ var AROMATI_ADMIN = (function () {
   var MIN_ZOOM = 1;
   var MAX_ZOOM = 4;
 
+  /* How long the frame takes to become its new shape. The animation itself is
+     in admin.css — this is here only so the timer that takes the transition
+     off again outlives it. Change one and change the other. */
+  var MORPH_MS = 340;
+
   /* Offered when the space on the page has no fixed shape. Its usual shape
      comes first: it asks nothing of an owner who is happy to be guided. */
   function shapeChoices(work, frame) {
@@ -3118,15 +3123,22 @@ var AROMATI_ADMIN = (function () {
           "closest to. Drag the photograph to move it, zoom in to crop closer, " +
           "and keep anything that matters away from the edges."));
 
+      var shapes = null;
+
       if (choices.length > 1) {
-        var shapes = el("div", "framer__shapes");
+        shapes = el("div", "framer__shapes");
         var buttons = [];
         choices.forEach(function (choice) {
           var b = el("button", "btn btn--small framer__shape", choice.label);
           b.type = "button";
           b.setAttribute("aria-pressed", choice === shape ? "true" : "false");
-          on(b, "click", function () {
+          /* Pressing the shape that is already chosen stays what it was — a
+             way to put a picture that has been dragged about back in the
+             middle. The pill has nowhere to travel to; the photograph still
+             moves, so the reset is visible rather than silent. */
+          on(b, "click", function (e) {
             shape = choice;
+            fillFrom(b, e);
             buttons.forEach(function (other) {
               other.setAttribute("aria-pressed", other === b ? "true" : "false");
             });
@@ -3135,12 +3147,53 @@ var AROMATI_ADMIN = (function () {
                a framing the owner never chose. */
             zoom = 1;
             slider.value = "1";
+            morph();
             layout(true);
           });
           buttons.push(b);
           shapes.appendChild(b);
         });
         panel.appendChild(shapes);
+      }
+
+      /* Where the fill starts and how big it has to get. The circle grows from
+         the point that was pressed, so it has to reach whichever corner is
+         furthest from there — anything less and the pill fills in with a bite
+         out of one end. Doubled because the circle is centred on the point and
+         scaled from the middle.
+
+         A keyboard press has no point. Chrome and Firefox report clientX 0 on
+         those, which is a real corner of the button and would fill from the
+         left edge; e.detail is 0 for a press that came from the keyboard and
+         non-zero for one that came from a pointer, which is the difference
+         that is actually being asked about. Those fill from the middle. */
+      function fillFrom(btn, e) {
+        var box = btn.getBoundingClientRect();
+        var fromPointer = e && e.detail;
+        var x = fromPointer ? e.clientX - box.left : box.width / 2;
+        var y = fromPointer ? e.clientY - box.top : box.height / 2;
+
+        var reach = 0;
+        [[0, 0], [box.width, 0], [0, box.height], [box.width, box.height]]
+          .forEach(function (corner) {
+            var dx = corner[0] - x, dy = corner[1] - y;
+            reach = Math.max(reach, Math.sqrt(dx * dx + dy * dy));
+          });
+
+        btn.style.setProperty("--fill-x", x + "px");
+        btn.style.setProperty("--fill-y", y + "px");
+        btn.style.setProperty("--fill-d", (reach * 2) + "px");
+      }
+
+      /* The shape the dialog opens on is already chosen, so its fill is
+         already at full size and has nothing to animate — it only needs a size
+         to be full of. Called again after a resize because the pills change
+         width when they rewrap, and only the circle's size changes, which is
+         not a transition, so nothing moves on screen. */
+      function fillChosen() {
+        if (!shapes || shapes.offsetParent === null) return;
+        var active = shapes.querySelector('[aria-pressed="true"]');
+        if (active) fillFrom(active, null);
       }
 
       var hold = el("div", "framer__hold");
@@ -3243,7 +3296,34 @@ var AROMATI_ADMIN = (function () {
         paint();
       }
 
+      /* ── the shape change, as something you watch ──
+         layout() writes the frame's new size and the picture's new size and
+         position all at once. Letting those land over a third of a second is
+         the difference between the frame having changed and the frame
+         changing — a cut versus the box opening out or closing in around a
+         photograph that stays where it was.
+
+         It is on for that one change and no longer. Dragging and the zoom
+         slider write the same properties on every pointer move, and a
+         transition on those does not smooth the drag, it puts the picture
+         behind the finger. So every hand-driven path calls still() first, and
+         a timer clears it in case none of them ever does. */
+      var morphTimer = null;
+
+      function morph() {
+        if (prefersReducedMotion()) return;
+        stage.classList.add("is-morphing");
+        clearTimeout(morphTimer);
+        morphTimer = setTimeout(still, MORPH_MS + 60);
+      }
+
+      function still() {
+        clearTimeout(morphTimer);
+        stage.classList.remove("is-morphing");
+      }
+
       on(slider, "input", function () {
+        still();
         setZoom(parseFloat(slider.value) || 1);
       });
 
@@ -3252,6 +3332,7 @@ var AROMATI_ADMIN = (function () {
       var dragging = false, lastX = 0, lastY = 0;
 
       on(stage, "pointerdown", function (e) {
+        still();
         dragging = true;
         lastX = e.clientX;
         lastY = e.clientY;
@@ -3280,6 +3361,7 @@ var AROMATI_ADMIN = (function () {
       /* Dragging is a mouse gesture and a touch gesture and nothing else, so
          the arrow keys are given the same job. */
       on(stage, "keydown", function (e) {
+        still();
         var step = e.shiftKey ? 48 : 12;
         if (e.key === "ArrowLeft") ox -= step;
         else if (e.key === "ArrowRight") ox += step;
@@ -3326,12 +3408,19 @@ var AROMATI_ADMIN = (function () {
         if (e.key === "Escape") { e.preventDefault(); close(null); }
       }
 
-      function onResize() { layout(false); }
+      /* A window being dragged is not a shape change, and the pills may have
+         rewrapped under it. */
+      function onResize() {
+        still();
+        layout(false);
+        fillChosen();
+      }
 
       var done = false;
       function close(result) {
         if (done) return;
         done = true;
+        clearTimeout(morphTimer);
         document.removeEventListener("keydown", onKey, true);
         window.removeEventListener("resize", onResize);
         if (root.parentNode) root.parentNode.removeChild(root);
@@ -3350,8 +3439,10 @@ var AROMATI_ADMIN = (function () {
       document.body.appendChild(root);
 
       /* Measured once the panel is in the page, so hold.clientWidth is a real
-         width rather than zero. */
+         width rather than zero — and so the chosen pill has a size for its
+         fill to be cut from. */
       layout(true);
+      fillChosen();
       stage.focus();
       if (!prefersReducedMotion()) {
         nextFrame(function () { panel.classList.add("is-in"); });
