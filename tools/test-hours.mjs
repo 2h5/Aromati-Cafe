@@ -45,6 +45,11 @@ function run(hours, nowNY) {
 
   inject("data/seed-settings.js");
   inject(null, `var SEED_HOURS = ${JSON.stringify(hours)}; var SEED_HOURS_NOTE = "";`);
+  /* data.js owns the site's New York clock, and script.js reads the pill's
+     week through it. Without it here the pill falls back to the machine's own
+     timezone and these assertions would pass or fail depending on where the
+     test was run — which is the same as not asserting anything. */
+  inject("data.js");
   inject("render.js");
 
   if (nowNY) {

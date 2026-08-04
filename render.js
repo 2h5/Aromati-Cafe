@@ -217,7 +217,18 @@
        5. the Google listing block       script[type="application/ld+json"]
 
      3 and 4 are deliberately different formats — "Sun – Tue  7:00 am – 10:00 pm"
-     against "Sun–Tue 7am–10pm" — so both are generated rather than shared. */
+     against "Sun–Tue 7am–10pm" — so both are generated rather than shared.
+
+     A one-off date reaches all five, but never by being folded into the week.
+     1 speaks for today and 5 tells Google. 2, 3 and 4 describe the week the
+     café repeats, so a closure is *added* to them on its own line, in its own
+     element, in the week before it happens — "Sun — Tue" with "closed December
+     25" merged into it would read as a new weekly rule rather than a holiday.
+
+     That week of notice is the whole point. The pill only speaks on the day
+     itself, and the listing block is read by Google rather than by a person,
+     so without these lines the visitor deciding on the 20th where to go on the
+     25th is the one person the closure never reaches. */
 
   var DAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   var DAY_LONG = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -259,8 +270,78 @@
     return clock(run.opens, compact) + (compact ? "–" : " – ") + clock(run.closes, compact);
   }
 
-  function renderHours(hours, note) {
+  /* ── closures, said out loud and in advance ───
+     The pill speaks for today and the search listing speaks to Google. Neither
+     helps the person deciding on the 20th where to go on the 25th, which is
+     the visitor a holiday closure is actually for. These lines are for them.
+
+     A date further out than NOTICE_DAYS is still in the listing and still
+     closes the café when it arrives; it just does not sit on the page for a
+     season first. Seven days is "the week of", which is about when someone
+     starts making a plan. */
+
+  var MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                     "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  var NOTICE_DAYS = 7;
+
+  /* Today in New York, from the site's one clock. Null when data.js is absent,
+     and then no closure is mentioned at all — better to say nothing than to
+     work out "tomorrow" against the visitor's own timezone. */
+  function todayNY() {
+    return (typeof AROMATI_DATA === "object" && AROMATI_DATA && AROMATI_DATA.nowNY)
+      ? AROMATI_DATA.nowNY().date
+      : null;
+  }
+
+  /* Whole days from one date to another, both "YYYY-MM-DD". UTC arithmetic on
+     values that carry no time, so a daylight saving change cannot turn the
+     answer into 0.958 of a day and round the wrong way. */
+  function daysBetween(a, b) {
+    var p = a.split("-"), q = b.split("-");
+    return Math.round((Date.UTC(+q[0], +q[1] - 1, +q[2]) -
+                       Date.UTC(+p[0], +p[1] - 1, +p[2])) / 86400000);
+  }
+
+  /* "today", "tomorrow", or "Fri, Dec 25". The first two are what a person
+     actually says, and they are the two that matter most. */
+  function dateLabel(dateKey, away) {
+    if (away === 0) return "today";
+    if (away === 1) return "tomorrow";
+    var p = dateKey.split("-");
+    var d = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2]));
+    return DAY_SHORT[d.getUTCDay()] + ", " + MONTH_SHORT[d.getUTCMonth()] + " " + d.getUTCDate();
+  }
+
+  /* The closures worth mentioning, soonest first. data.js has already dropped
+     everything in the past, so this only has to decide how far ahead to look. */
+  function upcoming(oneOffs) {
+    var from = todayNY();
+    if (!from) return [];
+    return Object.keys(oneOffs || {}).sort().map(function (date) {
+      return { date: date, away: daysBetween(from, date), one: oneOffs[date] };
+    }).filter(function (e) {
+      return e.away >= 0 && e.away <= NOTICE_DAYS;
+    });
+  }
+
+  /* "Closed today — Christmas Day", or "Fri, Dec 25, 9:00 am – 2:00 pm".
+     The compact form drops the note: the mobile menu line is already three
+     ranges long and a sentence in the middle of it reads as damage. */
+  function closureLine(entry, compact) {
+    var when = dateLabel(entry.date, entry.away);
+    if (entry.one.closed) {
+      var shut = "Closed " + when;
+      return !compact && entry.one.note ? shut + " — " + entry.one.note : shut;
+    }
+    var open = when.charAt(0).toUpperCase() + when.slice(1) + ", " +
+      clock(entry.one.opens, compact) + (compact ? "–" : " – ") +
+      clock(entry.one.closes, compact);
+    return !compact && entry.one.note ? open + " — " + entry.one.note : open;
+  }
+
+  function renderHours(hours, note, oneOffs) {
     var runs = groupDays(hours);
+    var soon = upcoming(oneOffs);
 
     /* 2. the Visit table. data-days is what script.js reads to light up today,
        so it carries every day in the run, not just its ends. */
@@ -279,7 +360,22 @@
       if (noteEl && note) noteEl.textContent = note;
     }
 
-    /* 3. the footer, one run per line. */
+    /* 2b. the closures, between the table and the note. Hidden rather than
+       left empty when there are none, so the card does not carry the gap of a
+       list that is not there — which is most weeks of most years. */
+    var box = document.getElementById("hoursClosures");
+    if (box) {
+      while (box.firstChild) box.removeChild(box.firstChild);
+      soon.forEach(function (entry) {
+        box.appendChild(el("li", "hours__closure", closureLine(entry, false)));
+      });
+      box.hidden = soon.length === 0;
+    }
+
+    /* 3. the footer, one run per line, then any closure on a line of its own.
+       The runs are the repeating week and a closure is not, so it is not left
+       to look like more of the same: it gets its own element and its own class
+       rather than another line of the same prose. */
     Array.prototype.forEach.call(document.querySelectorAll('[data-hours="footer"]'), function (p) {
       while (p.firstChild) p.removeChild(p.firstChild);
       runs.forEach(function (run, i) {
@@ -288,13 +384,24 @@
            days from the times */
         p.appendChild(document.createTextNode(runLabel(run, " – ") + " " + runTime(run, false)));
       });
+      soon.forEach(function (entry) {
+        p.appendChild(document.createElement("br"));
+        p.appendChild(el("span", "footer__closure", closureLine(entry, false)));
+      });
     });
 
-    /* 4. the mobile menu, all runs on one line, tighter. */
+    /* 4. the mobile menu, all runs on one line, tighter. A closure joins that
+       same line with the same separator: the line is one line by design, and a
+       second one would push the nav links under it down the screen. */
     Array.prototype.forEach.call(document.querySelectorAll(".mmenu__hours"), function (p) {
-      p.textContent = runs.map(function (run) {
+      while (p.firstChild) p.removeChild(p.firstChild);
+      p.appendChild(document.createTextNode(runs.map(function (run) {
         return runLabel(run, "–") + " " + runTime(run, true);
-      }).join(" · ");
+      }).join(" · ")));
+      soon.forEach(function (entry) {
+        p.appendChild(document.createTextNode(" · "));
+        p.appendChild(el("span", "mmenu__closure", closureLine(entry, true)));
+      });
     });
 
     /* 5. the Google listing. Parsed, mutated, assigned back through
@@ -321,6 +428,36 @@
           closes: hhmm(run.closes)
         };
       });
+
+    /* The one-off dates, in the construct schema.org has for exactly this. A
+       closure is `opens` and `closes` both at 00:00 — that is how the
+       vocabulary says "shut", not a placeholder — and validFrom and
+       validThrough are the same single day.
+
+       What is *not* here is a filter on dates already past. data.js drops
+       those where the rows arrive, so that staleness is handled once rather
+       than at each place that reads them; this file renders what it is handed,
+       the same way it does not second-guess the week. A second filter here
+       would be a second thing to keep true.
+
+       Absent rather than empty when there are none. An empty array is a claim
+       about special hours, and the café is not making one. */
+    var dates = Object.keys(oneOffs || {}).sort();
+    if (dates.length) {
+      target.specialOpeningHoursSpecification = dates.map(function (date) {
+        var one = oneOffs[date];
+        return {
+          "@type": "OpeningHoursSpecification",
+          validFrom: date,
+          validThrough: date,
+          opens: one.closed ? "00:00" : hhmm(one.opens),
+          closes: one.closed ? "00:00" : hhmm(one.closes)
+        };
+      });
+    } else {
+      delete target.specialOpeningHoursSpecification;
+    }
+
     ld.textContent = JSON.stringify(data, null, 2);
   }
 
@@ -554,7 +691,9 @@
     }
 
     if (content.hours) {
-      step("hours", function () { renderHours(content.hours, content.hoursNote || null); });
+      step("hours", function () {
+        renderHours(content.hours, content.hoursNote || null, content.exceptions || {});
+      });
     }
 
     if (host && page) {
@@ -587,6 +726,7 @@
     menu:      typeof SEED_MENU === "object" ? SEED_MENU : null,
     hours:     typeof SEED_HOURS === "object" ? SEED_HOURS : null,
     hoursNote: typeof SEED_HOURS_NOTE === "string" ? SEED_HOURS_NOTE : null,
+    exceptions: typeof SEED_HOURS_EXCEPTIONS === "object" ? SEED_HOURS_EXCEPTIONS : {},
     settings:  typeof SEED_SETTINGS === "object" ? SEED_SETTINGS : null,
     copy:      typeof SEED_COPY === "object" ? SEED_COPY : null
     /* No photos here on purpose. This branch runs when data.js is absent, and

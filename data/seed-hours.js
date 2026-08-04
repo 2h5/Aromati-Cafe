@@ -27,6 +27,26 @@ var SEED_HOURS = [
   /* 6 Sat */ { closed: false, opens: 7 * 60, closes: 23 * 60 }
 ];
 
+/* Single dates that do not follow the week above — a holiday closure, or a day
+   that opens late. Keyed by the date in New York, "YYYY-MM-DD", and shaped
+   exactly like a day of the week so that anything reading one can read the
+   other without a translation:
+
+     "2026-12-25": { closed: true, opens: null, closes: null, note: "Christmas Day" }
+
+   Keyed rather than a list because only two questions are ever asked of it —
+   "is there one for today", which is a key lookup, and "which are still to
+   come", which is a walk over the keys. ISO dates sort and compare correctly as
+   plain strings, so neither call site has to parse a date, and parsing dates is
+   where timezone bugs come from.
+
+   Empty, and it should stay empty. This is the site as it shipped, and the site
+   as it shipped had no closures; the owner's are in `hours_exceptions` in the
+   database. What this being here buys is that the shape is real when the
+   database is not — the offline floor can carry a closure rather than having
+   nowhere to put one. */
+var SEED_HOURS_EXCEPTIONS = {};
+
 /* Free text under the Visit hours table. Copy, not hours data — it is here
    rather than in seed-copy.js because it is the one line that has to stay
    truthful when the hours change. */

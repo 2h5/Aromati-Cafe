@@ -23,6 +23,16 @@ import { JSDOM } from "jsdom";
    when it was run is a harness people stop believing. */
 export const FROZEN = "2026-08-05T15:30";
 
+/* Read out of data.js rather than written down here. A harness that seeds the
+   cache under last version's key seeds nothing at all: data.js finds no cache,
+   renders the seeds, and every assertion about what a returning visitor sees
+   quietly becomes an assertion about a first visit — which passes, and means
+   nothing. This file held "aromati:content:v2" as a literal for exactly as
+   long as data.js did. */
+export const CACHE_KEY = (readFileSync("data.js", "utf8")
+  .match(/CACHE_KEY\s*=\s*"([^"]+)"/) || [])[1];
+if (!CACHE_KEY) throw new Error("page-boot: no CACHE_KEY found in data.js");
+
 export function boot(page, {
   fetcher, cache = null, key = "k".repeat(40), seedOnly = false, now = FROZEN
 } = {}) {
@@ -48,10 +58,16 @@ export function boot(page, {
   window.addEventListener("error", (e) => thrown.push(String(e.error || e.message)));
 
   if (now) {
-    /* New York is UTC-4 in August. Fixing the instant rather than the timezone
-       keeps script.js's Intl formatting on the real code path — the pill reads
-       the clock in America/New_York no matter where the page is opened. */
-    const fixed = new Date(`${now}:00-04:00`).getTime();
+    /* Fixing the instant rather than the timezone keeps the site's Intl
+       formatting on the real code path — the clock is read in
+       America/New_York no matter where the page is opened.
+
+       -04:00 is New York in August, which is where FROZEN sits and was fine
+       while every caller sat there with it. A harness reaching for a date in
+       the winter, or either side of a daylight saving change, has to say so:
+       pass a `now` that carries its own offset and it is used as written. */
+    const fixed = new Date(
+      /[+-]\d{2}:\d{2}$/.test(now) ? now : `${now}:00-04:00`).getTime();
     const RealDate = window.Date;
     class FakeDate extends RealDate {
       constructor(...args) { super(...(args.length ? args : [fixed])); }
@@ -69,7 +85,7 @@ export function boot(page, {
   window.scrollTo = () => {};
 
   const store = new Map();
-  if (cache) store.set("aromati:content:v2", JSON.stringify(cache));
+  if (cache) store.set(CACHE_KEY, JSON.stringify(cache));
   Object.defineProperty(window, "localStorage", {
     configurable: true,
     value: {
@@ -126,6 +142,7 @@ for (const f of ["data/seed-settings.js", "data/seed-hours.js", "data/seed-menu.
     g.SEED_MENU = typeof SEED_MENU !== "undefined" ? SEED_MENU : g.SEED_MENU;
     g.SEED_HOURS = typeof SEED_HOURS !== "undefined" ? SEED_HOURS : g.SEED_HOURS;
     g.SEED_HOURS_NOTE = typeof SEED_HOURS_NOTE !== "undefined" ? SEED_HOURS_NOTE : g.SEED_HOURS_NOTE;
+    g.SEED_HOURS_EXCEPTIONS = typeof SEED_HOURS_EXCEPTIONS !== "undefined" ? SEED_HOURS_EXCEPTIONS : g.SEED_HOURS_EXCEPTIONS;
     g.SEED_SETTINGS = typeof SEED_SETTINGS !== "undefined" ? SEED_SETTINGS : g.SEED_SETTINGS;
     g.SEED_COPY = typeof SEED_COPY !== "undefined" ? SEED_COPY : g.SEED_COPY;`)(seedEnv);
 }
@@ -135,7 +152,12 @@ export const hhmmss = (m) =>
 
 /* seed-menu.js → the rows menu_courses and menu_items would hold. `edit` gets
    the course list for each page and may drop, empty or reorder it first, which
-   is how the "deleted" cases are written. */
+   is how the "deleted" cases are written.
+
+   `hidden: true` on an item in that edit becomes is_hidden on the row. The seed
+   files themselves never carry it — a seed is by definition the menu as the
+   public sees it — so this exists only so a harness can say "the owner hid
+   this" and then check that the site agrees. */
 export function menuRows(edit) {
   const pages = JSON.parse(JSON.stringify(seedEnv.SEED_MENU));
   if (edit) edit(pages);
@@ -158,7 +180,8 @@ export function menuRows(edit) {
           price: it.price != null ? it.price : null,
           prices: it.prices != null ? it.prices : null,
           price_all_sizes: it.priceAllSizes != null ? it.priceAllSizes : null,
-          no_price: !!it.noPrice, options_dom_id: it.optionsId || null, sort_order: ii,
+          no_price: !!it.noPrice, is_hidden: !!it.hidden,
+          options_dom_id: it.optionsId || null, sort_order: ii,
           menu_item_pours: (it.pours || []).map((p, pi) => ({
             id: `p${iid}_${pi}`, label: p.label, price: p.price, sort_order: pi })),
           menu_item_options: (it.options || []).map((o, oi) => ({
@@ -212,7 +235,10 @@ function settingRows() {
   return rows.map(([key, value]) => ({ key, value: String(value) }));
 }
 
-export function seedRows({ menu, hours } = {}) {
+/* `exceptions` is the same shape data/seed-hours.js documents — a date keyed
+   object — turned back into the rows hours_exceptions holds. Empty by default,
+   which is both the shipped state and the state most weeks of the year are in. */
+export function seedRows({ menu, hours, exceptions = {} } = {}) {
   const week = hours || seedEnv.SEED_HOURS;
   const { courses, items } = menuRows(menu);
   return {
@@ -221,6 +247,15 @@ export function seedRows({ menu, hours } = {}) {
       day_of_week: i, is_closed: !!h.closed,
       opens_at: h.closed ? null : hhmmss(h.opens),
       closes_at: h.closed ? null : hhmmss(h.closes) })),
+    hours_exceptions: Object.keys(exceptions).sort().map((on_date) => {
+      const e = exceptions[on_date];
+      return {
+        on_date, is_closed: !!e.closed,
+        opens_at: e.closed ? null : hhmmss(e.opens),
+        closes_at: e.closed ? null : hhmmss(e.closes),
+        note: e.note || null
+      };
+    }),
     site_copy: Object.keys(seedEnv.SEED_COPY).map((key) => ({ key, value: seedEnv.SEED_COPY[key] })),
     menu_courses: courses,
     menu_items: items,

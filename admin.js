@@ -189,10 +189,15 @@ var AROMATI_ADMIN = (function () {
   var WRITABLE = {
     site_settings:   ["value"],
     site_copy:       ["value"],
-    business_hours:  ["is_closed", "opens_at", "closes_at", "note"],
+    /* business_hours.note is deliberately absent. The column exists and always
+       has, but there is no field for it in the editor and data.js never selects
+       it, so granting the write was a licence nothing could use. The note that
+       visitors actually read is hours_exceptions.note on the line below — that
+       one is live, and carries the reason for a closure. */
+    business_hours:  ["is_closed", "opens_at", "closes_at"],
     hours_exceptions: ["on_date", "is_closed", "opens_at", "closes_at", "note"],
     menu_courses:    ["page", "course_key", "tab_label", "heading", "sizes", "sort_order"],
-    menu_items:      ["course_id", "name", "tag", "description", "price", "prices",
+    menu_items:      ["course_id", "name", "tag", "description", "price", "prices", "is_hidden",
                       "price_all_sizes", "no_price", "sort_order"],
     menu_item_pours: ["item_id", "label", "price", "sort_order"],
     faq_entries:     ["question", "answer", "is_published", "sort_order"],
@@ -1513,8 +1518,11 @@ var AROMATI_ADMIN = (function () {
         count: exceptions.length === 0 ? "none" : plural(exceptions.length, "date", "dates"),
         changed: exceptions.filter(function (r) { return rowChanged("hours_exceptions", r); }).length +
           (removed.hours_exceptions || []).length,
-        describe: "Single dates that do not follow the usual week. The site uses " +
-          "one on its date and goes back to normal by itself.",
+        describe: "Days that are not like the usual week, such as a holiday " +
+          "or an early close for a private event. Add the date and the site " +
+          "does the rest. A week beforehand it starts warning visitors. On the " +
+          "day it says so everywhere. Afterwards it goes back to normal on its " +
+          "own. Google is told the moment you save.",
         render: renderExceptions
       }
     ];
@@ -1576,10 +1584,10 @@ var AROMATI_ADMIN = (function () {
     var card = makeCard(null);
 
     card.body.appendChild(el("p", "card__help",
-      "A single date that does not follow the usual week — closed for a holiday, " +
-      "or closing early for a private event. The site uses it on that date and " +
-      "then goes back to normal by itself. Old dates do no harm; delete them when " +
-      "you feel like tidying."));
+      "Pick the date. Leave Closed all day ticked if you are shutting. Untick " +
+      "it to set different opening times instead. Why is what visitors read, so " +
+      "put “Christmas Day” rather than “closed”. Old dates stop showing on their " +
+      "own, so remove them whenever you feel like tidying."));
 
     exceptions.forEach(function (row) {
       var block = el("div", "row row--hours");
@@ -1951,11 +1959,17 @@ var AROMATI_ADMIN = (function () {
 
     return courses.map(function (course) {
       var items = itemsIn(course.id);
+      /* The count is what is on the site, with the held-back ones named after
+         it. "6 items" when one of them is hidden would be a lie told in the
+         one place the owner looks to check their work. */
+      var shown = items.filter(function (i) { return !i.is_hidden; }).length;
+      var hidden = items.length - shown;
       return {
         id: "course:" + course.id,
         group: pageName,
         label: course.heading || "(untitled section)",
-        count: course.is_static ? "built in" : plural(items.length, "item", "items"),
+        count: course.is_static ? "built in"
+          : plural(shown, "item", "items") + (hidden ? ", " + hidden + " hidden" : ""),
         changed: (rowChanged("menu_courses", course) ? 1 : 0) +
           items.filter(function (i) { return rowChanged("menu_items", i); }).length,
         describe: course.is_static
@@ -2089,6 +2103,7 @@ var AROMATI_ADMIN = (function () {
       var row = {
         id: tempId(), course_id: course.id, name: "", tag: null, description: null,
         price: "", prices: null, price_all_sizes: null, no_price: false,
+        is_hidden: false,
         options_dom_id: null, sort_order: itemsIn(course.id).length + 1
       };
       draft.menu_items.push(row);
@@ -2101,7 +2116,8 @@ var AROMATI_ADMIN = (function () {
     delCourse.type = "button";
     on(delCourse, "click", function () {
       if (!window.confirm("Delete “" + (course.heading || "this section") + "” and its " +
-          items.length + " item(s)? This cannot be undone once you save.")) return;
+          items.length + " item(s)? This cannot be undone once you save." +
+          optionsWarning(items))) return;
       deleteCourse(course);
     });
     tools.appendChild(delCourse);
@@ -2137,7 +2153,7 @@ var AROMATI_ADMIN = (function () {
   }
 
   function renderItem(item, course, siblings) {
-    var wrap = el("div", "item");
+    var wrap = el("div", "item" + (item.is_hidden ? " item--hidden" : ""));
     wrap.setAttribute("data-item", item.id);
 
     var head = el("button", "item__head");
@@ -2145,6 +2161,9 @@ var AROMATI_ADMIN = (function () {
     var openId = "item:" + item.id;
     head.appendChild(el("span", null, item.name || "(new item)"));
     if (rowChanged("menu_items", item)) head.appendChild(el("span", "item__dot"));
+    /* A hidden item stays where it is in the list rather than dropping to a
+       fold at the bottom. One you cannot see is one you never bring back. */
+    if (item.is_hidden) head.appendChild(el("span", "item__flag", "Hidden"));
     head.appendChild(el("span", "item__price", summarisePrice(item, course)));
 
     var moves = el("span", "item__moves");
@@ -2308,10 +2327,26 @@ var AROMATI_ADMIN = (function () {
         "editable here yet — ask a developer to change it."));
     }
 
+    /* Deliberately the last thing before Delete. Nine times in ten the owner
+       wants this one — the salmon is off this week, not gone forever — and the
+       only way to find that out is to meet it on the way to the other button. */
+    var hideWrap = el("div", "field");
+    hideWrap.appendChild(el("span", "field__label", "On the menu"));
+    hideWrap.appendChild(makeCheck("Hide this item", item.is_hidden, function (hidden) {
+      item.is_hidden = hidden;
+      renderAll();
+    }).wrap);
+    hideWrap.appendChild(el("span", "field__help",
+      "Hidden items come off the site at the next save and keep everything they " +
+      "have — the description, the price, the extra lines. Untick to put it back. " +
+      "Use this rather than Delete for anything that might return."));
+    body.appendChild(hideWrap);
+
     var delItem = el("button", "btn btn--small btn--danger btn--add", "Delete this item");
     delItem.type = "button";
     on(delItem, "click", function () {
-      if (!window.confirm("Delete “" + (item.name || "this item") + "”?")) return;
+      if (!window.confirm("Delete “" + (item.name || "this item") + "”?" +
+          optionsWarning([item]))) return;
       poursOf(item.id).forEach(function (p) { dropRow("menu_item_pours", p); });
       deleteRow("menu_items", item);
     });
@@ -3617,6 +3652,27 @@ var AROMATI_ADMIN = (function () {
     renderAll();
   }
 
+  /* The one thing a delete destroys that this editor cannot put back.
+
+     menu_item_options holds exactly one item's data — the crêpe's toppings —
+     and it is deliberately not editable here, which the panel says three lines
+     above the Delete button. The foreign key is ON DELETE CASCADE, so the
+     toppings go with the item and there is no path back through the editor.
+     The confirm used to say only Delete “Aromati's Crêpe”?, which is true and
+     is not the whole truth.
+
+     The count is not named because the options are never loaded into the draft
+     — the editor knows a list exists, not how long it is — and inventing a
+     number would be worse than not giving one. */
+  function optionsWarning(items) {
+    var withOptions = (items || []).filter(function (i) { return i.options_dom_id; });
+    if (!withOptions.length) return "";
+    var names = withOptions.map(function (i) { return "“" + (i.name || "an item") + "”"; });
+    return "\n\n" + (names.length === 1 ? names[0] + " has" : names.join(", ") + " have") +
+      " an expandable list of options on the site. That list is deleted too, and " +
+      "it cannot be rebuilt here — it would take a developer to put it back.";
+  }
+
   function deleteCourse(course) {
     /* The foreign keys cascade, so the items and pours under a deleted course
        need no delete of their own — but they do need to leave the draft, or
@@ -3842,6 +3898,32 @@ var AROMATI_ADMIN = (function () {
               "match one to one.", "menu_items", item.id, "prices");
         }
       }
+    });
+
+    /* data.js publishes a section only when something in it is visible, and a
+       page only when a section is. Hiding a whole section is a fair thing to
+       want, so that is left alone. Hiding everything on a page is not — it
+       leaves the menu page with no menu on it, and nothing in the editor shows
+       that until someone loads the site and finds the hole. */
+    ["food", "drinks", "wine"].forEach(function (page) {
+      var courses = coursesOn(page);
+      if (!courses.length) return;
+      if (courses.some(function (c) { return c.is_static; })) return;
+
+      /* Only the state hiding introduces: items exist and every one of them is
+         held back. A page with no items left at all is the older question of
+         what deleting the last one should do, which this feature deliberately
+         does not answer — changing that would turn a hide toggle into a change
+         in what Delete means. */
+      var all = [];
+      courses.forEach(function (c) { all = all.concat(itemsIn(c.id)); });
+      if (!all.length) return;
+      if (all.some(function (i) { return !i.is_hidden; })) return;
+
+      var last = courses[courses.length - 1];
+      add("Everything on the " + (PAGE_NAMES[page] || page).toLowerCase() +
+          " is hidden, so that page would have no menu on it. Show at least one " +
+          "item.", "menu_courses", last.id, "heading");
     });
 
     rowsOf("menu_item_pours").forEach(function (pour) {
@@ -4248,10 +4330,13 @@ var AROMATI_ADMIN = (function () {
   var SELECTS = {
     site_settings: "id,key,label,help,value,is_editable,sort_order",
     site_copy: "id,key,page,section,label,help,value,max_length,sort_order",
+    /* note is read but not written: the draft has to carry every column the row
+       has, or a diff against what was loaded reports a change that is not one.
+       See WRITABLE above for why nothing may write it. */
     business_hours: "id,day_of_week,is_closed,opens_at,closes_at,note,sort_order",
     hours_exceptions: "id,on_date,is_closed,opens_at,closes_at,note",
     menu_courses: "id,page,course_key,tab_label,heading,sizes,is_static,static_id,sort_order",
-    menu_items: "id,course_id,name,tag,description,price,prices,price_all_sizes,no_price,options_dom_id,sort_order",
+    menu_items: "id,course_id,name,tag,description,price,prices,price_all_sizes,no_price,is_hidden,options_dom_id,sort_order",
     menu_item_pours: "id,item_id,label,price,sort_order",
     faq_entries: "id,question,answer,is_published,sort_order",
     photos: "id,slot,label,storage_path,source_path,alt,width,height,is_decorative,sort_order"

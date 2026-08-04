@@ -983,24 +983,57 @@
         : null;
       return live || (typeof SEED_HOURS !== "undefined" && SEED_HOURS) || null;
     }
-    if (!week()) return;                                // no data, no claim
-    var fmt;
-    try {
-      fmt = new Intl.DateTimeFormat("en-US", {
-        timeZone: "America/New_York",
-        weekday: "short", hour: "numeric", minute: "numeric", hour12: false,
-      });
-    } catch (e) { fmt = null; }
 
+    /* The one-off dates, read the same way and for the same reasons. Absent is
+       `{}` rather than null: a café with no holidays booked is a complete
+       answer, not a missing one. */
+    function oneOffs() {
+      var live = typeof AROMATI_DATA === "object" && AROMATI_DATA
+        ? (AROMATI_DATA.current() || {}).exceptions
+        : null;
+      return live ||
+        (typeof SEED_HOURS_EXCEPTIONS !== "undefined" && SEED_HOURS_EXCEPTIONS) || {};
+    }
+
+    if (!week()) return;                                // no data, no claim
+
+    /* The site's clock, from data.js, so this pill and the search listing
+       render.js writes can never disagree about what day it is in New York.
+       The local fallback covers the same case `week()` covers one for: a page
+       whose data.js did not load still has to render, and a pill that threw
+       would take the rest of this boot step down with it. */
     function nyNow() {
-      if (!fmt) { var d = new Date(); return { day: d.getDay(), mins: d.getHours() * 60 + d.getMinutes() }; }
-      var day = 0, hour = 0, min = 0;
-      fmt.formatToParts(new Date()).forEach(function (p) {
-        if (p.type === "weekday") day = Math.max(0, DAY.indexOf(p.value));
-        else if (p.type === "hour") hour = parseInt(p.value, 10) % 24;
-        else if (p.type === "minute") min = parseInt(p.value, 10);
-      });
-      return { day: day, mins: hour * 60 + min };
+      if (typeof AROMATI_DATA === "object" && AROMATI_DATA && AROMATI_DATA.nowNY) {
+        return AROMATI_DATA.nowNY();
+      }
+      var d = new Date();
+      return {
+        date: d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()),
+        day: d.getDay(),
+        mins: d.getHours() * 60 + d.getMinutes()
+      };
+    }
+
+    function pad(n) { return n < 10 ? "0" + n : String(n); }
+
+    /* Calendar arithmetic on a date with no time in it, done in UTC so that no
+       daylight saving transition can add or drop an hour and land the walk on
+       the wrong day. The weekday is read back off the resulting date rather
+       than counted forward from today's, so the two cannot drift apart. */
+    function plusDays(dateKey, n) {
+      var p = dateKey.split("-");
+      var d = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2]) + n * 86400000);
+      return {
+        date: d.getUTCFullYear() + "-" + pad(d.getUTCMonth() + 1) + "-" + pad(d.getUTCDate()),
+        day: d.getUTCDay()
+      };
+    }
+
+    /* What the café is actually doing on a given date: the one-off if there is
+       one, otherwise the usual weekday. The two are the same shape, which is
+       what lets everything below this line stop caring which it got. */
+    function dayAt(hours, ones, dateKey, dow) {
+      return (ones && ones[dateKey]) || hours[dow];
     }
 
     function clock(mins) {
@@ -1013,12 +1046,16 @@
     /* The next day the café is actually open, and when. Walks forward rather
        than assuming tomorrow, so a run of closed days reads correctly instead
        of promising a door that stays shut. Stops after a week: if every day is
-       closed there is nothing truthful to say. */
-    function nextOpening(hours, fromDay) {
+       closed there is nothing truthful to say.
+
+       It walks dates, not weekday numbers, because a one-off closure lands on
+       a date. Without that, "opens 7:00 am tomorrow" is exactly the sentence
+       the pill would print on Christmas Eve. */
+    function nextOpening(hours, ones, fromDate) {
       for (var i = 1; i <= 7; i++) {
-        var day = (fromDay + i) % 7;
-        var h = hours[day];
-        if (h && !h.closed) return { day: day, opens: h.opens, days: i };
+        var at = plusDays(fromDate, i);
+        var h = dayAt(hours, ones, at.date, at.day);
+        if (h && !h.closed) return { day: at.day, opens: h.opens, days: i };
       }
       return null;
     }
@@ -1028,8 +1065,9 @@
          week and finish on another. */
       var hours = week();
       if (!hours) return;
+      var ones = oneOffs();
       var now = nyNow();
-      var today = hours[now.day];
+      var today = dayAt(hours, ones, now.date, now.day);
       var open = !!today && !today.closed &&
         now.mins >= today.opens && now.mins < today.closes;
 
@@ -1058,9 +1096,16 @@
         status.textContent = "Closed · opens " + clock(today.opens);
         return;
       }
-      var next = nextOpening(hours, now.day);
+
+      /* A one-off closure carries its reason, and it is worth saying. "Closed"
+         on a day the café is normally open is a confusing thing to read, and
+         the note is the answer to the question it raises. A day with unusual
+         *times* gets no such treatment — the times already say everything. */
+      var why = today && today.closed && today.note ? " for " + today.note : "";
+
+      var next = nextOpening(hours, ones, now.date);
       if (!next) { status.hidden = true; return; }
-      status.textContent = "Closed · opens " + clock(next.opens) +
+      status.textContent = "Closed" + why + " · opens " + clock(next.opens) +
         (next.days === 1 ? " tomorrow" : " " + DAY[next.day]);
     }
 

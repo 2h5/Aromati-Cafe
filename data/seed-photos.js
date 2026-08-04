@@ -24,11 +24,11 @@
 var SEED_PHOTOS = {
   "hero.main": { src: "assets/web/hero-dining.jpg", alt: "The upstairs dining room at Aromati — cane chairs, tufted leather, burgundy walls", width: 1535, height: 1024 },
 
-  "story.a": { src: "assets/web/dining-corner.jpg", alt: "Burgundy wall, organic mirror and cane chairs inside Aromati", width: 1023, height: 1537 },
-  "story.b": { src: "assets/web/golden-hour.jpg", alt: "Golden hour light across the window tables at Aromati", width: 1088, height: 1446 },
+  "story.a": { src: "assets/web/dining-corner-framed.webp", alt: "Burgundy wall, organic mirror and cane chairs inside Aromati", width: 1023, height: 682 },
+  "story.b": { src: "assets/web/golden-hour-framed.webp", alt: "Golden hour light across the window tables at Aromati", width: 1088, height: 680 },
 
   "kitchen.plate1": { src: "assets/web/adjaruli.webp", alt: "Adjaruli khachapuri — cheese boat with egg yolk and butter", width: 1100, height: 566 },
-  "kitchen.plate2": { src: "assets/web/khinkali.webp", alt: "Khinkali — Georgian soup dumplings", width: 1100, height: 550 },
+  "kitchen.plate2": { src: "assets/web/khinkali-framed.webp", alt: "Khinkali — Georgian soup dumplings", width: 688, height: 550 },
   "kitchen.plate3": { src: "assets/web/imeruli.webp", alt: "Imeruli khachapuri — round cheese-filled bread", width: 1100, height: 578 },
   "kitchen.plate4": { src: "assets/web/badrijani.webp", alt: "Eggplant rolls with walnut paste and pomegranate", width: 1100, height: 576 },
   "kitchen.plate5": { src: "assets/web/pkhali-board.webp", alt: "Assorted pkhali with warm cornbread", width: 1100, height: 546 },
@@ -38,16 +38,16 @@ var SEED_PHOTOS = {
   "kitchen.plate9": { src: "assets/web/honey-cake.webp", alt: "Layered honey cake with pistachio", width: 1100, height: 570 },
 
   "cafe.card1": { src: "assets/web/tiramisu-latte.jpg", alt: "Tiramisu latte in a branded Aromati cup", width: 1088, height: 1446 },
-  "cafe.card2": { src: "assets/web/maple-latte-outpainted.webp", alt: "Maple syrup iced latte with cold foam", width: 1072, height: 1467 },
-  "cafe.card3": { src: "assets/web/matcha-trio.jpg", alt: "Three fruit matcha lattes held in a stack", width: 1085, height: 1450 },
-  "cafe.card4": { src: "assets/web/latte-art-outpainted.webp", alt: "Flat white with rosetta latte art", width: 1074, height: 1465 },
+  "cafe.card2": { src: "assets/web/maple-latte-framed.webp", alt: "Maple syrup iced latte with cold foam", width: 878, height: 1200 },
+  "cafe.card3": { src: "assets/web/matcha-trio-framed.webp", alt: "Three fruit matcha lattes held in a stack", width: 878, height: 1200 },
+  "cafe.card4": { src: "assets/web/latte-art-card-framed.webp", alt: "Flat white with rosetta latte art", width: 878, height: 1200 },
 
   "wine.backdrop": { src: "assets/web/wine-cabinet.jpg", decorative: true, width: 1088, height: 1445 },
-  "wine.board": { src: "assets/web/wine-board.jpg", alt: "Saperavi and a cheese and charcuterie board at Aromati", width: 1089, height: 1444 },
+  "wine.board": { src: "assets/web/wine-board-framed.webp", alt: "Saperavi and a cheese and charcuterie board at Aromati", width: 1089, height: 1089 },
 
   "gallery.g1": { src: "assets/web/dining-wide.jpg", alt: "The full dining room — banquette, mirrors, pendant globes", width: 1535, height: 1024 },
-  "gallery.g2": { src: "assets/web/dining-detail.jpg", alt: "Tables set with wine glasses beneath pendant lights", width: 1023, height: 1537 },
-  "gallery.g3": { src: "assets/web/saperavi-bag.jpg", alt: "A bottle of Saperavi with an Aromati wine bag", width: 937, height: 1679 },
+  "gallery.g2": { src: "assets/web/dining-detail-framed.webp", alt: "Tables set with wine glasses beneath pendant lights", width: 1023, height: 1139 },
+  "gallery.g3": { src: "assets/web/saperavi-bag-framed.webp", alt: "A bottle of Saperavi with an Aromati wine bag", width: 937, height: 1187 },
   "gallery.g4": { src: "assets/web/georgian-salad.jpg", alt: "Georgian salad with walnut dressing and pomegranate", width: 1735, height: 906 },
   "gallery.g5": { src: "assets/web/cappuccino.jpg", alt: "Cappuccino with heart latte art", width: 1085, height: 1450 },
   "gallery.g6": { src: "assets/web/strawberry-salad.jpg", alt: "Strawberry and goat cheese salad", width: 1732, height: 908 },
@@ -58,7 +58,7 @@ var SEED_PHOTOS = {
 
   "menuFood.masthead": { src: "assets/web/adjaruli.jpg", decorative: true, width: 1747, height: 900 },
 
-  "menuDrinks.masthead": { src: "assets/web/latte-art.jpg", decorative: true, width: 1083, height: 1452 },
+  "menuDrinks.masthead": { src: "assets/web/latte-art-framed.webp", decorative: true, width: 1083, height: 542 },
 
   "menuWine.masthead": { src: "assets/web/wine-cabinet.jpg", decorative: true, width: 1088, height: 1445 }
 };

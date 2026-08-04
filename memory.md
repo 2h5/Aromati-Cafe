@@ -40,6 +40,43 @@ the features around it, not adding a new architecture.
   or the Reserve a Table placeholder without an explicit request.
 - Prices are stored as text and their order is explicit. Do not turn them into
   numbers or rely on database order.
+- A one-off date is added to the week, never merged into it. It appears on its
+  own line in the Visit card, the footer and the mobile menu from seven days
+  ahead (`NOTICE_DAYS` in `render.js`), drives the open/closed pill on the day,
+  and goes to Google as `specialOpeningHoursSpecification` immediately. What
+  must not happen is a closure being folded into the grouped runs — "Sun — Tue"
+  with a holiday inside it reads as a new weekly rule.
+- `hours_exceptions` had a full editor panel and a promise in its help text for
+  the whole of Phases 5–8 while no file on the public site read the table — the
+  pill would have said "Open now" on a day the owner had marked closed.
+  Anything that reads the week must read the one-off dates beside it.
+  `tools/test-hours-exceptions.mjs` starts by checking that the request is made
+  at all, because twenty-six harnesses were green the entire time it was not.
+- `menu_item_options` is the one thing in the database the editor cannot
+  rebuild: the crêpe's seven toppings, deliberately not exposed, carried off by
+  `ON DELETE CASCADE` when the item or its section is deleted. Any confirm that
+  can reach them must name them — `optionsWarning()` in `admin.js` is the single
+  place that sentence is written, and `test:admin` checks both delete paths say
+  it and that an ordinary item does not. Hiding is the escape route: it is the
+  reason the toggle sits directly above the Delete button.
+- A hidden menu item is pruned in `shapeMenu` (`data.js`) and nowhere else.
+  Every public reader is downstream of that one point, so none of them can leak
+  one. Do not add `if (!item.hidden)` to a renderer — a forgotten branch there
+  publishes a withdrawn item silently, and the likeliest place for it to surface
+  is the JSON-LD, where nobody looks. A section whose items are *all* hidden is
+  not published either, and neither is its filter tab — but a section with no
+  rows at all keeps both, because that is an interrupted edit rather than a
+  decision. Case 3 of `tools/test-resilience.mjs` owns that half of the rule and
+  predates this one.
+- The seed files never carry a hidden item. A seed is the menu as the public
+  sees it, so if a live-to-seed dump is ever written it must prune first —
+  otherwise the fallback serves withdrawn items exactly when Supabase is
+  unreachable, which is the hardest moment to notice. `test:menuhidden` holds
+  the line on both of these.
+- There is one clock. `AROMATI_DATA.nowNY()` answers what time and what day it
+  is in New York; `script.js` and `render.js` both read it and neither builds
+  its own. A second `Intl` formatter is a second answer on the hours a year
+  when New York and UTC disagree about the date.
 - A photo is not uploaded until the owner saves. Discard must remain safe, and
   restoring the original photo must remain possible.
 - Framing is baked into the uploaded file. The public site must keep doing
@@ -88,7 +125,8 @@ the features around it, not adding a new architecture.
 | Editor area | Stored in | Fallback file |
 | --- | --- | --- |
 | Words | `site_copy` | `data/seed-copy.js` |
-| Hours and one-off closures | `business_hours`, `hours_exceptions` | `data/seed-hours.js` |
+| Hours | `business_hours` | `SEED_HOURS` in `data/seed-hours.js` |
+| One-off closures | `hours_exceptions` | `SEED_HOURS_EXCEPTIONS`, same file |
 | Contact details and links | `site_settings` | `data/seed-settings.js` |
 | Menu courses and items | `menu_courses`, `menu_items`, related menu tables | `data/seed-menu.js` |
 | Photos and descriptions | `photos` and the `site-photos` bucket | `data/seed-photos.js` |
@@ -178,14 +216,47 @@ this is the part that is easy to get wrong:
 | The photograph the site was built with | the committed file under `assets/`, same origin | the crop gets an original of its own, so it can be widened again |
 | An upload with no `source_path` | the framed copy on the site | framing works inwards only, and the panel says so before the button is pressed |
 
-The last row is the one that cannot be fixed after the fact, and today it is
-empty: `photos` has no row with a `storage_path`, so every slot is still on its
-built-in file and every future upload keeps an original. It can only be reached
-by an upload whose 2600px original came out over the bucket's 3 MB limit.
+The last row is the one that cannot be fixed after the fact, and as of 4 August
+2026 it is still empty — but no longer because nothing has been uploaded. Ten
+slots carry a `storage_path`: `cafe.card2`, `cafe.card3`, `cafe.card4`,
+`gallery.g2`, `gallery.g3`, `kitchen.plate2`, `menuDrinks.masthead`, `story.a`,
+`story.b` and `wine.board`. Every one also carries a `source_path`, so every one
+can still be widened. The row can only be reached by an upload whose 2600px
+original comes out over the bucket's 3 MB limit.
+`tools/check-live-project.mjs` names that state explicitly and fails on it.
 
-Do not treat a CMS-to-files sync tool as current work. The CMS is the editing
-surface. Revisit that only if the project later needs offline fallback files to
-include every live edit.
+### Keeping the offline floor in step with the uploads
+
+On 4 August 2026 those ten framed uploads were pulled out of the bucket and
+committed as the files the site ships with — `assets/web/*-framed.webp` — and
+the markup was repointed at them. Before that, a visitor who arrived while
+Supabase was unreachable saw ten photographs the owner had replaced months
+earlier. Now the fallback shows the same pictures the live site does.
+
+**This does not stay true by itself.** After any future upload, run
+`node tools/extract-photos.mjs` and commit, or the gap opens again silently —
+nothing on the site looks wrong until the day the database is unreachable, which
+is the day nobody is in a position to notice. `check-live-project.mjs` reports
+how many slots are overridden on every run, which is the prompt to do it.
+
+New names rather than overwriting the originals, because `story.a` shared
+`dining-corner.jpg` with `faq.masthead`, which was never overridden — replacing
+the file in place would have silently reframed a slot the owner never touched.
+
+`tools/extract-photos.mjs` could not read a WebP's dimensions until the same
+day. It returned null and the generator wrote the slot without a width, so a
+single run stripped the numbers off all eleven WebP slots at once — including
+nine nobody had touched. Nothing broke visibly, because the layout is CSS and
+does not use them; the only casualty was the editor's warning that a replacement
+photograph is a very different shape from the one it replaces. A reader that
+fails by going quiet deserves more suspicion than one that throws.
+
+Do not treat a general CMS-to-files sync tool as current work. The CMS is the
+editing surface, and text edits reach the seed files through the existing
+extract tools. The photographs are the one place this has actually been done by
+hand — see "Keeping the offline floor in step with the uploads" above — and that
+was a one-off, not the start of a sync tool. Revisit only if the project later
+needs the offline fallback to include every live edit.
 
 ## What to test next
 
@@ -194,8 +265,14 @@ include every live edit.
 - Sign in with the owner account and confirm an unapproved account cannot edit.
 - Change a word, save it, reload, and confirm the public page shows it.
 - Change a word, discard it, reload, and confirm the old value remains.
-- Test hours, closed days and one-off closures. The open/closed pill, Visit
-  section, footer, mobile menu and search-engine hours must agree.
+- Test hours and closed days. The open/closed pill, Visit section, footer,
+  mobile menu and search-engine hours must agree.
+- Enter a one-off closure a few days out and confirm it is named under the
+  hours, in the footer and in the mobile menu, on every page that has them.
+  Enter one for today and confirm the pill says so and names the reason; enter
+  one for tomorrow and confirm the pill steps over it rather than promising a
+  door that stays shut. One eight days out should be invisible on the page and
+  still present in the page source's search listing.
 - Change contact details and confirm every public location updates together.
 - Edit, reorder, hide and restore menu content. Confirm filters and the two
   hardcoded special menu blocks still work.
@@ -218,7 +295,14 @@ include every live edit.
 
 - Do the full security sweep around database permissions, storage, headers and
   preview access.
-- Decide whether the FAQ page stays.
+- Decide whether the FAQ page stays. The `faq_entries` table, its policies and a
+  full editor panel all exist and nothing on the public site reads them —
+  `faq.html` carries its ten questions as markup. The table is empty, so nothing
+  is lost, but the panel is reachable and looks like it works. Wire it or hide
+  it; leaving it is how `hours_exceptions` became a live defect.
+- Leaked-password protection stays off. It is a Pro feature and this project is
+  on the free plan, so the Supabase advisor will keep reporting it as a WARN
+  forever. Not a finding — do not raise it again.
 - Revisit multiple staff accounts only if they become necessary.
 - Back up uploaded photos outside the live storage bucket.
 
@@ -249,14 +333,15 @@ also run `node tools/check-live-project.mjs`. For headline or responsive layout
 changes, run `node tools/measure-headlines.mjs` and inspect the result in a real
 browser. Automated checks cannot replace the browser pass for visual behavior.
 
-### The twenty-six harnesses
+### The twenty-eight harnesses
 
 `npm test` currently covers: `check:fonts`, `test:fonts`, `check:csp`,
 `check:vendor`, `test:pages`, `test:hours`, `test:copy`, `test:ordering`,
 `test:guards`, `test:admin`, `test:photos`, `test:sql`, `test:rls`,
 `test:dbguards`, `test:live`, `test:policies`, `check:policies`, `check:seed`,
 `check:photosql`, `check:memory`, `check:layout`, `test:replay`,
-`test:resilience`, `test:hourslive`, `test:menushapes` and `test:hostile`.
+`test:resilience`, `test:hourslive`, `test:hoursexceptions`, `test:menushapes`,
+`test:menuhidden` and `test:hostile`.
 
 The Phase 1 snapshot check is `tools/verify-phase1.mjs` and uses baseline
 `53b3d5e`. Do not silently change that baseline when changing the renderer.
@@ -276,8 +361,10 @@ Tools: `tools/add-content-hooks.mjs`, `tools/check-csp.mjs`,
 `tools/strip-menu-markup.mjs`, `tools/supabase-shim.mjs`,
 `tools/test-admin.mjs`, `tools/test-copy.mjs`, `tools/test-db-guards.mjs`,
 `tools/test-fonts.mjs`, `tools/test-guards.mjs`, `tools/test-hostile-content.mjs`,
-`tools/test-hours-live.mjs`, `tools/test-hours.mjs`, `tools/test-live.mjs`,
-`tools/test-menu-shapes.mjs`, `tools/test-ordering.mjs`, `tools/test-photos.mjs`,
+`tools/test-hours-exceptions.mjs`, `tools/test-hours-live.mjs`,
+`tools/test-hours.mjs`, `tools/test-live.mjs`,
+`tools/test-menu-hidden.mjs`, `tools/test-menu-shapes.mjs`,
+`tools/test-ordering.mjs`, `tools/test-photos.mjs`,
 `tools/test-policies.mjs`, `tools/test-replay.mjs`, `tools/test-resilience.mjs`,
 `tools/test-rls.mjs`, `tools/test-sql.mjs`, `tools/verify-phase1.mjs` and
 `tools/wire-scripts.mjs`.
@@ -285,5 +372,6 @@ Tools: `tools/add-content-hooks.mjs`, `tools/check-csp.mjs`,
 Migrations: `supabase/migrations/20260801000000_init_cms.sql`,
 `supabase/migrations/20260801000100_seed_content.sql`,
 `supabase/migrations/20260801000200_allowlist_owner.sql`,
-`supabase/migrations/20260801000300_advisor_fixes.sql` and
-`supabase/migrations/20260801000400_photos.sql`.
+`supabase/migrations/20260801000300_advisor_fixes.sql`,
+`supabase/migrations/20260801000400_photos.sql` and
+`supabase/migrations/20260804000000_menu_item_hidden.sql`.

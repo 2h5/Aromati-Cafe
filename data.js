@@ -41,10 +41,10 @@ var AROMATI_DATA = (function () {
      than half-understood — a rename that silently reads `undefined` renders a
      blank menu, which looks like a data-loss bug and is very hard to trace.
 
-     v2 added the photographs. A v1 cache has no `photos` key, and a returning
-     visitor whose cache is thrown away is served the seeds for one paint and
-     the live content a moment later, which is the ordinary path. */
-  var CACHE_KEY = "aromati:content:v2";
+     v2 added the photographs. v3 added the one-off dates. A returning visitor
+     whose cache is thrown away is served the seeds for one paint and the live
+     content a moment later, which is the ordinary path. */
+  var CACHE_KEY = "aromati:content:v3";
 
   /* ── the seed floor ──────────────────────────
      Read through functions rather than captured at load, so a seed file that
@@ -55,6 +55,8 @@ var AROMATI_DATA = (function () {
       menu:      typeof SEED_MENU === "object" && SEED_MENU ? SEED_MENU : null,
       hours:     typeof SEED_HOURS === "object" && SEED_HOURS ? SEED_HOURS : null,
       hoursNote: typeof SEED_HOURS_NOTE === "string" ? SEED_HOURS_NOTE : null,
+      exceptions: typeof SEED_HOURS_EXCEPTIONS === "object" && SEED_HOURS_EXCEPTIONS
+        ? SEED_HOURS_EXCEPTIONS : {},
       settings:  typeof SEED_SETTINGS === "object" && SEED_SETTINGS ? SEED_SETTINGS : null,
       copy:      typeof SEED_COPY === "object" && SEED_COPY ? SEED_COPY : null,
       photos:    seedPhotos()
@@ -89,7 +91,14 @@ var AROMATI_DATA = (function () {
       c.hours && c.hours.length === 7 &&
       c.settings && typeof c.settings === "object" &&
       c.copy && typeof c.copy === "object" &&
-      c.photos && typeof c.photos === "object";
+      c.photos && typeof c.photos === "object" &&
+      /* An empty object is the ordinary state here, so this asks for the key
+         rather than for content in it — but it does ask. A cache written
+         before the one-off dates existed has no `exceptions`, and reading
+         `undefined` would silently put the site back to where it was before
+         they were wired up, which is the failure this whole file exists to
+         make loud rather than quiet. */
+      c.exceptions && typeof c.exceptions === "object";
   }
 
   /* localStorage throws rather than returning null in a surprising number of
@@ -145,6 +154,61 @@ var AROMATI_DATA = (function () {
     return JSON.stringify(stable(a)) === JSON.stringify(stable(b));
   }
 
+  /* ── the New York clock ──────────────────────
+     The café keeps New York hours no matter where the page is read from, so
+     every question about "now" is asked in that timezone. It lives here, in
+     the one file both readers already depend on, because there are two of
+     them: script.js needs the weekday and the minute for the open/closed
+     pill, render.js needs the date to decide which one-off closures are still
+     ahead. Two formatters would be two answers on the several hours a year
+     when New York and UTC disagree about what day it is.
+
+     The date, the weekday and the time come out of a single formatToParts of
+     a single instant, so they cannot describe different moments. A pill
+     reading Friday's hours against Saturday's date is a bug that would happen
+     once, at one minute past midnight, and never reproduce. */
+
+  var NY_DAY = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  var nyFmt;                                  // undefined until first asked
+
+  function pad2(n) { return n < 10 ? "0" + n : String(n); }
+
+  function nowNY() {
+    if (nyFmt === undefined) {
+      try {
+        nyFmt = new Intl.DateTimeFormat("en-US", {
+          timeZone: "America/New_York",
+          weekday: "short", year: "numeric", month: "2-digit", day: "2-digit",
+          hour: "numeric", minute: "numeric", hour12: false
+        });
+      } catch (err) { nyFmt = null; }         // no Intl, or no timezone database
+    }
+
+    var d = new Date();
+    /* Without Intl there is no honest way to be in New York, so the visitor's
+       own clock stands in. It is exactly right for anyone actually in New
+       York, which is most of the people for whom the answer matters. */
+    if (!nyFmt) {
+      return {
+        date: d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate()),
+        day: d.getDay(),
+        mins: d.getHours() * 60 + d.getMinutes()
+      };
+    }
+
+    var y = "", mo = "", da = "", hour = 0, min = 0, day = 0;
+    nyFmt.formatToParts(d).forEach(function (p) {
+      if (p.type === "year") y = p.value;
+      else if (p.type === "month") mo = p.value;
+      else if (p.type === "day") da = p.value;
+      else if (p.type === "weekday") day = Math.max(0, NY_DAY.indexOf(p.value));
+      /* hour12:false says 24 rather than 0 for midnight in some engines. */
+      else if (p.type === "hour") hour = parseInt(p.value, 10) % 24;
+      else if (p.type === "minute") min = parseInt(p.value, 10);
+    });
+    return { date: y + "-" + mo + "-" + da, day: day, mins: hour * 60 + min };
+  }
+
   /* ── the network half ────────────────────────── */
 
   function configured() {
@@ -195,6 +259,40 @@ var AROMATI_DATA = (function () {
        that dropped one, and the pill would read it as closed forever. */
     for (i = 0; i < 7; i++) if (!week[i]) return null;
     return week;
+  }
+
+  /* One-off dates, keyed by date and shaped exactly like a day of the week, so
+     that whatever can read a weekday can read one of these without a
+     translation step.
+
+     Dates already past are dropped here rather than at each place that reads
+     them. Nothing prunes `hours_exceptions` — a closure entered for 2026 is
+     still a row in 2031 — and every consumer would otherwise have to remember
+     to skip it. The pill cannot match a past date anyway, but the search
+     listing would carry a list of closures that have already happened, growing
+     by a few rows a year forever. One filter, at the edge, and staleness stops
+     being anybody else's problem.
+
+     A row that says "open" without saying when is dropped rather than rendered.
+     The table's own constraints already forbid it, which is exactly what makes
+     this cheap: it costs one comparison, and it means a schema that loosens
+     later cannot put NaN into the pill. */
+  function shapeExceptions(rows) {
+    var today = nowNY().date;
+    var out = {};
+    rows.forEach(function (r) {
+      var date = typeof r.on_date === "string" ? r.on_date.slice(0, 10) : "";
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < today) return;
+      var note = typeof r.note === "string" ? r.note : "";
+      if (r.is_closed) {
+        out[date] = { closed: true, opens: null, closes: null, note: note };
+        return;
+      }
+      var opens = minutes(r.opens_at), closes = minutes(r.closes_at);
+      if (opens === null || closes === null) return;
+      out[date] = { closed: false, opens: opens, closes: closes, note: note };
+    });
+    return out;
   }
 
   var SETTING_NAMES = {
@@ -310,9 +408,25 @@ var AROMATI_DATA = (function () {
     return String(a.id) < String(b.id) ? -1 : 1;
   }
 
+  /* Hidden items are dropped here and nowhere else.
+
+     This is the single choke point every public reader is downstream of — the
+     three menu pages, the tabs, the filter counts, the JSON-LD. Pruning at the
+     edge means no consumer can leak a hidden item, because no consumer is ever
+     handed one. The alternative, an `if (!item.hidden)` in each renderer, makes
+     a leak one forgotten check away and silent when it happens: the item turns
+     up on the page, or worse, only in the structured data where nobody looks.
+
+     Same reasoning as shapeExceptions dropping past dates. Prune at the edge,
+     and the rest of the file gets to be simple. */
   function shapeMenu(courses, items) {
     var byCourse = {};
+    var held = {};                 // courses that had rows, all of them hidden
     items.forEach(function (row) {
+      if (row.is_hidden) {
+        held[row.course_id] = true;
+        return;
+      }
       (byCourse[row.course_id] = byCourse[row.course_id] || []).push(row);
     });
 
@@ -332,6 +446,17 @@ var AROMATI_DATA = (function () {
         course.staticId = c.static_id;
       } else {
         course.items = (byCourse[c.id] || []).slice().sort(bySort).map(shapeItem);
+
+        /* An empty section is not published — but only when the owner emptied
+           it on purpose by hiding everything in it. A section with no rows at
+           all keeps its heading and its tab, because that is the shape of an
+           accident: the owner selected the items to retype them and was
+           interrupted, and a section that vanishes mid-edit takes its tab with
+           it and the page silently loses a chunk of the menu. See case 3 in
+           tools/test-resilience.mjs, which is older than this rule and right.
+
+           So: deliberate emptiness disappears, accidental emptiness waits. */
+        if (!course.items.length && held[c.id]) return;
       }
 
       (pages[c.page] = pages[c.page] || []).push(course);
@@ -356,9 +481,10 @@ var AROMATI_DATA = (function () {
       get("business_hours?select=day_of_week,is_closed,opens_at,closes_at"),
       get("site_copy?select=key,value"),
       get("menu_courses?select=id,page,course_key,tab_label,heading,sizes,is_static,static_id,sort_order&order=sort_order"),
-      get("menu_items?select=id,course_id,name,tag,description,price,prices,price_all_sizes,no_price,options_dom_id,sort_order," +
+      get("menu_items?select=id,course_id,name,tag,description,price,prices,price_all_sizes,no_price,is_hidden,options_dom_id,sort_order," +
           "menu_item_pours(id,label,price,sort_order),menu_item_options(id,name,price,sort_order)&order=sort_order"),
-      get("photos?select=slot,storage_path,alt")
+      get("photos?select=slot,storage_path,alt"),
+      get("hours_exceptions?select=on_date,is_closed,opens_at,closes_at,note&order=on_date")
     ];
 
     Promise.all(wanted).then(function (r) {
@@ -370,11 +496,13 @@ var AROMATI_DATA = (function () {
          would blank the site, which is precisely the failure the seed floor
          exists to prevent.
 
-         The photographs are deliberately not in this list. An empty photos
-         table means no slot has been given an override, which is the state
-         every one of them starts in — and it renders as the pictures already
-         in the markup, which is right. Treating it as a failure would take the
-         menu down over a table nobody has touched yet. */
+         The photographs are deliberately not in this list, and neither are the
+         one-off dates. An empty photos table means no slot has been given an
+         override, which is the state every one of them starts in — and it
+         renders as the pictures already in the markup, which is right. An
+         empty hours_exceptions table means the café is keeping its usual week,
+         which is true of most weeks of most years. Treating either as a
+         failure would take the menu down over a table nobody has touched. */
       if (!hours || !r[0].length || !r[2].length || !Object.keys(menu).length) {
         throw new Error("the database answered, but with nothing in it");
       }
@@ -383,6 +511,7 @@ var AROMATI_DATA = (function () {
         menu: menu,
         hours: hours,
         hoursNote: seedContent().hoursNote,   // not yet a database field
+        exceptions: shapeExceptions(r[6]),
         settings: shapeSettings(r[0]),
         copy: shapeCopy(r[2]),
         photos: shapePhotos(r[5])
@@ -406,6 +535,13 @@ var AROMATI_DATA = (function () {
   /* `stable` is exported for tools/test-live.mjs, which compares what the
      database returns against the seed files and needs to compare them the same
      way this file decides whether anything changed. Sharing the function means
-     the test cannot pass under a looser rule than the site uses. */
-  return { current: current, refresh: refresh, stable: stable, CACHE_KEY: CACHE_KEY };
+     the test cannot pass under a looser rule than the site uses.
+
+     `nowNY` is exported because it is the site's only clock. script.js reads
+     it for the open/closed pill and render.js for the search listing; a second
+     implementation in either would be a second answer. */
+  return {
+    current: current, refresh: refresh, stable: stable,
+    nowNY: nowNY, CACHE_KEY: CACHE_KEY
+  };
 })();

@@ -93,10 +93,10 @@ function fixture() {
     menu_items: [
       { id: "i1", course_id: "k1", name: "Morning Plate", tag: null,
         description: "Mixed greens.", price: "21", prices: null, price_all_sizes: null,
-        no_price: false, options_dom_id: null, sort_order: 1 },
+        no_price: false, is_hidden: false, options_dom_id: null, sort_order: 1 },
       { id: "i2", course_id: "k2", name: "Drip Coffee", tag: null, description: null,
         price: null, prices: ["4", "5"], price_all_sizes: null, no_price: false,
-        options_dom_id: null, sort_order: 1 }
+        is_hidden: false, options_dom_id: null, sort_order: 1 }
     ],
     menu_item_pours: [
       { id: "p1", item_id: "i1", label: "Bottle", price: "60", sort_order: 1 }
@@ -257,7 +257,9 @@ async function boot(opts) {
     anonKey: "sb_publishable_0000000000000000000000000000"
   };
   window.supabase = { createClient: () => fakeSupabase(data, log, opts) };
-  window.confirm = () => opts.confirm !== false;    // jsdom has none; the editor asks before deleting
+  /* jsdom has none; the editor asks before deleting. The text is kept because
+     what a destructive confirm actually says is the whole of its value. */
+  window.confirm = (message) => { log.push({ what: "confirm", message }); return opts.confirm !== false; };
   window.scrollTo = () => {};
   window.HTMLElement.prototype.scrollIntoView = () => {};
   window.matchMedia = (query) => ({
@@ -421,6 +423,7 @@ async function boot(opts) {
     async save() { q("#saveBtn").click(); await settle(); },
 
     problems() { return [...doc.querySelectorAll(".problems__link")].map((n) => n.textContent); },
+    confirms() { return log.filter((l) => l.what === "confirm").map((l) => l.message); },
     changeCount() { return q("#saveCount").textContent; },
     writes() { return log.filter((l) => ["insert", "update", "delete"].includes(l.what)); },
 
@@ -809,6 +812,153 @@ console.log("\ndeleting");
         [["delete", "menu_items", "i1"]]);
   check("and its pour is not deleted separately — the database cascades it",
         writes.some((w) => w.table === "menu_item_pours"), false);
+}
+
+/* Hiding is the gentler half of the pair the Delete button belongs to: the item
+   comes off the site and keeps everything it has. What the editor owes it is
+   that the flag actually leaves the page as a column — the pruning on the
+   public side is tools/test-menu-hidden.mjs's business — and that the one state
+   nobody wants, a menu page with nothing visible left on it, is refused before
+   it can be saved rather than discovered by loading the site. */
+function hideBox(item) {
+  const field = [...item.querySelectorAll(".field")]
+    .find((f) => {
+      const own = f.querySelector(".field__label");
+      return own && own.textContent.trim().startsWith("On the menu");
+    });
+  if (!field) throw new Error("no On the menu field on this item");
+  return field.querySelector("input[type=checkbox]");
+}
+
+console.log("\nhiding an item rather than deleting it");
+{
+  /* Two items in the breakfast section rather than the fixture's one. Hiding
+     the only item on a page is a different case with a different answer, and it
+     is the one below — this case needs something left standing. */
+  const r = await boot({
+    data: Object.assign(fixture(), {
+      menu_items: fixture().menu_items.concat([{
+        id: "i3", course_id: "k1", name: "Shakshuka", tag: null, description: null,
+        price: "16", prices: null, price_all_sizes: null, no_price: false,
+        is_hidden: false, options_dom_id: null, sort_order: 2
+      }])
+    })
+  });
+  await r.signIn();
+  r.tab("Menus");
+  r.all(".item__head")[0].click();                              // open Morning Plate
+
+  const box = hideBox(r.q(".item"));
+  check("it starts on the menu", box.checked, false);
+  box.click();
+  await settle();
+
+  await r.save();
+  const writes = r.writes();
+  check("one row is updated, not deleted",
+        writes.map((w) => [w.what, w.table, w.id]), [["update", "menu_items", "i1"]]);
+  check("carrying the flag", writes[0].payload.is_hidden, true);
+  /* The whole promise of hiding is that nothing is lost, so the row that goes
+     out has to still be the row. An update that blanked the description while
+     setting the flag would satisfy every other check here. */
+  check("and the item itself, intact",
+        [writes[0].payload.name, writes[0].payload.description, writes[0].payload.price],
+        ["Morning Plate", "Mixed greens.", "21"]);
+  check("nothing was deleted, so nothing cascaded",
+        writes.some((w) => w.what === "delete"), false);
+}
+
+console.log("\na hidden item says so without being opened");
+{
+  const r = await boot({
+    data: Object.assign(fixture(), {
+      menu_items: fixture().menu_items.map((i) =>
+        i.id === "i1" ? Object.assign({}, i, { is_hidden: true }) : i)
+    })
+  });
+  await r.signIn();
+  r.tab("Menus");
+  check("the closed row is flagged",
+        r.q(".item__flag") && r.q(".item__flag").textContent, "Hidden");
+  check("and the row is marked for the stylesheet",
+        r.q(".item").classList.contains("item--hidden"), true);
+  check("the section count says what is on the site, and what is not",
+        [...r.all(".index__row")].some((n) => /0 items, 1 hidden/.test(n.textContent)), true);
+}
+
+console.log("\nhiding everything on a page is refused");
+{
+  const r = await boot();
+  await r.signIn();
+  r.tab("Menus");
+  r.all(".item__head")[0].click();
+  hideBox(r.q(".item")).click();                    // the food page's only item
+  await settle();
+  await r.save();
+
+  check("the save does not go out", r.writes(), []);
+  check("and the page is named in the reason",
+        r.problems().some((p) => /food menu is hidden/.test(p)), true);
+}
+
+/* menu_item_options is the one thing in this database the editor cannot
+   rebuild: seven toppings belonging to one item, deliberately not exposed, and
+   carried off by ON DELETE CASCADE the moment the item or its section goes. The
+   confirm is the only thing standing between the owner and losing them, so what
+   it says is the fix. These check the sentence, not the deletion. */
+const CREPE = () => Object.assign(fixture(), {
+  menu_items: fixture().menu_items.concat([{
+    id: "i9", course_id: "k1", name: "Aromati’s Crêpe", tag: "7 toppings",
+    description: null, price: "14", prices: null, price_all_sizes: null,
+    no_price: false, is_hidden: false, options_dom_id: "crepeOpts", sort_order: 9
+  }])
+});
+
+console.log("\ndeleting an item that owns a list the editor cannot rebuild");
+{
+  const r = await boot({ data: CREPE(), confirm: false });
+  await r.signIn();
+  r.tab("Menus");
+  const crepe = r.all(".item").find((n) =>
+    n.querySelector(".item__head").textContent.includes("Crêpe"));
+  crepe.querySelector(".item__head").click();
+  crepe.querySelectorAll(".btn--danger").forEach((b) => {
+    if (b.textContent === "Delete this item") b.click();
+  });
+
+  const said = r.confirms()[0] || "";
+  check("the item is named", /Aromati’s Crêpe/.test(said), true);
+  check("and so is what else goes with it",
+        /expandable list of options/.test(said), true);
+  check("and that it is not recoverable here",
+        /cannot be rebuilt here/.test(said), true);
+  check("saying no really does cancel it", r.writes(), []);
+}
+
+console.log("\nand deleting the section it sits in warns about the same thing");
+{
+  const r = await boot({ data: CREPE(), confirm: false });
+  await r.signIn();
+  r.tab("Menus");
+  r.all(".btn--danger").find((b) => b.textContent === "Delete this section").click();
+
+  const said = r.confirms()[0] || "";
+  check("the section and its item count are named",
+        /Breakfast/.test(said) && /2 item\(s\)/.test(said), true);
+  check("and the list that cannot come back is named too",
+        /Aromati’s Crêpe/.test(said) && /cannot be rebuilt here/.test(said), true);
+}
+
+console.log("\nan ordinary item is not warned about a list it does not have");
+{
+  const r = await boot({ confirm: false });
+  await r.signIn();
+  r.tab("Menus");
+  r.all(".item__head")[0].click();
+  r.all(".btn--danger").find((b) => b.textContent === "Delete this item").click();
+  /* The control. A warning on everything is a warning on nothing — this is
+     what stops the sentence being pasted onto every delete in the editor. */
+  check("no mention of options", /options/.test(r.confirms()[0] || ""), false);
 }
 
 console.log("\nthe section that is built into the page");

@@ -68,7 +68,7 @@ async function rest(path) {
   if (table === "menu_items") {
     const items = (await db.query(
       `select id, course_id, name, tag, description, price, prices, price_all_sizes,
-              no_price, options_dom_id, sort_order
+              no_price, is_hidden, options_dom_id, sort_order
        from public.menu_items order by sort_order`)).rows;
     const pours = (await db.query(
       `select id, item_id, label, price, sort_order from public.menu_item_pours`)).rows;
@@ -86,6 +86,11 @@ async function rest(path) {
   if (table === "photos") {
     return (await db.query(
       `select slot, storage_path, alt from public.photos order by sort_order`)).rows;
+  }
+  if (table === "hours_exceptions") {
+    return (await db.query(
+      `select on_date::text, is_closed, opens_at::text, closes_at::text, note
+       from public.hours_exceptions order by on_date`)).rows;
   }
   throw new Error(`the stub does not answer ${table} — add it deliberately`);
 }
@@ -163,7 +168,15 @@ console.log("\nthe live path against the seed path\n");
       ["the photographs", fresh.photos, Object.keys(SEED_PHOTOS).reduce((out, slot) => {
         out[slot] = { alt: SEED_PHOTOS[slot].alt || "", url: null };
         return out;
-      }, {})]
+      }, {})],
+      /* Both empty, and that is the assertion. The seed migration carries no
+         one-off dates and data/seed-hours.js declares none, so the live path
+         and the seed path have to agree on nothing-in-particular — which is
+         the state the site spends most of the year in, and the state a
+         forgotten `select` would also produce. What stops that from being a
+         vacuous check is tools/test-hours-exceptions.mjs, which puts rows in
+         and follows them to the page. */
+      ["the one-off dates", fresh.exceptions, {}]
     ];
     /* Compared through data.js's own `stable`, so the test cannot pass under a
        looser rule than the site uses to decide whether anything changed.

@@ -259,3 +259,38 @@ landed.
 the site's own files, not in the bucket, and "no photograph uploaded" is the
 state every slot starts in. Putting the original back is always available and is
 just another edit.
+
+---
+
+## Why the live migration list is longer than this folder
+
+`list_migrations` on the live project returns nine entries. `supabase/migrations/`
+holds six. Nothing has drifted, and the next person to compare the two lists
+should read this before spending an hour on it.
+
+The three the folder does not have are:
+
+| Live-only version | What it did | Where it lives now |
+| --- | --- | --- |
+| `advisor_fixes_revoke_from_public` | Revoked a grant the linter flagged | `20260801000300_advisor_fixes.sql`, at the revoke near the end of the file |
+| `fix_hero_sub_nbsp` | Corrected a non-breaking space in one headline | The regenerated `site_copy` seed — `test:live` passing is the proof that live and the seed files agree on it |
+| `photos_allow_png_originals` | Added PNG to the bucket's allowed types | `20260801000400_photos.sql`, in the bucket's MIME list |
+
+All three were folded back into the numbered files rather than kept as separate
+steps, because the numbered files are what a rebuild from scratch runs and a
+rebuild has to produce the schema that is actually live. That is the trade this
+project made: **the folder is the source of truth for what the schema should be,
+and the live version list is a history of how it got there.** They are not
+supposed to match, and making them match would mean either replaying fixes the
+numbered files already contain, or leaving the numbered files wrong.
+
+What keeps this honest is not the two lists agreeing. It is
+`tools/check-live-project.mjs`, which compares the live *content* against the
+seed files through `data.js`'s own comparison function, and `npm run test:sql`,
+which applies this folder to a real Postgres and checks the result. If those
+pass, the folder rebuilds what is live regardless of how the version numbers
+line up.
+
+Add a new change as a **new numbered file here first**, then apply it. The one
+exception is a hotfix applied live under pressure — and that one is not finished
+until it has been folded into a numbered file and added to the table above.

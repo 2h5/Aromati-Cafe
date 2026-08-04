@@ -66,11 +66,18 @@ console.log("\nthe site with the data taken away\n");
   console.log("the network dies, and the last visit is still in localStorage");
 
   /* A cache that is deliberately not the seed, so "the cache rendered" and
-     "the seeds rendered" cannot be confused for one another. */
+     "the seeds rendered" cannot be confused for one another.
+
+     Every key data.js's `looksComplete` asks for has to be here, including the
+     ones an empty object is a perfectly good answer for. A cache missing one
+     is not a cache — it is rejected, the seeds render, and this block goes on
+     passing its first check while testing the opposite of what it says. That
+     is not hypothetical: `exceptions` was added to the shape and this object
+     was not, and the only thing that noticed was the second check. */
   const cache = JSON.parse(JSON.stringify({
     menu: seedEnv.SEED_MENU, hours: seedEnv.SEED_HOURS,
-    hoursNote: seedEnv.SEED_HOURS_NOTE || "", settings: seedEnv.SEED_SETTINGS,
-    copy: seedEnv.SEED_COPY, photos: {}
+    hoursNote: seedEnv.SEED_HOURS_NOTE || "", exceptions: {},
+    settings: seedEnv.SEED_SETTINGS, copy: seedEnv.SEED_COPY, photos: {}
   }));
   cache.menu.food[0].items[0].name = "CACHED, NOT SEEDED";
 

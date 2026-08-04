@@ -92,6 +92,7 @@ surprises. Pretty URLs are a hosting rewrite later, not a file move.
 | Opening hours, and one-off closures | `business_hours`, `hours_exceptions` | Hours | `seed-hours.js` |
 | Phone, email, Instagram, address, delivery links | `site_settings` | Contact | `seed-settings.js` |
 | Courses, items, prices, pours | `menu_courses`, `menu_items`, `menu_item_pours` | Menus | `seed-menu.js` |
+| Taking an item off the menu | `menu_items.is_hidden` | Menus, on the item | — never seeded |
 | The crêpe's topping list | `menu_item_options` | — modelled, not exposed | `seed-menu.js` |
 | Photographs and their descriptions | `photos` + the `site-photos` bucket | Photos | `seed-photos.js` |
 | FAQ questions | `faq_entries` (empty) | FAQ | — |
@@ -215,7 +216,7 @@ enough.
 npm test
 ```
 
-26 harnesses, no network, no Docker. They run the real files — the real pages
+28 harnesses, no network, no Docker. They run the real files — the real pages
 in jsdom, the real renderer, and the migrations against Postgres
 compiled to WebAssembly. `memory.md` records the current verification workflow;
 the individual commands live in `package.json`.

@@ -75,6 +75,44 @@ function dimensions(file) {
       at += 2 + size;
     }
   }
+
+  /* WebP: a RIFF container with the size in whichever chunk comes first. There
+     are three and they disagree about where the numbers live — VP8X (an
+     extended file, which is what the editor's own encoder writes), VP8L
+     (lossless) and VP8 (plain lossy). All three are 14-bit fields, and two of
+     them are stored minus one.
+
+     This branch was missing until 4 August 2026, which meant `dimensions()`
+     quietly returned null for every .webp on the site and a run of this tool
+     stripped the width and height off eleven slots at once. Nothing broke
+     visibly — the layout is CSS and does not use them — so the only symptom
+     was the editor losing its ability to warn that a replacement photograph is
+     a very different shape from the one it replaces. A reader that fails by
+     going quiet is worth more suspicion than one that throws. */
+  if (buf.length > 30 && buf.toString("ascii", 0, 4) === "RIFF" &&
+      buf.toString("ascii", 8, 12) === "WEBP") {
+    let at = 12;
+    while (at + 8 <= buf.length) {
+      const kind = buf.toString("ascii", at, at + 4);
+      const size = buf.readUInt32LE(at + 4);
+      const body = at + 8;
+
+      if (kind === "VP8X" && body + 10 <= buf.length) {
+        return { width: buf.readUIntLE(body + 4, 3) + 1,
+                 height: buf.readUIntLE(body + 7, 3) + 1 };
+      }
+      if (kind === "VP8L" && body + 5 <= buf.length) {
+        const bits = buf.readUInt32LE(body + 1);
+        return { width: (bits & 0x3fff) + 1, height: ((bits >> 14) & 0x3fff) + 1 };
+      }
+      if (kind === "VP8 " && body + 10 <= buf.length) {
+        return { width: buf.readUInt16LE(body + 6) & 0x3fff,
+                 height: buf.readUInt16LE(body + 8) & 0x3fff };
+      }
+      /* Chunks are padded to an even length and the pad byte is not counted. */
+      at = body + size + (size & 1);
+    }
+  }
   return null;
 }
 

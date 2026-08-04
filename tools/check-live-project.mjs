@@ -66,8 +66,9 @@ g.window = g;
 const keys = Object.keys(g);
 const fn = new Function(...keys,
   `${configSrc}\n${seedSrc}\n${dataSrc}\n` +
-  `return { AROMATI_CONFIG, AROMATI_DATA, SEED_MENU, SEED_HOURS, SEED_SETTINGS, SEED_COPY, SEED_PHOTOS };`);
-const { AROMATI_CONFIG, AROMATI_DATA, SEED_MENU, SEED_HOURS, SEED_SETTINGS, SEED_COPY, SEED_PHOTOS } =
+  `return { AROMATI_CONFIG, AROMATI_DATA, SEED_MENU, SEED_HOURS, SEED_SETTINGS, SEED_COPY, SEED_PHOTOS, SEED_HOURS_EXCEPTIONS };`);
+const { AROMATI_CONFIG, AROMATI_DATA, SEED_MENU, SEED_HOURS, SEED_SETTINGS, SEED_COPY, SEED_PHOTOS,
+        SEED_HOURS_EXCEPTIONS } =
   fn(...keys.map((k) => g[k]));
 
 console.log(`\nthe live project against this working copy\n`);
@@ -98,15 +99,29 @@ if (!live) {
     ["the settings", live.settings, SEED_SETTINGS],
     ["the copy", live.copy, SEED_COPY],
     /* The photographs compare as what render.js writes rather than as the seed
-       file's own shape — see the same note in tools/test-live.mjs. A difference
-       here is the useful one: it means either a description has been edited, or
-       a photograph has been replaced and the file it was replaced with exists
-       only on the server. The second is not recoverable from git, so it is
-       worth knowing about long before anybody needs to recover from git. */
-    ["the photographs", live.photos, Object.keys(SEED_PHOTOS).reduce((out, slot) => {
-      out[slot] = { alt: SEED_PHOTOS[slot].alt || "", url: null };
+       file's own shape — see the same note in tools/test-live.mjs. But only the
+       *descriptions* are compared here. Whether a slot is showing an upload is
+       asked separately below, because it is a different question with a
+       different answer, and folding the two together made this check fail
+       permanently the moment a single photograph was replaced.
+
+       A description that differs is the drift that matters at this level: the
+       owner reworded the alt text, the seed file did not hear about it, and a
+       visitor on the offline fallback gets the old wording read out to them. */
+    ["the photograph descriptions", Object.keys(live.photos || {}).reduce((out, slot) => {
+      out[slot] = (live.photos[slot] || {}).alt || "";
       return out;
-    }, {})]
+    }, {}), Object.keys(SEED_PHOTOS).reduce((out, slot) => {
+      out[slot] = SEED_PHOTOS[slot].alt || "";
+      return out;
+    }, {})],
+    /* Compared against the seed file rather than against `{}`, so an owner who
+       has booked a holiday shows up here as a difference — the same signal the
+       photographs give. Unlike the rest of this list it is expected to differ
+       eventually and that is fine: it says the offline fallback does not know
+       about a closure the live site does, which is worth seeing before the
+       database is the thing that has gone away. */
+    ["the one-off dates", live.exceptions, SEED_HOURS_EXCEPTIONS]
   ]) {
     const a = canon(got), b = canon(want);
     if (a === b) { pass(`${what} in the project is identical to data/seed-*.js`); continue; }
@@ -118,6 +133,37 @@ if (!live) {
          `\n  seed:    …${b.slice(Math.max(0, i - 60), i + 60)}…\n` +
          `If the owner edited this, the seed file is stale and the offline\n` +
          `fallback now serves the old wording. Regenerate it.`);
+  }
+
+  /* ── the photographs that exist only on the server ──────────────────────
+     This is what the description comparison above used to be tangled up with,
+     and it is the half with teeth. A slot showing an upload is normal and
+     expected. What is not recoverable is an upload whose *original* is gone —
+     `source_path` null means the framed copy is all there is, so the crop can
+     never be widened again and there is nothing to re-frame from.
+
+     The built-in files under assets/web/ were refreshed from the uploads on
+     4 August 2026 so that the offline fallback shows the same photographs a
+     visitor sees. That does not stay true by itself: after any future upload,
+     run tools/extract-photos.mjs to bring them back into step. */
+  const shot = await fetch(
+    AROMATI_CONFIG.url + "/rest/v1/photos?select=slot,storage_path,source_path", {
+      headers: { apikey: AROMATI_CONFIG.anonKey,
+                 Authorization: "Bearer " + AROMATI_CONFIG.anonKey } });
+  const rows = shot.ok ? await shot.json() : [];
+  const uploaded = rows.filter((r) => r.storage_path);
+  const orphaned = uploaded.filter((r) => !r.source_path).map((r) => r.slot);
+
+  if (!uploaded.length) {
+    pass("no slot is showing an uploaded photograph");
+  } else if (orphaned.length) {
+    fail(`${orphaned.length} upload(s) have no original left`,
+         `${orphaned.join(", ")}\n` +
+         `The framed copy is all there is. These crops can never be widened\n` +
+         `again. Nothing here can fix that — it is worth knowing, not fixing.`);
+  } else {
+    pass(`${uploaded.length} slot(s) show an uploaded photograph, every one ` +
+         `still holding its original`);
   }
 }
 

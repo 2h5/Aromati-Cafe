@@ -919,6 +919,20 @@ button{ font-family: inherit; }
 .item__dot{
   width: 6px; height: 6px; border-radius: 50%; background: var(--gold); flex: 0 0 auto;
 }
+
+/* A hidden item stays in place in the list, dimmed, rather than dropping to a
+   fold at the bottom — the whole point is that it is easy to bring back. The
+   fade is on the head only: the body has to stay fully legible, because the
+   owner opens a hidden item to edit it before showing it again. */
+.item--hidden{ border-style: dashed; background: transparent; }
+.item--hidden > .item__head{ opacity: .62; }
+.item__flag{
+  flex: 0 0 auto;
+  padding: 2px 7px; border-radius: 999px;
+  border: 1px solid var(--line);
+  font: 600 10px/1.5 var(--sans); letter-spacing: .06em; text-transform: uppercase;
+  color: var(--ink-faint);
+}
 .item__body{
   display: grid;
   grid-template-rows: 0fr;

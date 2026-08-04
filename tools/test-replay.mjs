@@ -71,7 +71,8 @@ function probe() {
             price: it.price != null ? it.price : null,
             prices: it.prices != null ? it.prices : null,
             price_all_sizes: it.priceAllSizes != null ? it.priceAllSizes : null,
-            no_price: !!it.noPrice, options_dom_id: it.optionsId || null,
+            no_price: !!it.noPrice, is_hidden: !!it.hidden,
+            options_dom_id: it.optionsId || null,
             sort_order: ii,
             menu_item_pours: (it.pours || []).map(function (p, pi) {
               return { id: "p" + iid + "_" + pi, label: p.label, price: p.price, sort_order: pi };
