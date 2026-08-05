@@ -93,6 +93,13 @@ the features around it, not adding a new architecture.
   those sends a 2000px file into a 320px box nine times over, which is a visible
   stall on a laptop and was the reason the reel lagged. The resize stays
   automatic either way: no upload is ever refused for being too large.
+- A generated file that a check compares character for character must have its
+  line endings normalised before the comparison. Git stores LF and hands out
+  CRLF on Windows, so a raw `===` against a freshly checked-out file fails on
+  every clone while passing for whoever last ran the generator — running it
+  rewrites the file with LF, so the fix and the camouflage are the same action.
+  `gen-seed-sql.mjs` and `gen-photo-sql.mjs` both normalise now; a third
+  generator must too.
 - Photographs are sized for where they are drawn, not for where they came from.
   The kitchen plates are 1100px WebP because a plate is drawn at 320px; the
   gallery and hero keep their full-size files because they are drawn at 800-900.
