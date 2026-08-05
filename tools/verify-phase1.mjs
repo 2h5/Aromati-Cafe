@@ -49,15 +49,15 @@ const INTENDED = [
      that applied everywhere would go on forgiving this string on a page that
      stopped displaying it. */
   { page: "index.html", was: "info@aromatiNY.com", now: "info@aromatinyc.com",
-    why: "the café's real address, 2026-08-01 (ac4615e)" },
+    why: "the café's real address, 2026-08-01 (50d9002)" },
   { page: "faq.html", was: "info@aromatiNY.com", now: "info@aromatinyc.com",
-    why: "the café's real address, 2026-08-01 (ac4615e)" },
+    why: "the café's real address, 2026-08-01 (50d9002)" },
   { page: "menu-food.html", was: "info@aromatiNY.com", now: "info@aromatinyc.com",
-    why: "the café's real address, 2026-08-01 (ac4615e)" },
+    why: "the café's real address, 2026-08-01 (50d9002)" },
   { page: "menu-drinks.html", was: "info@aromatiNY.com", now: "info@aromatinyc.com",
-    why: "the café's real address, 2026-08-01 (ac4615e)" },
+    why: "the café's real address, 2026-08-01 (50d9002)" },
   { page: "menu-wine.html", was: "info@aromatiNY.com", now: "info@aromatinyc.com",
-    why: "the café's real address, 2026-08-01 (ac4615e)" }
+    why: "the café's real address, 2026-08-01 (50d9002)" }
 ];
 
 /* Presentation-only text that was removed from the page. These nodes are
