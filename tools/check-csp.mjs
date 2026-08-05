@@ -252,7 +252,18 @@ if (!policy) {
 {
   const measures = existsSync("admin.js") &&
     /createElement\("iframe"|el\("iframe"/.test(readFileSync("admin.js", "utf8"));
-  const ancestors = (policy["frame-ancestors"] || []).join(" ");
+  const sources = policy["frame-ancestors"] || [];
+  const ancestors = sources.join(" ");
+
+  /* The portfolio embeds this site as a live demo, so it is allowed to frame
+     it. Anything beyond this list is not: the point of the check is that a
+     third origin cannot be added without someone deciding to add it here. */
+  const ALLOWED_FRAMERS = [
+    "'self'",
+    "https://aragvelipalazzolo.com",
+    "https://www.aragvelipalazzolo.com"
+  ];
+  const strangers = sources.filter((s) => !ALLOWED_FRAMERS.includes(s));
 
   if (!measures) {
     pass("the editor does not frame the site, so frame-ancestors is unconstrained");
@@ -260,10 +271,15 @@ if (!policy) {
     fail("the editor frames the site to measure headlines, but frame-ancestors is 'none'",
          "the frame would load nothing and the length warning would silently never appear\n" +
          "'self' is the value this needs, and it still refuses every other origin");
-  } else if (ancestors.includes("*") || /https?:/.test(ancestors)) {
-    fail("frame-ancestors allows an origin other than this one", `frame-ancestors ${ancestors}\n` +
-         "the editor only needs 'self'");
-  } else pass("frame-ancestors allows the editor's measuring frame and nothing else");
+  } else if (!sources.includes("'self'")) {
+    fail("frame-ancestors no longer allows 'self'", `frame-ancestors ${ancestors}\n` +
+         "the editor's measuring frame is same-origin and would stop loading");
+  } else if (strangers.length) {
+    fail("frame-ancestors allows an origin nobody signed off on", `frame-ancestors ${ancestors}\n` +
+         `unexpected: ${strangers.join(" ")}\n` +
+         "the editor needs 'self' and the portfolio needs its two origins; add to\n" +
+         "ALLOWED_FRAMERS in this file if another embed is genuinely wanted");
+  } else pass("frame-ancestors allows the editor's frame and the portfolio, and nothing else");
 }
 
 /* ── 9. the uploaded photographs are loadable ──────────────────────────────

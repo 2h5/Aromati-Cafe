@@ -16,7 +16,7 @@
 # build if anything is added that this policy would silently block.
 
 /*
-  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https://yofoiqgknsqzsuwtlqvh.supabase.co; font-src 'self' data:; connect-src 'self' https://yofoiqgknsqzsuwtlqvh.supabase.co; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https://yofoiqgknsqzsuwtlqvh.supabase.co; font-src 'self' data:; connect-src 'self' https://yofoiqgknsqzsuwtlqvh.supabase.co; frame-ancestors 'self' https://aragvelipalazzolo.com https://www.aragvelipalazzolo.com; base-uri 'self'; form-action 'self'; object-src 'none'
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: geolocation=(), microphone=(), camera=(), payment=(), interest-cohort=()
@@ -60,21 +60,30 @@
 #                          live content and falls back to the seeds — which
 #                          looks like everything working.
 #
-#   frame-ancestors 'self' Nobody *else* may put this site in an iframe. It was
-#                          'none' until Phase 5, and the change is deliberate:
-#                          the editor checks a headline's length by loading the
-#                          real page into a hidden frame, putting the candidate
-#                          text into the real element and counting the line
-#                          boxes. That is the only way to measure the wrap
-#                          without duplicating the site's type — and duplicated
-#                          type is type that drifts.
+#   frame-ancestors        'self' plus the portfolio, and nobody else. It was
+#                          'none' until Phase 5, and 'self' after: the editor
+#                          checks a headline's length by loading the real page
+#                          into a hidden frame, putting the candidate text into
+#                          the real element and counting the line boxes. That is
+#                          the only way to measure the wrap without duplicating
+#                          the site's type — and duplicated type is type that
+#                          drifts.
 #
-#                          'self' gives up nothing that mattered. Clickjacking
-#                          is an attack by a page on *another* origin, which
-#                          'self' still refuses; a same-origin frame can already
-#                          read and script the page it framed. The admin page
-#                          below keeps 'none' — it is the one holding a session
-#                          token, and nothing needs to frame it.
+#                          The two aragvelipalazzolo.com origins are the studio
+#                          portfolio, which shows this site as a live demo in an
+#                          iframe. Without them the frame is refused and the
+#                          panel renders as Chrome's "refused to connect" — a
+#                          failure that looks like the demo being down. Both the
+#                          apex and www are listed because frame-ancestors
+#                          matches origins literally: www is a different origin
+#                          and would be blocked even though it redirects.
+#
+#                          What this gives up is bounded: an origin listed here
+#                          can frame the site and attempt clickjacking. Both are
+#                          the same owner's pages, so the trust already exists.
+#                          Every other origin is still refused, and the admin
+#                          page below keeps 'none' — it is the one holding a
+#                          session token, and nothing needs to frame it.
 
 # The editor page. It holds the owner's session token in localStorage, so an
 # injected script there is worth more to an attacker than one on a menu page.
