@@ -3,7 +3,7 @@
 Marketing site for Aromati Café & Wine Bar — 103 E 34th Street, Murray Hill,
 New York. Five pages, plus an editor the owner uses to change what is on them.
 
-**Status, 2026-08-02: the CMS is built and usable.** Hours, contact details, the
+**Status, 2026-08-04: the CMS is built and usable.** Hours, contact details, the
 whole menu across three pages, the section copy and the photographs all come
 from a Supabase project and are edited at `/admin.html`. The next work is
 testing the editor and its browser behavior. The FAQ panel exists, but the FAQ
@@ -13,19 +13,23 @@ The remaining known visual issue is separate from the CMS: the Wine 04 photo is
 visible on affected iOS portrait sizes but does not currently move with the
 page. The hero and kitchen reel issues are closed.
 
-Two other files matter as much as this one:
+Three other files matter as much as this one:
 
 - **`memory.md`** — the current technical status, rules that must not regress,
   open decisions and the checks to run before release.
 - **`client-notes.md`** — the same site described for the owner, in the owner's
   language. Nothing technical in it.
+- **`HANDOFF-ios.md`** — the iOS investigation: what was fixed, what is still
+  open, and what to check on a real device rather than in emulation.
 
 ---
 
 ## The shape of it
 
-Plain HTML, CSS and JavaScript. **No build step, no framework, no bundler.**
-The source tree *is* the site: what is in this folder is what gets uploaded.
+Plain HTML, CSS and JavaScript. **No framework, and nothing in the source tree
+needs compiling** — every page opens by double-clicking it. There is a Vite
+build, and `dist/` is what gets deployed, but it only gathers and rewrites
+paths; it is not something development goes through. See *Deploying*.
 
 Content arrives in one order, and the order is the design:
 
@@ -71,7 +75,7 @@ See *Backing up* below.
 | `data.js` | `network → localStorage → seed`, and nothing else — it never touches the DOM |
 | `config.js` | Which Supabase project, and the publishable key. Both are public by design |
 | `data/seed-*.js` | The site as it shipped: the offline floor and the disaster-recovery story |
-| `supabase/migrations/` | Five migrations — schema, seed content, the owner allowlist, advisor fixes, photographs |
+| `supabase/migrations/` | Six migrations — schema, seed content, the owner allowlist, advisor fixes, photographs, hiding an item |
 | `supabase/POLICIES.md` | What the database allows, in plain words |
 | `tools/` | The extractors, the generators and the test suite. Never shipped |
 | `vendor/` | The Supabase SDK, vendored with its digest written down |
@@ -187,7 +191,7 @@ edits that copy. Nothing reaches the database until **Save changes**, and
 
 ## The database
 
-Five migrations in `supabase/migrations/`, applied in order. `POLICIES.md` says
+Six migrations in `supabase/migrations/`, applied in order. `POLICIES.md` says
 what they allow in plain words and is the file to read first.
 
 The rules that are not negotiable, all of them checked:
@@ -259,24 +263,45 @@ For a server (canonical URLs, the `_headers` file, the live data path):
 
 ```
 npm run dev          # Vite, http://localhost:5173
-npm run build        # local preview only — nothing deployed depends on it
+npm run build        # produces dist/ — this is what gets deployed, see below
+npm run preview      # serve the built dist/, which is worth doing before a deploy
 ```
 
-`vite.config.js` and `dist/` are a convenience. Keep the build honest anyway: a
-broken build that nobody notices is how the last one stayed broken.
+A broken build that nobody notices is how the last one stayed broken — and since
+`dist/` is the deploy, that is a broken *site*, not a broken convenience.
 
 ## Deploying
 
-**A direct upload to Cloudflare Pages.** No build command, no `dist/`. The
-source tree is the site, which is the same property that makes `file://` work.
+```
+npm run build        # then drag dist/ to Cloudflare Pages
+```
+
+**A direct upload of `dist/` to Cloudflare Pages.** There is no git integration
+and no build command configured on Cloudflare's side — the build runs here, and
+the folder it produces is what gets dragged.
+
+So `dist/` is not a convenience, and `vite.config.js` is not optional
+scaffolding: it is the deploy. Read its header before changing it. It exists
+because three separate things do not survive a default Vite build — the five
+pages after the first, every classic `<script>` on them, and the photographs
+`data/seed-photos.js` names as plain strings — and none of the three fails
+loudly. The build prints `✓ built` and ships a site with no JavaScript.
 
 Two things follow:
 
-- **Upload the site files, not the repo.** `node_modules/`, `tools/`,
-  `memory.md`, `client-notes.md` and `.git/` have no business on a public host.
-  Whatever is dragged in gets served — there is no ignore file protecting this.
-- **`_headers` has to be in the drag.** There is no error if it is missing. The
-  headers simply do not appear and nothing looks any different.
+- **`_headers` and `robots.txt` reach `dist/` only because the build copies
+  them.** No page links to either, so nothing would otherwise pull them in, and
+  both fail silently when missing: the deploy looks identical and has no CSP.
+  The build asserts they landed rather than trusting the copy. Note that
+  `npm run check:csp` reads the *source tree*, so it passes whether or not they
+  ever reached the build — it cannot catch this, and once did not.
+- **Upload `dist/`, not the repo.** That is what makes this safe: `dist/` holds
+  built output only, so `node_modules/`, `tools/`, `memory.md`, `client-notes.md`
+  and `.git/` cannot reach a public host by being in the drag.
+
+The source tree is still a complete working site — that is what keeps `file://`
+working and what makes local development a double-click. It just is not the
+thing that gets uploaded.
 
 `admin.html` ships with the rest of the site and is therefore reachable on every
 preview URL. Supabase auth is the real gate and RLS is the real defence, so this
@@ -298,7 +323,7 @@ already providing.
 
 ## The FAQ page
 
-`faq.html` is a **demo**. Its 18 questions came from Aromati's OpenTable
+`faq.html` is a **demo**. Its nine questions came from Aromati's OpenTable
 listing, where they read as automatically generated, and nothing in them has
 been verified against how the café actually runs. The page says so, loudly, in a
 `.notice` block above the questions — **that block is the point, and it must not

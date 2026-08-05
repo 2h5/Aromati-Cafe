@@ -129,6 +129,13 @@ as you want them read: `7.50` stays `7.50`, `21` stays `21`.
 Sections and items each have ▲▼ arrows beside them, and the order you set is
 the order on the page.
 
+**To take something off the menu, tick Hide this item — do not delete it.** The
+salmon being off this week is not the same as the salmon being gone. A hidden
+item comes off the site at the next save and keeps everything it has: the
+description, the price, the extra lines. Untick it and it is back exactly as it
+was. Delete is permanent, and if it was the only item in a section the section
+goes too. Use Hide for anything that might return, which is most things.
+
 One block on the food menu — **Build Your Own Breakfast** — is built into the
 page rather than stored here. You can move where it sits on the menu; changing
 what is in it needs a developer.
@@ -171,7 +178,7 @@ photograph** button under each one.
 
 This tab is empty on purpose, and there is a question waiting for you.
 
-The FAQ page on the site today is **placeholder text**. Those eighteen questions
+The FAQ page on the site today is **placeholder text**. Those nine questions
 came off your OpenTable listing and read as though a computer wrote them —
 nobody has checked a single answer against how the café actually runs. The page
 says so, in a box above the questions.
