@@ -479,15 +479,12 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
 }
 
 /* ── section links ──
-   Number, word, chevron: a list you can aim at, not five words floating in
-   the middle of the screen. The word rides up out of a mask with a degree of
-   rotation on it, which is what makes the reveal read as printed rather than
-   slid. */
+   The word rides up out of a mask with a degree of rotation on it, which makes
+   the reveal read as printed rather than slid. */
 .mmenu__links{ display:flex; flex-direction:column; }
 .mmenu__links a{
   position:relative;
-  display:grid; grid-template-columns:2.4ch 1fr auto; align-items:center;
-  gap:clamp(10px,3vw,16px);
+  display:block;
   padding:clamp(10px,1.75vh,16px) 2px;
   transition:opacity .25s var(--ease);
 }
@@ -496,11 +493,6 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
   background:linear-gradient(90deg, rgba(201,163,92,.5), rgba(244,237,225,.13) 46%, transparent);
   transform:scaleX(0); transform-origin:left;
   transition:transform .3s var(--ease);
-}
-.mml__n{
-  font-size:10px; letter-spacing:.2em; font-weight:700; color:var(--gold);
-  opacity:0; transform:translateX(-6px);
-  transition:opacity .25s var(--ease), transform .25s var(--ease);
 }
 /* the mask is a hair taller than the line so Café's accent is not shaved off
    by the overflow that makes the reveal work */
@@ -514,22 +506,8 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
   transform:translateY(112%) rotate(2.4deg); transform-origin:0 0;
   transition:transform .34s var(--ease);
 }
-.mml__go{
-  width:9px; height:9px; margin-right:4px;
-  border-top:1.4px solid var(--gold); border-right:1.4px solid var(--gold);
-  transform:rotate(45deg) translateX(-5px); opacity:0;
-  transition:opacity .25s var(--ease), transform .35s var(--ease);
-}
 .mmenu.open .mmenu__links a::after{ transform:scaleX(1); transition:transform .85s var(--ease-exp) var(--d); }
-.mmenu.open .mml__n{
-  opacity:.6; transform:none;
-  transition:opacity .5s var(--ease) var(--d), transform .7s var(--ease-exp) var(--d);
-}
 .mmenu.open .mml__w > span{ transform:none; transition:transform .95s var(--ease-exp) var(--d); }
-.mmenu.open .mml__go{
-  opacity:.7; transform:rotate(45deg);
-  transition:opacity .5s var(--ease) calc(var(--d) + .06s), transform .7s var(--ease-exp) calc(var(--d) + .06s);
-}
 .mmenu__links a:nth-child(1){ --d:.26s; }
 .mmenu__links a:nth-child(2){ --d:.32s; }
 .mmenu__links a:nth-child(3){ --d:.38s; }
@@ -537,10 +515,8 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
 .mmenu__links a:nth-child(5){ --d:.50s; }
 /* touch has no hover, so the press itself has to answer */
 .mmenu__links a:active{ opacity:.62; }
-.mmenu.open .mmenu__links a:active .mml__go{ transform:rotate(45deg) translateX(3px); opacity:1; transition-duration:.12s; }
 @media (hover:hover){
   .mmenu__links a:hover .mml__w > span{ color:var(--gold); }
-  .mmenu.open .mmenu__links a:hover .mml__go{ opacity:1; transform:rotate(45deg) translateX(3px); }
 }
 
 /* ── the three menus, a second tier under the sections ── */
@@ -687,11 +663,10 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
   margin-bottom:clamp(30px,5vh,64px);
 }
 .hero__eyebrow{
-  display:inline-flex; align-items:center; gap:12px;
+  display:inline-flex; align-items:center;
   font-size:11px; letter-spacing:.34em; text-transform:uppercase; font-weight:700;
   margin-bottom:clamp(14px,2vh,26px); color:var(--parchment);
 }
-.hero__eyebrow .dot{ width:7px; height:7px; border-radius:50%; background:var(--gold); box-shadow:0 0 0 5px rgba(201,163,92,.22); }
 .hero__title{
   font-size:clamp(64px, 15.5vw, 236px);
   line-height:.86; letter-spacing:.015em; font-weight:400;
@@ -1882,23 +1857,13 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
 /* ── hours ────────────────────────────────────── */
 .hours__status[hidden]{ display:none; }
 .hours__status{
-  display:inline-flex; align-items:center; gap:9px; white-space:nowrap;
+  display:inline-flex; align-items:center; white-space:nowrap;
   font-size:10px; letter-spacing:.18em; text-transform:uppercase; font-weight:700;
-  padding:5px 12px 5px 10px; border-radius:99px;
+  padding:5px 12px; border-radius:99px;
   border:1px solid var(--hairline-lt); opacity:.92;
 }
-.hours__status::before{
-  content:""; width:6px; height:6px; border-radius:50%;
-  background:currentColor; flex:0 0 auto;
-}
 .hours__status[data-state="open"]{ color:#8fbf8a; border-color:rgba(143,191,138,.4); }
-.hours__status[data-state="open"]::before{ box-shadow:0 0 0 0 currentColor; animation:pulse 2.6s infinite; }
 .hours__status[data-state="closed"]{ color:var(--cognac); border-color:rgba(176,122,74,.42); }
-@keyframes pulse{
-  0%  { box-shadow:0 0 0 0 rgba(143,191,138,.55); }
-  70% { box-shadow:0 0 0 7px rgba(143,191,138,0); }
-  100%{ box-shadow:0 0 0 0 rgba(143,191,138,0); }
-}
 .hours__list{ display:flex; flex-direction:column; gap:11px; }
 .hours__line{
   display:flex; align-items:baseline; gap:12px; flex-wrap:nowrap;

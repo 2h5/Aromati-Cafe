@@ -60,6 +60,14 @@ const INTENDED = [
     why: "the café's real address, 2026-08-01 (ac4615e)" }
 ];
 
+/* Presentation-only text that was removed from the page. These nodes are
+   removed from the baseline copy before the whole-page text comparison; all
+   remaining copy is still required to match exactly. */
+const REMOVED = [
+  { page: "index.html", sel: ".mmenu__links .mml__n",
+    why: "decorative mobile-menu numbers removed, 2026-08-04" }
+];
+
 /* Content added since the baseline, named by selector rather than by the words
    in it. A text diff compares two lists by position, so an insertion shifts
    everything after it and reports the whole rest of the page as changed —
@@ -124,6 +132,7 @@ function boardOf(html, { render }) {
 let failures = 0;
 const usedIntent = new Set();
 const usedAdded = new Set();
+const usedRemoved = new Set();
 
 for (const page of PAGES) {
   const before = boardOf(
@@ -135,7 +144,13 @@ for (const page of PAGES) {
   if (!before || !after) throw new Error(`${page}: no ${ROOT}`);
 
   const rewrites = INTENDED.filter((r) => r.page === page);
-  const a = visibleText(before).map((s) => {
+  const textBefore = before.cloneNode(true);
+  for (const remove of REMOVED.filter((r) => r.page === page)) {
+    const hits = [...textBefore.querySelectorAll(remove.sel)];
+    if (hits.length) usedRemoved.add(remove);
+    for (const n of hits) n.parentNode.removeChild(n);
+  }
+  const a = visibleText(textBefore).map((s) => {
     const hit = rewrites.find((r) => r.was === s);
     if (!hit) return s;
     usedIntent.add(hit);
@@ -261,6 +276,16 @@ if (deadAdds.length) {
   for (const r of deadAdds) {
     console.log(`        ${r.page}: ${r.sel} — ${r.why}`);
     console.log("        the block is gone; drop the entry, or it hides the next one");
+  }
+}
+
+const deadRemoved = REMOVED.filter((r) => !usedRemoved.has(r));
+if (deadRemoved.length) {
+  failures++;
+  console.log("\nFAIL  a removed-content entry matched nothing in the baseline");
+  for (const r of deadRemoved) {
+    console.log(`        ${r.page}: ${r.sel} — ${r.why}`);
+    console.log("        the baseline no longer contains it; drop the entry");
   }
 }
 
