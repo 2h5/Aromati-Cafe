@@ -263,8 +263,15 @@ create policy "site-photos owner list"
    never regenerated. Without it the committed SQL and the site's own data drift
    apart quietly, and the drift only shows up on a project that is set up from
    scratch — which is the worst possible moment to find it. */
+/* The line endings are normalised before comparing, the same way gen-seed-sql
+   does it, and leaving it out is how this check spent its life failing on every
+   machine but the one it was written on. Git stores this file with LF and hands
+   out CRLF on Windows, so a fresh clone fails here — while `sql` is always LF,
+   because a template literal normalises CRLF in its own source. The only reason
+   it ever passed is that running the generator rewrites the file with LF, so an
+   author who has run it once stops being able to see the failure. */
 if (process.argv.includes("--check")) {
-  const on_disk = existsSync(OUT) ? readFileSync(OUT, "utf8") : "";
+  const on_disk = existsSync(OUT) ? readFileSync(OUT, "utf8").replace(/\r\n/g, "\n") : "";
   if (on_disk === sql) {
     console.log(`  ok   the photographs migration matches the slots and the seed data`);
     process.exit(0);
