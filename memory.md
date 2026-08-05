@@ -152,9 +152,7 @@ Under 1200px the rail lies down under the topbar. Under 900px the index and the
 editor take turns and `.shell--editing` says which is showing.
 
 There is no accordion anywhere except inside a menu section, where the items
-still expand one at a time. `CMS-REDESIGN.md` is the working spec for this
-layout and the interpretation calls behind it; delete it once the redesign has
-settled.
+still expand one at a time.
 
 Things that are easy to break here:
 
