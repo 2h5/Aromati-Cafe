@@ -121,11 +121,33 @@
       <ul class="problems__list" id="problemsList"></ul>
     </div>
 
+    <!-- What the next save would write, listed rather than counted. It is the
+         shell's for the same reason the savebar is, and it sits between the
+         two so the count that opens it stays directly underneath.
+
+         Closed, it is `hidden` — not merely collapsed — so nothing inside it
+         can be reached by tabbing past the savebar. -->
+    <div class="changes" id="changes" hidden>
+      <div class="changes__inner">
+        <p class="changes__title" id="changesTitle"></p>
+        <ul class="changes__list" id="changesList"></ul>
+      </div>
+    </div>
+
     <!-- The savebar is the only thing that writes. Nothing above it is live
          until it is used, and Discard puts everything back. -->
     <div class="savebar savebar--clean" id="savebar">
       <span class="savebar__dot" aria-hidden="true"></span>
-      <span class="savebar__count" id="saveCount"></span>
+      <!-- The count is the handle for the list above. It was already the one
+           thing on this bar that says how much is waiting, so pressing it is
+           the smallest control this could have been. #saveCount stays its own
+           element: the caret is a sibling, and the text is written straight
+           into the span the way it always was. -->
+      <button class="savebar__count" type="button" id="changesToggle"
+              aria-expanded="false" aria-controls="changes">
+        <span id="saveCount"></span>
+        <span class="savebar__caret" aria-hidden="true"></span>
+      </button>
       <span class="savebar__spacer"></span>
       <button class="btn btn--ghost"   type="button" id="discardBtn">Discard</button>
       <button class="btn btn--primary" type="button" id="saveBtn">Save changes</button>

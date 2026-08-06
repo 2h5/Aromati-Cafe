@@ -173,6 +173,14 @@ edits that copy. Nothing reaches the database until **Save changes**, and
   fourteen is refused, the first eight really happened. Each call that succeeds
   is folded into the baseline as it lands, and the database's own wording is
   shown as it was written. The editor never claims a state it has not confirmed.
+- **The count on the savebar opens what it is counting.** One entry per changed
+  row — where it lives, what it was, what it is now — with a link into the
+  section and *Put back* on an edited row. Fourteen is a number the owner has
+  to take on trust; the same fourteen with their values beside them is
+  something they can check before a non-transactional save runs. It is derived
+  from the baseline every time it is drawn, never recorded, and it lists but
+  does not undo an added or removed row — Discard is the button for that, and
+  it already handles the cascades correctly.
 - **The validation in the editor is not the security boundary.** It exists to
   give the owner a sentence they can act on before a save is attempted. RLS
   decides what may be written; CHECK constraints and triggers decide what is

@@ -1014,15 +1014,22 @@ var AROMATI_ADMIN = (function () {
       emptyIndex: "No questions yet." }
   ];
 
+  /* Which tables each area owns. The dot on a rail button is counted from it,
+     and the change list in part 7a orders itself by it — so it is written once
+     rather than once per reader. test:admin requires it to name every table in
+     TABLES exactly once: a table missing from here has no dot and no line in
+     the change list, and both failures are silent. */
+  var PANEL_TABLES = {
+    copy: ["site_copy"],
+    hours: ["business_hours", "hours_exceptions"],
+    contact: ["site_settings"],
+    menu: ["menu_courses", "menu_items", "menu_item_pours"],
+    photos: ["photos"],
+    faq: ["faq_entries"]
+  };
+
   function panelChangeCount(id) {
-    var tables = {
-      copy: ["site_copy"],
-      hours: ["business_hours", "hours_exceptions"],
-      contact: ["site_settings"],
-      menu: ["menu_courses", "menu_items", "menu_item_pours"],
-      photos: ["photos"],
-      faq: ["faq_entries"]
-    }[id] || [];
+    var tables = PANEL_TABLES[id] || [];
     var n = 0;
     tables.forEach(function (table) {
       rowsOf(table).forEach(function (row) { if (rowChanged(table, row)) n += 1; });
@@ -4050,6 +4057,455 @@ var AROMATI_ADMIN = (function () {
     for (i = 0; i < tabs.length; i++) {
       setTabDot(tabs[i], panelChangeCount(PANELS[i].id) > 0);
     }
+
+    refreshChanges();
+  }
+
+
+  /* ═══════════════════════════════════════════════
+     7a. what changed
+     ═══════════════════════════════════════════════
+
+     The savebar counts what the next save would write. This lists it.
+
+     A save is a sequence of REST calls rather than one transaction, and by the
+     time it runs the owner may have been editing for an hour across six areas.
+     "14 unsaved changes" is a number they have to take on trust; the same
+     fourteen with their old and new values beside them is something they can
+     check. It opens from the count itself — that was already the one thing on
+     the bar saying how much is waiting.
+
+     Three rules hold it together.
+
+     **Derived, never recorded.** The list is rebuilt from `baseline` against
+     `draft` every time it is drawn, exactly like every other "changed" in this
+     file. A running log of edits would report a word typed and typed back as a
+     change, which is the whole reason part 1 derives instead of tracking.
+
+     **One entry per row, not per field.** `changeCount()` counts rows — a menu
+     item with three edited boxes is one change and one PATCH — so a list that
+     counted boxes would disagree with the number on the button that opened it.
+     Columns are the lines inside an entry, not entries.
+
+     **It reverts an edit and nothing else.** Putting an edited row back is a
+     copy of `baseline` over the draft and cannot be anything but that. Putting
+     back a *deleted* section means restoring its items and its pours through
+     the same cascade `deleteCourse` walks by hand, and un-adding a new one
+     means deciding what happens to the rows added under it — both are real
+     operations with real ways to go wrong, and Discard already does the lot
+     correctly in one step. So an added or removed row is listed and named
+     here, and its undo is the button already at the foot of the pane. */
+
+  /* Where a row is edited: which area, which section of it, and — for the
+     menus, whose index lists one page at a time — which page that section is
+     on. The ids are the ones the six section builders in part 4 mint, which
+     makes this a second place they are written down. tools/test-admin.mjs
+     walks every table and requires each id returned here to exist in that
+     panel's own section list, so a renamed section fails a check rather than
+     becoming a line in here that quietly goes nowhere. */
+  function locate(table, row) {
+    if (!row) return null;
+
+    if (table === "site_copy") {
+      return { tab: "copy", section: "copy:" + row.page + ":" + row.section,
+               where: (PAGE_NAMES[row.page] || "The site") + " · " + row.section,
+               title: row.label || row.key };
+    }
+    if (table === "site_settings") {
+      var bucket = Math.floor((row.sort_order || 0) / 10);
+      return { tab: "contact", section: "contact:" + bucket,
+               where: SETTING_GROUPS[bucket] || "Contact details",
+               title: row.label || row.key };
+    }
+    if (table === "business_hours") {
+      return { tab: "hours", section: "hours:week", where: "The usual week",
+               title: DAY_NAMES[row.day_of_week] || ("Day " + row.day_of_week) };
+    }
+    if (table === "hours_exceptions") {
+      return { tab: "hours", section: "hours:exceptions",
+               where: "Holidays and one-off days",
+               title: row.on_date ? String(row.on_date) : "A new date" };
+    }
+    if (table === "menu_courses") {
+      return { tab: "menu", section: "course:" + row.id, page: row.page,
+               where: PAGE_NAMES[row.page] || "Menus",
+               title: row.heading || "(untitled section)" };
+    }
+    if (table === "menu_items") {
+      return menuChild(findRow("menu_courses", row.course_id),
+                       row.name || "(unnamed item)");
+    }
+    if (table === "menu_item_pours") {
+      var item = findRow("menu_items", row.item_id);
+      var course = item ? findRow("menu_courses", item.course_id) : null;
+      return menuChild(course, (item ? item.name : "An item") + " · " +
+                               (row.label || "a pour"));
+    }
+    if (table === "photos") {
+      var prefix = String(row.slot).split(".")[0];
+      return { tab: "photos", section: "photos:" + prefix,
+               where: PHOTO_GROUPS[prefix] || prefix,
+               title: row.label || row.slot };
+    }
+    if (table === "faq_entries") {
+      return { tab: "faq", section: "faq:" + row.id, where: "Questions",
+               title: row.question || "(new question)" };
+    }
+    return null;
+  }
+
+  /* An item or a pour whose section has itself been deleted in this same
+     sitting has nowhere to be sent. It still belongs in the list — it is still
+     going to be written — so it keeps its name and loses only its link. */
+  function menuChild(course, title) {
+    if (!course) return { tab: "menu", section: null, where: "Menus", title: title };
+    return {
+      tab: "menu", section: "course:" + course.id, page: course.page,
+      where: (PAGE_NAMES[course.page] || "Menus") + " · " +
+             (course.heading || "(untitled section)"),
+      title: title
+    };
+  }
+
+  /* The owner's word for a column, where the panels have one. Anything not
+     named here falls back to the column, which is ugly and legible and better
+     than a blank. */
+  var COL_LABELS = {
+    site_settings:   { value: "Value" },
+    site_copy:       { value: "Text" },
+    business_hours:  { is_closed: "Closed all day", opens_at: "Opens", closes_at: "Closes" },
+    hours_exceptions: { on_date: "Date", is_closed: "Closed all day",
+                        opens_at: "Opens", closes_at: "Closes", note: "Reason" },
+    menu_courses:    { page: "Menu", course_key: "Filter key", tab_label: "Filter tab",
+                       heading: "Heading", sizes: "Size columns", sort_order: "Position" },
+    menu_items:      { course_id: "Section", name: "Name", tag: "Note beside the name",
+                       description: "Description", price: "Price", prices: "Price per size",
+                       is_hidden: "Hidden from the site", price_all_sizes: "One price across sizes",
+                       no_price: "No price", sort_order: "Position" },
+    menu_item_pours: { item_id: "Item", label: "Pour", price: "Price", sort_order: "Position" },
+    faq_entries:     { question: "Question", answer: "Answer",
+                       is_published: "Published", sort_order: "Position" },
+    photos:          { storage_path: "Photograph", source_path: "Unframed original",
+                       alt: "Description", width: "Width", height: "Height" }
+  };
+
+  var VALUE_MAX = 64;
+
+  /* What a stored value looks like said out loud. Long text is cut because a
+     line that wraps four times stops being a comparison, and the point of the
+     list is that two values can be read against each other at a glance. */
+  function describeValue(table, col, value) {
+    /* A storage path is a name in a bucket and tells the owner nothing. What
+       they changed is which picture is in the slot. */
+    if (table === "photos" && (col === "storage_path" || col === "source_path")) {
+      return value ? "a photograph you uploaded" : "the one the site came with";
+    }
+    /* A foreign key is an id. What it means is the thing it points at. */
+    if (table === "menu_items" && col === "course_id") {
+      var course = findRow("menu_courses", value);
+      return course ? (course.heading || "(untitled section)") : "another section";
+    }
+    if (table === "menu_item_pours" && col === "item_id") {
+      var item = findRow("menu_items", value);
+      return item ? (item.name || "(unnamed item)") : "another item";
+    }
+
+    if (value === true) return "yes";
+    if (value === false) return "no";
+    if (value === null || value === undefined || value === "") return "empty";
+
+    if (Array.isArray(value)) {
+      if (!value.length) return "empty";
+      return value.map(function (v) {
+        return v === null || v === undefined || v === "" ? "—" : String(v);
+      }).join(" / ");
+    }
+
+    var text = String(value);
+    /* "07:00:00" is the database's; "07:00" is what the owner typed and what
+       the box shows. */
+    if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(text)) return toInputTime(text);
+
+    text = text.replace(/\s+/g, " ").trim();
+    if (text.length > VALUE_MAX) text = text.slice(0, VALUE_MAX - 1) + "…";
+    return text;
+  }
+
+  /* A removed row is gone from the draft, so its name has to come out of the
+     baseline — which holds only the writable columns, and that is enough for
+     all five tables a row can be removed from. */
+  function removedTitle(table, was) {
+    if (!was) return "A row";
+    if (table === "hours_exceptions") return was.on_date ? String(was.on_date) : "A date";
+    if (table === "menu_courses") return was.heading || "(untitled section)";
+    if (table === "menu_items") return was.name || "(unnamed item)";
+    if (table === "menu_item_pours") return was.label || "a pour";
+    if (table === "faq_entries") return was.question || "(a question)";
+    return "A row";
+  }
+
+  var REMOVED_WHERE = {
+    hours_exceptions: "Holidays and one-off days",
+    menu_courses:     "Menus",
+    menu_items:       "Menus",
+    menu_item_pours:  "Menus",
+    faq_entries:      "Questions"
+  };
+
+  /* Every row the next save would touch, in rail order — Words first, FAQ
+     last — so the list reads down the same six areas the rail does. The count
+     is the length of this: both walk rows, and PANEL_TABLES is the one list of
+     which tables belong where. */
+  function changeEntries() {
+    var out = [];
+
+    PANELS.forEach(function (panel) {
+      (PANEL_TABLES[panel.id] || []).forEach(function (table) {
+        rowsOf(table).forEach(function (row) {
+          var cols = changedFields(table, row);
+          if (!cols.length) return;
+          var at = locate(table, row);
+          var fresh = isNew(row);
+          /* changedFields() treats a row with no baseline as entirely changed
+             rather than throwing, and so does this: a row that is not new and
+             has no confirmed state is not a case that should exist, but the
+             answer to it is a list that says so — not a list that dies and
+             takes the drawer with it. */
+          var was = (baseline[table] && baseline[table][row.id]) || {};
+          out.push({
+            kind: fresh ? "added" : "changed",
+            table: table, id: row.id, at: at,
+            where: at ? at.where : "",
+            title: at ? at.title : "A row",
+            /* A new row has no "before", so listing every column against an
+               empty one is fourteen lines saying nothing. It is named and
+               flagged instead. */
+            lines: fresh ? [] : cols.map(function (col) {
+              return {
+                label: (COL_LABELS[table] && COL_LABELS[table][col]) || col,
+                plain: col === "sort_order" ? "moved" : null,
+                was: describeValue(table, col, was[col]),
+                now: describeValue(table, col, row[col])
+              };
+            })
+          });
+        });
+
+        (removed[table] || []).forEach(function (id) {
+          out.push({
+            kind: "removed", table: table, id: id, at: null,
+            where: REMOVED_WHERE[table] || "",
+            title: removedTitle(table, baseline[table] && baseline[table][id]),
+            lines: []
+          });
+        });
+      });
+    });
+
+    return out;
+  }
+
+  /* Put an edited row back the way the database last confirmed it. Only the
+     writable columns move, which is the same set the save would have sent —
+     so this cannot restore something the editor was never allowed to change. */
+  function revertRow(table, id) {
+    var row = findRow(table, id);
+    var was = baseline[table] && baseline[table][id];
+    if (!row || !was) return;
+
+    /* A photograph picked this sitting is holding a decoded file and a blob:
+       URL. Putting the row back has to let go of both, or the slot shows the
+       old description beside the new picture and the save still uploads it. */
+    if (table === "photos") forgetUpload(row);
+
+    /* Where this row sits in the list, asked before it is restored — a moment
+       later it is not in the list at all, and the answer is -1. The button
+       that was just pressed is about to be rebuilt out of existence with it,
+       so the keyboard needs somewhere to land: the entry that takes its
+       place, which makes a run of corrections a run of presses rather than a
+       press and a hunt for where focus went. */
+    var at = changeEntries().map(function (e) { return e.table + ":" + e.id; })
+      .indexOf(table + ":" + id);
+
+    WRITABLE[table].forEach(function (col) { row[col] = was[col]; });
+    renderAll(false, true);
+    if (changesOpen) focusUndoNear(at);
+  }
+
+  /* `at` is where the reverted row used to be. It has left the list, so the
+     entry now at that index is the one that followed it; at the end of the
+     list there is nothing after it and the last one is the nearest thing. */
+  function focusUndoNear(at) {
+    var buttons = byId("changesList").querySelectorAll(".change__undo");
+    if (!buttons.length || at < 0) return;
+    var target = buttons[Math.min(at, buttons.length - 1)];
+    if (target) target.focus();
+  }
+
+  function goToChange(entry) {
+    if (!entry.at || !entry.at.section) return;
+    changesOpen = false;
+    openTab(entry.at.tab);
+    /* The menu index lists one page at a time, so arriving at a section on
+       another one means changing the page first — otherwise the section id is
+       not in the list and currentSection() falls back to the first course of
+       whatever page happened to be showing. */
+    if (entry.at.page) ui.menuPage = entry.at.page;
+    selectSection(entry.at.tab, entry.at.section);
+    renderAll("tab");
+  }
+
+  function changeEntryNode(entry) {
+    var li = el("li", "change");
+
+    var head = el("div", "change__head");
+    if (entry.where) head.appendChild(el("span", "change__where", entry.where));
+
+    if (entry.at && entry.at.section) {
+      var link = el("button", "change__title", entry.title);
+      link.type = "button";
+      on(link, "click", function () { goToChange(entry); });
+      head.appendChild(link);
+    } else {
+      head.appendChild(el("span", "change__title--flat", entry.title));
+    }
+
+    if (entry.kind !== "changed") {
+      head.appendChild(el("span",
+        "change__flag" + (entry.kind === "removed" ? " change__flag--removed" : ""),
+        entry.kind === "removed" ? "removed" : "added"));
+    }
+
+    head.appendChild(el("span", "change__spacer"));
+
+    if (entry.kind === "changed") {
+      var undo = el("button", "change__undo", "Put back");
+      undo.type = "button";
+      undo.title = "Put this back the way it was last saved";
+      on(undo, "click", function () { revertRow(entry.table, entry.id); });
+      head.appendChild(undo);
+    }
+
+    li.appendChild(head);
+
+    if (entry.lines.length) {
+      var lines = el("ul", "change__lines");
+      entry.lines.forEach(function (line) {
+        var row = el("li", "change__line");
+        row.appendChild(el("span", "change__col", line.label));
+        if (line.plain) {
+          row.appendChild(el("span", "change__plain", line.plain));
+        } else {
+          row.appendChild(el("span", "change__was", line.was));
+          row.appendChild(el("span", "change__arrow", "→"));
+          row.appendChild(el("span", "change__now", line.now));
+        }
+        lines.appendChild(row);
+      });
+      li.appendChild(lines);
+    }
+
+    if (entry.kind !== "changed") {
+      li.appendChild(el("p", "change__note",
+        entry.kind === "removed"
+          ? "It goes when you save. Discard brings it back."
+          : "It is written when you save. Discard takes it away again."));
+    }
+
+    return li;
+  }
+
+  var changesOpen = false;
+  var changesExitToken = 0;
+
+  function openChangesDrawer(host) {
+    changesExitToken += 1;
+    if (host.hidden) {
+      host.hidden = false;
+      /* Reading a layout value here commits the un-hiding as its own style
+         pass, so the class below has a height to grow from. Without it the
+         browser coalesces the two and the drawer appears at full size with no
+         transition. It is a read — nothing in this file may write a style
+         attribute, because style-src 'self' drops it in production and it
+         works perfectly on a laptop. */
+      void host.offsetHeight;
+    }
+    host.classList.add("is-open");
+  }
+
+  /* A closed drawer holds nothing. It is invisible either way, but a container
+     sitting on the last list it drew is a stale answer waiting for whoever
+     reads it next — and the entries hold references to draft rows that a
+     discard has already thrown away.
+
+     Emptied at the end of the collapse rather than the start of it, though:
+     a drawer whose contents vanish on the first frame and then closes around
+     the hole is the one thing here that reads as broken rather than as slow. */
+  function emptyChangesDrawer(host) {
+    host.hidden = true;
+    clear(byId("changesList"));
+  }
+
+  function closeChangesDrawer(host, immediate) {
+    host.classList.remove("is-open");
+    if (host.hidden) { clear(byId("changesList")); return; }
+    if (immediate || prefersReducedMotion()) { emptyChangesDrawer(host); return; }
+
+    /* Hidden only once it has finished collapsing, and only if nothing has
+       reopened it in the meantime — the same token the savebar's own exit
+       uses, for the same reason. */
+    var token = ++changesExitToken;
+    window.setTimeout(function () {
+      if (changesExitToken === token && !changesOpen) emptyChangesDrawer(host);
+    }, DISCLOSURE_MS);
+  }
+
+  /* Called from updateSavebar, so the list follows every edit rather than
+     being a snapshot of whenever it was opened. */
+  function refreshChanges() {
+    var host = byId("changes");
+    var toggle = byId("changesToggle");
+    if (!host || !toggle) return;
+
+    var entries = changeEntries();
+
+    toggle.disabled = saving || entries.length === 0;
+    if (!entries.length) changesOpen = false;
+    toggle.setAttribute("aria-expanded", changesOpen ? "true" : "false");
+
+    if (!changesOpen) {
+      /* Nothing left to list is the one close that does not animate: there is
+         no honest thing to show shrinking. It goes at once, and takes its
+         contents with it. */
+      closeChangesDrawer(host, !entries.length);
+      return;
+    }
+
+    byId("changesTitle").textContent = entries.length === 1
+      ? "The one change waiting to be saved"
+      : "The " + entries.length + " changes waiting to be saved";
+
+    /* This runs on every keystroke the drawer is open for, because the values
+       in it follow what is being typed. Rebuilding a scrolled list without
+       putting it back where it was sends it to the top under the reader —
+       so an owner checking the eleventh of fourteen changes loses their place
+       the moment they correct anything. */
+    var inner = host.querySelector(".changes__inner");
+    var scrollTop = inner ? inner.scrollTop : 0;
+
+    var listNode = byId("changesList");
+    clear(listNode);
+    entries.forEach(function (entry) {
+      listNode.appendChild(changeEntryNode(entry));
+    });
+
+    openChangesDrawer(host);
+    if (inner && scrollTop > 0) inner.scrollTop = scrollTop;
+  }
+
+  function toggleChanges() {
+    changesOpen = !changesOpen;
+    refreshChanges();
   }
 
 
@@ -4142,6 +4598,11 @@ var AROMATI_ADMIN = (function () {
     byId("savebar").className = "savebar savebar--busy";
     byId("saveBtn").disabled = true;
     byId("discardBtn").disabled = true;
+    /* The list stays on screen while the save runs — it is what is being
+       written — but it stops being something to open and close halfway
+       through. refreshChanges() disables it too; this is the same statement
+       said where the other two buttons say it. */
+    byId("changesToggle").disabled = true;
 
     var idMap = {};
     var done = 0, planned = 0;
@@ -4532,6 +4993,7 @@ var AROMATI_ADMIN = (function () {
     on(byId("signOut"), "click", signOut);
     on(byId("saveBtn"), "click", save);
     on(byId("discardBtn"), "click", discard);
+    on(byId("changesToggle"), "click", toggleChanges);
 
     /* ⌘S and Ctrl+S. The browser's own Save-page dialog is never what anybody
        pressing it in here wanted. */
@@ -4590,10 +5052,27 @@ var AROMATI_ADMIN = (function () {
       orientationToApply: orientationToApply,
       fitInside: fitInside,
       shapeName: shapeName,
+      describeValue: describeValue,
+      changeEntries: changeEntries,
+      /* The change list locates a row by minting a section id; the panels mint
+         theirs independently. These two let test:admin hold them together
+         without either one being told what the other says. */
+      locate: function (table, id) { return locate(table, findRow(table, id)); },
+      sectionIds: function (tab) {
+        var panel = PANELS.filter(function (p) { return p.id === tab; })[0];
+        return panel ? panel.sections().map(function (s) { return s.id; }) : [];
+      },
+      setMenuPage: function (page) { ui.menuPage = page; },
+      /* Stages the one state the editor should never be in — a row that is
+         not new and has no confirmed values — so the change list can be made
+         to meet it. Nothing in the page calls this. */
+      forgetBaseline: function (table, id) { delete baseline[table][id]; },
       SETTING_RULES: SETTING_RULES,
       WRITABLE: WRITABLE,
       CAN_ADD: CAN_ADD,
       TABLES: TABLES,
+      PANEL_TABLES: PANEL_TABLES,
+      COL_LABELS: COL_LABELS,
       SELECTS: SELECTS
     }
   };

@@ -195,6 +195,41 @@ Things that are easy to break here:
 - There is no "last saved" or "last published" anywhere, deliberately. Every
   content table does carry `updated_at`, so if it is ever wanted it is one
   `max()` away and needs no migration.
+- The savebar's count opens a list of what the next save would write — one
+  entry per changed row, with the old value against the new one, a link to the
+  section it lives in, and "Put back" on an edited row. Three things about it
+  are load-bearing:
+  - It is **derived on every draw**, from `baseline` against `draft`, like
+    every other "changed" in `admin.js`. It must never become a recorded log
+    of edits: a word typed and typed back is not a change.
+  - It is **one entry per row, not per box**, because `changeCount()` counts
+    rows and the list has to agree with the number on the button that opened
+    it. Both walk `PANEL_TABLES`, which is the single list of which tables
+    belong to which area.
+  - It **reverts an edit and nothing else.** Un-deleting a section means
+    restoring its items and pours through the cascade `deleteCourse` walks by
+    hand, and un-adding one means deciding what happens to the rows added
+    under it. Discard already does all of it correctly in one step, so an
+    added or removed row is listed and named but carries no undo.
+  `locate()` mints a section id per table and the six section builders mint
+  theirs independently — `test:admin` walks every row and requires the two to
+  agree, because an entry pointing at an id no panel produces looks completely
+  fine and simply goes nowhere when pressed.
+- The change drawer opens on the **`0fr` → `1fr` grid row** the menu item
+  bodies and the time picker use, and it has to. It was written on `max-height`
+  first, which animates to the cap rather than to the list: one entry is 121px
+  under a `42vh` cap, so it reached full height in 40ms of a 240ms transition
+  and read as no animation at all, while closing sat still for 60ms and then
+  dropped. Driving the transition's own `currentTime` and reading the box back
+  is how to see this — it is invisible at speed and obvious in numbers.
+  **`align-self: start` on `.changes__inner` is load-bearing:** stretched, the
+  inner is squeezed to the animating row, carries a scrollbar through the whole
+  open, and reflows 10px wider on the last frame. The cap now lives on the
+  inner alone, in both the default and narrow-screen blocks — one number, not a
+  pair that had to be kept equal.
+  (An earlier note here claimed the `0fr` idiom collapses to zero in this
+  position. It does not; that measurement came from a dev server holding a
+  stale stylesheet.)
 
 The Opens and Closes boxes are still `input[type=time]` — that is what holds the
 value, what can be typed into, and what opens the phone's own wheel. Only the

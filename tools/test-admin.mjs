@@ -50,6 +50,7 @@ function check(what, got, want) {
 }
 
 const ADMIN_JS = readFileSync("admin.js", "utf8");
+const ADMIN_CSS = readFileSync("admin.css", "utf8");
 const MIGRATION = readFileSync("supabase/migrations/20260801000000_init_cms.sql", "utf8");
 
 
@@ -114,6 +115,23 @@ function fixture() {
         width: 1088, height: 1445, is_decorative: true, sort_order: 20 }
     ]
   };
+}
+
+/* The fixture leaves faq_entries and hours_exceptions empty, because most of
+   what is tested here does not need them. The change list does: it has a line
+   for every table, and a table with no rows in it is a line nothing has ever
+   walked. */
+function withExtras() {
+  const data = fixture();
+  data.faq_entries = [
+    { id: "q1", question: "Do you take walk-ins?", answer: "Always.",
+      is_published: true, sort_order: 1 }
+  ];
+  data.hours_exceptions = [
+    { id: "x1", on_date: "2026-12-25", is_closed: true,
+      opens_at: null, closes_at: null, note: "Christmas Day" }
+  ];
+  return data;
 }
 
 /* What data/seed-photos.js gives the editor: the picture a slot has before
@@ -235,6 +253,11 @@ const settle = async (turns = 12) => {
   for (let i = 0; i < turns; i++) await new Promise((r) => setTimeout(r, 0));
 };
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/* admin.js's own disclosure timing, read out of the file rather than copied,
+   so a test that waits for something to finish collapsing keeps waiting the
+   right amount when that number changes. */
+const DISCLOSURE_MS = Number(/DISCLOSURE_MS = (\d+)/.exec(ADMIN_JS)[1]);
 
 /* Async because admin.js waits for DOMContentLoaded before it wires anything
    up. Dispatching a submit at a form whose handler has not been attached yet
@@ -421,6 +444,71 @@ async function boot(opts) {
     },
 
     async save() { q("#saveBtn").click(); await settle(); },
+
+    /* ── the change list ── */
+
+    /* Opened the way the owner opens it: by pressing the count. */
+    async openChanges() { q("#changesToggle").click(); await settle(); },
+    changesOpen() { return q("#changes").classList.contains("is-open"); },
+    changesHidden() { return q("#changes").hidden; },
+    changesTitle() { return q("#changesTitle").textContent; },
+
+    /* One object per entry, shaped like what the owner reads rather than like
+       the markup — so a test says what the list says, not where it says it. */
+    changeRows() {
+      return [...doc.querySelectorAll(".change")].map((li) => ({
+        where: (li.querySelector(".change__where") || { textContent: "" }).textContent,
+        title: li.querySelector(".change__title, .change__title--flat").textContent,
+        flag: (li.querySelector(".change__flag") || { textContent: "" }).textContent,
+        lines: [...li.querySelectorAll(".change__line")]
+          .map((n) => [...n.children].map((c) => c.textContent).join(" ")),
+        canGo: !!li.querySelector(".change__title"),
+        canUndo: !!li.querySelector(".change__undo")
+      }));
+    },
+
+    async undoChange(title) {
+      const li = [...doc.querySelectorAll(".change")].find((n) => {
+        const own = n.querySelector(".change__title, .change__title--flat");
+        return own && own.textContent === title;
+      });
+      if (!li) throw new Error(`no change listed for ${JSON.stringify(title)}`);
+      const button = li.querySelector(".change__undo");
+      if (!button) throw new Error(`no undo offered for ${JSON.stringify(title)}`);
+      button.click();
+      await settle();
+    },
+
+    async goToChange(title) {
+      const li = [...doc.querySelectorAll(".change")].find((n) => {
+        const own = n.querySelector(".change__title, .change__title--flat");
+        return own && own.textContent === title;
+      });
+      if (!li) throw new Error(`no change listed for ${JSON.stringify(title)}`);
+      li.querySelector(".change__title").click();
+      await settle();
+    },
+
+    /* Which menu page the index is showing, by the button that is pressed. */
+    menuPage() {
+      const on_ = [...doc.querySelectorAll(".pagepick__btn")]
+        .find((b) => b.getAttribute("aria-pressed") === "true");
+      return on_ ? on_.textContent : null;
+    },
+    async menuPageTo(name) {
+      const b = [...doc.querySelectorAll(".pagepick__btn")].find((n) => n.textContent === name);
+      if (!b) throw new Error(`no menu page called ${name}`);
+      b.click();
+      await settle();
+    },
+
+    /* Which section the editor pane is actually showing. */
+    openSection() {
+      const row = [...doc.querySelectorAll(".index__pick")]
+        .find((n) => n.getAttribute("aria-current") === "true");
+      const label = row && row.querySelector(".index__label");
+      return label ? label.textContent : null;
+    },
 
     problems() { return [...doc.querySelectorAll(".problems__link")].map((n) => n.textContent); },
     confirms() { return log.filter((l) => l.what === "confirm").map((l) => l.message); },
@@ -1783,6 +1871,419 @@ console.log("\nthe columns a photograph slot does not own");
   check("only the picture and the words about it",
         Object.keys(payload).sort(),
         ["alt", "height", "source_path", "storage_path", "width"]);
+}
+
+
+/* ═══ the change list ═══════════════════════════════════════════════════════
+   The savebar says how many changes are waiting; the list says which. The
+   thing worth testing is not that it renders — it is that it cannot disagree
+   with the save it is describing.
+
+   Three ways it could:
+
+     the count and the list could differ, if one walks rows and the other
+     walks fields;
+
+     an entry could point at a section that no longer exists, because the id
+     it mints and the id the panel mints are written down in two places;
+
+     "put back" could restore something the save would not have sent, if it
+     copied more than the writable columns. */
+
+console.log("\nthe change list, against the count it opens from");
+{
+  const r = await boot();
+  await r.signIn();
+
+  check("nothing to open before anything is edited",
+        r.q("#changesToggle").disabled, true);
+
+  r.tab("Words");
+  r.type(r.fieldShowing("Georgian cooking for a Manhattan morning."), "A new headline");
+  r.tab("Contact");
+  r.type(r.fieldShowing("info@aromatinyc.com"), "hello@aromatinyc.com");
+
+  check("the count says two", r.changeCount(), "2 unsaved changes");
+  check("and the button is now something to press", r.q("#changesToggle").disabled, false);
+  check("but nothing is listed until it is pressed", r.changesHidden(), true);
+
+  await r.openChanges();
+  check("pressing it opens the list", r.changesOpen(), true);
+  check("the title agrees with the count", r.changesTitle(), "The 2 changes waiting to be saved");
+  check("one entry per changed row", r.changeRows().length, 2);
+  check("in rail order — Words before Contact",
+        r.changeRows().map((c) => c.title), ["Headline", "Email address"]);
+  check("each says where it lives",
+        r.changeRows()[0].where, "Home page · The Idea");
+  check("and what it was against what it is",
+        r.changeRows()[0].lines,
+        ["Text Georgian cooking for a Manhattan morning. → A new headline"]);
+
+  check("the toggle says it is open, for anything not looking at it",
+        r.q("#changesToggle").getAttribute("aria-expanded"), "true");
+  await r.openChanges();
+  check("and pressing it again closes it", r.changesOpen(), false);
+
+  /* What closes has to be a drawer with a list in it. Emptied on the first
+     frame instead, it collapses around a hole — the height animates down from
+     a box whose contents have already gone, which reads as a bug rather than
+     as a close. It empties at the far end, with the same token that hides it. */
+  check("the entries are still there while it collapses", r.changeRows().length, 2);
+  await wait(DISCLOSURE_MS + 60);
+  check("and gone once it has", r.changeRows().length, 0);
+  check("along with the drawer itself", r.changesHidden(), true);
+}
+
+console.log("\nthe drawer's two measured facts");
+{
+  /* Neither of these is visible to a test that does not do layout, and both
+     were found by driving the transition's own currentTime in a browser and
+     reading the box back. They are here as text because the alternative is
+     nothing.
+
+     A cap the reveal animates to rather than the list: one entry is 121px
+     under a 42vh cap, so it arrives in 40ms of a 240ms transition and looks
+     like it never animated. A 0fr → 1fr row is sized by the list itself.
+
+     And a stretched inner: squeezed to the animating row, it spends the whole
+     open overflowing its own scroll box with a scrollbar out, then reflows
+     10px wider on the last frame when the bar goes. */
+  /* Every block whose selector is exactly this one, joined: the layout blocks
+     put where it sits in the shell, the component block puts how it opens, and
+     the narrow-screen block moves the cap. */
+  const body = (sel) => {
+    const re = new RegExp("(?:^|[},])\\s*\\" + sel + "\\s*\\{([^}]*)\\}", "gm");
+    return [...ADMIN_CSS.matchAll(re)].map((m) => m[1]).join(" ").replace(/\s+/g, " ");
+  };
+  const changes = body(".changes"), inner = body(".changes__inner");
+
+  check("the drawer opens on a row sized by its list",
+        /grid-template-rows:\s*0fr/.test(changes) &&
+        /transition:[^;]*grid-template-rows/.test(changes), true);
+  check("not on a cap it would reach before the transition ends",
+        /max-height/.test(changes), false);
+  check("and the inner keeps its own height while the row uncovers it",
+        /align-self:\s*start/.test(inner), true);
+}
+
+console.log("\none entry per row, not per box");
+{
+  /* A menu item with three edited boxes is one PATCH and one line in the
+     count. A list that counted boxes would say three and be describing the
+     same single write. */
+  const r = await boot();
+  await r.signIn();
+  r.tab("Menus");
+  r.section("Breakfast");
+
+  const item = r.inSomeSection(() =>
+    [...r.doc.querySelectorAll(".item")].find((n) => n.textContent.includes("Morning Plate")));
+  item.querySelector(".item__head").click();
+  await settle();
+
+  r.type(r.fieldLabelled(item, "Name"), "Morning Plate for Two");
+  r.type(r.fieldLabelled(item, "Price"), "24");
+
+  check("two boxes, one change", r.changeCount(), "1 unsaved change in Breakfast");
+  await r.openChanges();
+  check("and one entry", r.changeRows().length, 1);
+  check("with a line each inside it",
+        r.changeRows()[0].lines,
+        ["Name Morning Plate → Morning Plate for Two", "Price 21 → 24"]);
+  check("named for the section it is in",
+        r.changeRows()[0].where, "Food menu · Breakfast");
+}
+
+console.log("\nderived, not recorded");
+{
+  /* The list is rebuilt from baseline against draft every time it is drawn.
+     A log of edits would carry this one forever. */
+  const r = await boot();
+  await r.signIn();
+  r.tab("Contact");
+
+  const box = r.fieldShowing("info@aromatinyc.com");
+  r.type(box, "typo@aromatinyc.com");
+  await r.openChanges();
+  check("the typo is listed", r.changeRows().length, 1);
+
+  r.type(box, "info@aromatinyc.com");
+  check("typed back, it is not a change", r.changeCount(), "No changes yet");
+  check("the list empties with it", r.changeRows().length, 0);
+  check("and the drawer closes on its own", r.changesHidden(), true);
+  check("leaving nothing to open", r.q("#changesToggle").disabled, true);
+}
+
+console.log("\nput back");
+{
+  const r = await boot();
+  await r.signIn();
+  r.tab("Words");
+  r.type(r.fieldShowing("Georgian cooking for a Manhattan morning."), "Something else entirely");
+
+  await r.openChanges();
+  check("offered on an edited row", r.changeRows()[0].canUndo, true);
+
+  await r.undoChange("Headline");
+  check("and it puts the row back", r.changeCount(), "No changes yet");
+
+  /* The control: an editor that had merely stopped *listing* the change would
+     also satisfy the line above. This asks the save what it would write. */
+  r.tab("Words");
+  r.q("#saveBtn").click();
+  await settle();
+  check("with nothing left for the save to write", r.writes().length, 0);
+}
+
+console.log("\nput back, twice in a row");
+{
+  /* The button that was pressed is rebuilt out of existence — its entry has
+     gone, because the row no longer differs from what was saved. If focus is
+     not put somewhere, it falls to the document and correcting three things
+     in a row means three trips back with the keyboard. */
+  const r = await boot();
+  await r.signIn();
+  r.tab("Words");
+  r.type(r.fieldShowing("Georgian cooking for a Manhattan morning."), "One");
+  r.type(r.fieldShowing("Aromati, from the Georgian word for *aroma*."), "Two");
+  r.tab("Contact");
+  r.type(r.fieldShowing("info@aromatinyc.com"), "three@aromatinyc.com");
+
+  await r.openChanges();
+  check("three of them", r.changeRows().length, 3);
+
+  await r.undoChange("Headline");
+  check("one gone", r.changeRows().length, 2);
+  check("and the keyboard is still in the list, on the entry that moved up",
+        r.doc.activeElement.className, "change__undo");
+  check("which is the one that followed it",
+        r.doc.activeElement.closest(".change")
+          .querySelector(".change__title").textContent, "Opening paragraph");
+
+  /* At the end of the list there is nothing after it, so the nearest thing is
+     the one before. */
+  await r.undoChange("Email address");
+  check("and at the end it lands on the last one left",
+        r.doc.activeElement.closest(".change")
+          .querySelector(".change__title").textContent, "Opening paragraph");
+}
+
+console.log("\nthe list keeps its place while it is being typed into");
+{
+  /* The values in the list follow what is being typed, so it is rebuilt on
+     every keystroke. A rebuild that does not put the scroll back sends a
+     scrolled list to the top under the reader. */
+  const r = await boot({ data: withExtras() });
+  await r.signIn();
+
+  /* Enough entries to have somewhere to scroll to. */
+  r.tab("Words");
+  r.type(r.fieldShowing("Georgian cooking for a Manhattan morning."), "One");
+  r.type(r.fieldShowing("Aromati, from the Georgian word for *aroma*."), "Two");
+  r.tab("Contact");
+  const email = r.fieldShowing("info@aromatinyc.com");
+  r.type(email, "three@aromatinyc.com");
+
+  await r.openChanges();
+  const inner = r.q(".changes__inner");
+
+  /* Asserting on scrollTop after the rebuild proves nothing here: jsdom does
+     no layout, so emptying the list never moves it and the check passes with
+     the restore deleted. It was written that way first and a sabotage run
+     caught it. What can be asked instead is whether the rebuild puts the
+     value back — which is the actual contract, in a browser as well as here. */
+  let stored = 40;
+  const written = [];
+  Object.defineProperty(inner, "scrollTop", {
+    configurable: true,
+    get() { return stored; },
+    set(v) { written.push(v); stored = v; }
+  });
+
+  r.type(email, "four@aromatinyc.com");
+  check("a keystroke rebuilds the list and puts it back where it was",
+        written, [40]);
+}
+
+console.log("\na row with no confirmed state does not take the drawer with it");
+{
+  /* changedFields() answers "everything" for a row it has no baseline for,
+     rather than throwing. The list has to be built the same way, or one
+     impossible row is an exception thrown on every keystroke and a drawer
+     that never opens again. */
+  const r = await boot();
+  await r.signIn();
+  r.tab("Contact");
+  r.type(r.fieldShowing("info@aromatinyc.com"), "hello@aromatinyc.com");
+
+  const api = r.window.AROMATI_ADMIN._test;
+  api.forgetBaseline("site_settings", "s2");
+
+  let entries = null;
+  try { entries = api.changeEntries(); } catch (e) { entries = "threw: " + e.message; }
+  check("the list is still built", Array.isArray(entries), true);
+  check("and the row is in it", entries.filter((e) => e.id === "s2").length, 1);
+  check("with what it was reported as unknown rather than invented",
+        entries.find((e) => e.id === "s2").lines[0].was, "empty");
+
+  await r.openChanges();
+  check("and the drawer still opens", r.changesOpen(), true);
+}
+
+console.log("\nwhat put back deliberately does not cover");
+{
+  /* Reverting an edit is a copy of the baseline and cannot be anything else.
+     Un-deleting a section means restoring its items and its pours through the
+     same cascade deleteCourse walks by hand, and un-adding one means deciding
+     what happens to the rows added under it. Discard does both correctly, in
+     one step, and is the button next to this list. */
+  const r = await boot();
+  await r.signIn();
+  r.tab("Menus");
+  r.section("Breakfast");
+
+  const add = [...r.doc.querySelectorAll("button")].find((b) => b.textContent === "Add an item");
+  add.click();
+  await settle();
+
+  await r.openChanges();
+  const added = r.changeRows().find((c) => c.flag === "added");
+  check("an added row is listed and flagged", !!added, true);
+  check("with no old value to show against", added.lines, []);
+  check("and no put back on it", added.canUndo, false);
+}
+
+console.log("\na removed row keeps its name");
+{
+  const r = await boot({ data: withExtras() });
+  await r.signIn();
+  r.tab("FAQ");
+
+  const remove = [...r.doc.querySelectorAll(".btn--danger")]
+    .find((b) => b.textContent === "Delete");
+  remove.click();
+  await settle();
+
+  await r.openChanges();
+  const gone = r.changeRows()[0];
+  check("it is still listed after it leaves the editor", gone.flag, "removed");
+  check("by the words the owner would recognise", gone.title, "Do you take walk-ins?");
+  check("with nowhere to be sent, because it is not there any more", gone.canGo, false);
+  check("and no put back — Discard is the way back", gone.canUndo, false);
+}
+
+console.log("\nthe section ids the list mints are the ones the panels mint");
+{
+  /* The drift guard. locate() builds a section id per table; the six section
+     builders in part 4 build theirs independently. Nothing in the running
+     editor compares them — an entry pointing at an id no panel produces looks
+     perfectly fine and simply goes nowhere when pressed. So every row in the
+     fixture is located, and the id it produces is required to exist in its
+     panel's own list. */
+  const r = await boot({ data: withExtras() });
+  await r.signIn();
+  const api = r.window.AROMATI_ADMIN._test;
+
+  check("every table belongs to exactly one area",
+        Object.keys(api.PANEL_TABLES).reduce((all, id) => all.concat(api.PANEL_TABLES[id]), []).sort(),
+        api.TABLES.slice().sort());
+
+  const orphans = [];
+  let located = 0;
+  for (const table of api.TABLES) {
+    for (const row of r.data[table]) {
+      const at = api.locate(table, row.id);
+      if (!at) { orphans.push(`${table}:${row.id} — not located at all`); continue; }
+      located++;
+      /* The menu index lists one page at a time, so its sections have to be
+         asked for with that page showing — which is the same thing goToChange
+         does before it selects one. */
+      if (at.page) api.setMenuPage(at.page);
+      if (api.sectionIds(at.tab).indexOf(at.section) < 0) {
+        orphans.push(`${table}:${row.id} → ${at.section} is in no ${at.tab} section`);
+      }
+    }
+  }
+  check("every row in the fixture was located", located > 0 && orphans.length === 0, true);
+  check("with none pointing at a section that does not exist", orphans, []);
+
+  check("and every writable column has a word for it",
+        api.TABLES.filter((t) =>
+          api.WRITABLE[t].some((c) => !(api.COL_LABELS[t] && api.COL_LABELS[t][c]))), []);
+}
+
+console.log("\ngoing to a change on a menu page that is not showing");
+{
+  /* The menus are the one area whose index lists a slice of itself. An entry
+     for a wine that is edited, left, and returned to from the Food page has to
+     take its page with it — otherwise the section id is not in the list,
+     currentSection() falls back to the first course of whatever page happened
+     to be showing, and the owner arrives somewhere else entirely. */
+  const r = await boot();
+  await r.signIn();
+  r.tab("Menus");
+
+  await r.menuPageTo("Drinks");
+  r.section("Coffee & Espresso");
+  const heading = r.fieldShowing("Coffee & Espresso");
+  r.type(heading, "Coffee, Espresso & Tea");
+
+  await r.menuPageTo("Food");
+  check("standing on another page", r.menuPage(), "Food");
+
+  await r.openChanges();
+  await r.goToChange("Coffee, Espresso & Tea");
+
+  check("pressing it changes the page too", r.menuPage(), "Drinks");
+  check("and lands on the section that was edited",
+        r.openSection(), "Coffee, Espresso & Tea");
+  check("with the list collapsing behind it", r.changesOpen(), false);
+
+  /* And gone from the page once it has finished collapsing — not merely
+     flat. A drawer left at zero height is a row of buttons the tab key still
+     walks through, under a savebar that looks like the end of the page. */
+  await wait(DISCLOSURE_MS + 60);
+  check("and out of the way entirely once it has", r.changesHidden(), true);
+}
+
+console.log("\nwhat the owner typed, as text");
+{
+  /* The one security rule, at the newest sink in the file. The whole-file scan
+     above would catch an innerHTML; this catches the other half — that a value
+     with markup in it arrives as characters rather than as elements. */
+  const r = await boot();
+  await r.signIn();
+  r.tab("Words");
+  r.type(r.fieldShowing("Georgian cooking for a Manhattan morning."),
+         "<img src=x onerror=alert(1)>");
+
+  await r.openChanges();
+  const now = r.doc.querySelector(".change__now");
+  check("it is shown", now.textContent, "<img src=x onerror=alert(1)>");
+  check("and it is text, not a tag", now.querySelectorAll("*").length, 0);
+  check("nothing was built out of it", r.doc.querySelectorAll("#changes img").length, 0);
+}
+
+console.log("\nlong values are cut rather than wrapped four times");
+{
+  const r = await boot();
+  const api = r.window.AROMATI_ADMIN._test;
+  const long = "x".repeat(200);
+
+  check("a long line is trimmed with an ellipsis",
+        api.describeValue("site_copy", "value", long).length, 64);
+  check("a short one is left exactly alone",
+        api.describeValue("site_copy", "value", "Two words"), "Two words");
+  check("nothing there reads as nothing, not as empty quotes",
+        api.describeValue("site_copy", "value", null), "empty");
+  check("a flag reads as a word", api.describeValue("menu_items", "is_hidden", true), "yes");
+  check("a time drops the seconds the database keeps",
+        api.describeValue("business_hours", "opens_at", "07:00:00"), "07:00");
+  check("prices per size read the way the board does",
+        api.describeValue("menu_items", "prices", ["4", "5"]), "4 / 5");
+  check("and a storage path is described rather than printed",
+        api.describeValue("photos", "storage_path", "hero/2026-08-05-abc.webp"),
+        "a photograph you uploaded");
 }
 
 

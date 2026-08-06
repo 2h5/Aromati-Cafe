@@ -201,21 +201,24 @@ button{ font-family: inherit; }
 
 /* ── the three panes ─────────────────────────── */
 
-/* The rail and the index run the full height. The editor, the problems list
-   and the savebar stack down the third column, so the savebar is the foot of
-   the editor's column rather than a child of the editor — which is what lets
-   it survive the index and the editor taking turns on a narrow screen. */
+/* The rail and the index run the full height. The editor, the problems list,
+   the change list and the savebar stack down the third column, so the savebar
+   is the foot of the editor's column rather than a child of the editor — which
+   is what lets it survive the index and the editor taking turns on a narrow
+   screen. The change list is directly above the savebar because the count that
+   opens it lives on the savebar. */
 .shell{
   min-height: 0;
   display: grid;
   grid-template-columns: var(--rail) var(--index) minmax(0, 1fr);
-  grid-template-rows: minmax(0, 1fr) auto auto;
+  grid-template-rows: minmax(0, 1fr) auto auto auto;
 }
 .rail{ grid-column: 1; grid-row: 1 / -1; }
 .index{ grid-column: 2; grid-row: 1 / -1; }
 .editor{ grid-column: 3; grid-row: 1; }
 .problems{ grid-column: 3; grid-row: 2; }
-.savebar{ grid-column: 3; grid-row: 3; }
+.changes{ grid-column: 3; grid-row: 3; }
+.savebar{ grid-column: 3; grid-row: 4; }
 
 /* ── the rail ────────────────────────────────── */
 
@@ -817,7 +820,32 @@ button{ font-family: inherit; }
   border-radius: 50%; background: var(--gold);
   transition: background-color 220ms ease;
 }
-.savebar__count{ font-size: 13px; color: var(--ink); }
+/* The count is a button, and looks like the text it replaced until there is
+   something to open — then it takes a caret and a pointer. Disabled rather
+   than swapped for a span, so the bar never reflows as the last edit is
+   undone. */
+.savebar__count{
+  appearance: none; border: 0; background: none; padding: 0;
+  display: inline-flex; align-items: center; gap: 6px;
+  font: inherit; font-size: 13px; color: var(--ink);
+  cursor: pointer; text-align: left;
+}
+.savebar__count:disabled{ cursor: default; }
+.savebar__count:focus-visible{
+  outline: 2px solid var(--gold); outline-offset: 3px; border-radius: 4px;
+}
+/* Drawn rather than typed: a glyph would need a font that has it, and this one
+   has to point up — the list opens above the bar, not below it. */
+.savebar__caret{
+  width: 0; height: 0; flex: 0 0 auto;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-bottom: 5px solid currentColor;
+  opacity: .55;
+  transition: transform 240ms var(--ease), opacity 220ms ease;
+}
+.savebar__count:disabled .savebar__caret{ opacity: 0; }
+.savebar__count[aria-expanded="true"] .savebar__caret{ transform: rotate(180deg); opacity: .9; }
 .savebar__spacer{ flex: 1 1 auto; }
 .savebar--busy{ opacity: .75; }
 .savebar--leaving .savebar__count{ opacity: .6; }
@@ -839,6 +867,108 @@ button{ font-family: inherit; }
   appearance: none; border: 0; background: none; cursor: pointer; padding: 0;
   font: inherit; color: var(--danger); text-decoration: underline;
   text-align: left;
+}
+
+/* ── what changed ────────────────────────────── */
+
+/* It opens on the same 0fr→1fr grid row the menu item bodies and the time
+   picker use, and for the same reason: the row is sized by the list, so both
+   directions animate the whole way whether there is one change in it or forty.
+   An earlier version of this ran on max-height, which animates to the cap
+   rather than to the content — a one-entry drawer reached its full 121px in
+   40ms of a 240ms transition and looked like it had simply appeared.
+
+   `align-self: start` is load-bearing. Stretched — the default — the inner is
+   squeezed to the animating row, so it spends the whole open overflowing its
+   own scroll box with a scrollbar out, and the text reflows 10px wider on the
+   last frame when the bar goes. Anchored to the start it keeps its height and
+   the row uncovers it.
+
+   The cap lives on the inner alone now, so there is one number here rather
+   than a pair that had to be kept equal. */
+.changes{
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-rows: 0fr;
+  overflow: hidden;
+  background: var(--card);
+  border-top: 1px solid var(--line);
+  transition: grid-template-rows 240ms var(--ease);
+}
+.changes[hidden]{ display: none; }
+.changes.is-open{ grid-template-rows: 1fr; }
+.changes__inner{
+  align-self: start;
+  max-height: 42vh; overflow-y: auto;
+  scrollbar-width: thin;
+}
+.changes__title{
+  margin: 0;
+  padding: 14px max(26px, env(safe-area-inset-right)) 8px 26px;
+  font-size: 12px; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.changes__list{
+  margin: 0;
+  padding: 0 max(26px, env(safe-area-inset-right)) 14px 26px;
+  list-style: none;
+}
+
+.change{
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+.change:first-child{ border-top: 0; }
+.change__head{ display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.change__where{
+  flex: 0 0 auto;
+  font-size: 11px; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.change__title{
+  appearance: none; border: 0; background: none; padding: 0;
+  font: inherit; font-size: 13px; font-weight: 500; color: var(--ink);
+  text-align: left; cursor: pointer;
+  border-bottom: 1px solid var(--line-input);
+}
+.change__title:hover{ border-bottom-color: var(--gold); }
+.change__title:focus-visible{
+  outline: 2px solid var(--gold); outline-offset: 2px; border-radius: 3px;
+}
+/* A row whose section is not reachable — everything on a removed one — says
+   the same words without pretending to be pressable. */
+.change__title--flat{ font-size: 13px; font-weight: 500; color: var(--ink); }
+.change__flag{
+  flex: 0 0 auto;
+  padding: 1px 7px; border-radius: 999px;
+  border: 1px solid var(--line);
+  font: 600 10px/1.6 var(--sans); letter-spacing: .06em; text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.change__flag--removed{ color: var(--danger); border-color: #eccec7; }
+.change__spacer{ flex: 1 1 auto; }
+.change__undo{
+  appearance: none; border: 1px solid var(--line-input); background: var(--field);
+  padding: 2px 9px; border-radius: 999px;
+  font: 500 11px/1.7 var(--sans); color: var(--ink-soft);
+  cursor: pointer;
+  transition: border-color 160ms ease, color 160ms ease;
+}
+.change__undo:hover{ border-color: var(--gold); color: var(--ink); }
+.change__undo:focus-visible{ outline: 2px solid var(--gold); outline-offset: 2px; }
+
+.change__lines{ margin: 4px 0 0; padding: 0; list-style: none; }
+.change__line{
+  display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap;
+  font-size: 12px; line-height: 1.7; color: var(--ink-soft);
+}
+.change__col{ color: var(--ink-faint); }
+.change__was{ text-decoration: line-through; color: var(--ink-faint); }
+.change__arrow{ color: var(--ink-faint); }
+.change__now{ color: var(--ink); }
+.change__plain{ color: var(--ink-soft); font-style: italic; }
+.change__note{
+  margin: 6px 0 0; font-size: 12px; line-height: 1.6; color: var(--ink-faint);
 }
 
 /* ── the menu index controls ─────────────────── */
@@ -1168,12 +1298,13 @@ body.is-framing{ overflow: hidden; }
      the first row across, and everything else moves down one. */
   .shell{
     grid-template-columns: var(--index) minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr) auto auto;
+    grid-template-rows: auto minmax(0, 1fr) auto auto auto;
   }
   .index{ grid-column: 1; grid-row: 2 / -1; }
   .editor{ grid-column: 2; grid-row: 2; }
   .problems{ grid-column: 2; grid-row: 3; }
-  .savebar{ grid-column: 2; grid-row: 4; }
+  .changes{ grid-column: 2; grid-row: 4; }
+  .savebar{ grid-column: 2; grid-row: 5; }
   .rail{
     grid-column: 1 / -1; grid-row: 1;
     flex-direction: row; align-items: center; gap: 14px;
@@ -1198,7 +1329,8 @@ body.is-framing{ overflow: hidden; }
   .shell{ grid-template-columns: minmax(0, 1fr); }
   .index, .editor{ grid-column: 1; grid-row: 2; }
   .problems{ grid-column: 1; grid-row: 3; }
-  .savebar{ grid-column: 1; grid-row: 4; }
+  .changes{ grid-column: 1; grid-row: 4; }
+  .savebar{ grid-column: 1; grid-row: 5; }
   .index{ border-right: 0; }
   .shell .index{ display: flex; }
   .shell .editor{ display: none; }
@@ -1209,6 +1341,9 @@ body.is-framing{ overflow: hidden; }
   .editor__scroll{ padding: 22px max(16px, env(safe-area-inset-right)) 32px 16px; }
   .editor__title{ font-size: 27px; }
   .savebar, .problems{ padding-left: 16px; padding-right: 16px; }
+  .changes__title, .changes__list{ padding-left: 16px; padding-right: 16px; }
+  /* Less of a short screen given over to the list. */
+  .changes__inner{ max-height: 38vh; }
   .index__head{ padding: 14px 14px 12px; }
 
   /* iOS Safari zooms controls smaller than 16px when they receive focus. */
@@ -1268,4 +1403,8 @@ body.is-framing{ overflow: hidden; }
   .tpick__opt{ transition: none; }
   .tpick__opt--on{ animation: none; }
   .index__row, .savebar{ transition: none; }
+  /* The drawer still opens; it just arrives at its height. The caret still
+     turns over, because which way it points is information rather than
+     decoration. */
+  .changes, .savebar__caret{ transition: none; }
 }
