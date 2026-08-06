@@ -1727,7 +1727,330 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
 .mboard > *{ position:relative; z-index:1; }
 /* no title block above the tabs on a menu page — the masthead is the title */
 .page-menu .carte__masthead{ margin-bottom:0; }
-.page-menu .carte__tabs{ border-top:1px solid var(--hairline-lt); padding-top:clamp(24px,3vw,38px); }
+
+/* ═══════════ THE PRINTED MENU ═══════════
+   Everything below re-skins the board on the three menu pages to Aromati's
+   real printed carte: blush paper, burgundy rules, vermilion display caps.
+
+   ── why it is an override block and not an edit to the rules above ──
+   .mboard, .carte and .course are shared with faq.html, which is still the
+   dark page it always was. Every selector here is therefore prefixed with
+   .page-menu — the class that menu-food, menu-drinks and menu-wine carry and
+   faq.html (.page-doc) does not. Nothing above this comment changed, so the
+   dark treatment is still exactly one class away if a page ever wants it.
+
+   ── where the numbers come from ──
+   The three inks are sampled off the supplied PDFs rather than eyeballed:
+   #f8f0f0 paper, #702030 burgundy and #c03030 vermilion are the top three
+   buckets on both the A3 food sheet and the A5 coffee sheet. They are nudged
+   a few points here for contrast on a backlit screen, not for taste.
+
+   ── the two ornaments ──
+   Both are inline SVG data: URIs, which img-src 'self' data: already allows
+   (see _headers) and which cost no request and no dependency.
+
+   The frame is a nine-slice border-image: the four corner cells carry the
+   sweeping arc that cuts the corner off a squared inner rule, and the four
+   edge cells are two straight parallel lines that stretch to any length. A
+   background-image could not do this — background-size:100% 100% on a tall
+   card would flatten the corner arcs into ellipses.
+
+   The divider is a fixed-size ornament sitting on a full-width rule drawn as
+   a second background layer, so the rule runs the width of the course and the
+   flourish stays the same size whatever that width is. Both layers are
+   positioned against the pseudo-element's own fixed height, which is what
+   keeps the rule passing cleanly through the middle of the two diamonds. */
+.page-menu{
+  --m-paper:     #faf2f1;   /* the card */
+  --m-blush:     #f2e2e0;   /* the table it lies on */
+  --m-wine:      #732334;   /* rules, item names, frame */
+  --m-red:       #c43331;   /* display caps and prices */
+  --m-ink-soft:  #8a4550;   /* descriptions — 5.9:1 on the paper */
+  --m-rule:      rgba(115,35,52,.30);
+  --m-rule-soft: rgba(115,35,52,.15);
+  /* The band the frame is drawn into. border-image ties the corner art to the
+     border width, so this number *is* the size of the corner scoop — at 34px
+     the geometry was too small to read and the card looked merely rounded. */
+  --m-frame:     clamp(26px,5.2vw,62px);
+}
+.page-menu .mboard{
+  background:var(--m-blush); color:var(--m-wine);
+  padding-inline:var(--pad);
+}
+/* the gold bloom belonged to the dark board; on paper it reads as a stain */
+.page-menu .mboard::before{
+  background:radial-gradient(circle, rgba(255,255,255,.55), transparent 66%);
+}
+
+/* ── the card ─────────────────────────────── */
+.page-menu .carte{
+  position:relative;
+  max-width:1180px;
+  /* The frame is drawn by ::before rather than by this element's own border,
+     so that it can be clipped and drawn on (see the animation below). The
+     border width therefore has to be paid for here instead — the card's own
+     padding only adds breathing room past the inner rule. */
+  padding:calc(var(--m-frame) + clamp(10px,1.4vw,22px));
+  background:var(--m-paper);
+  box-shadow:0 1px 2px rgba(115,35,52,.06), 0 14px 38px rgba(115,35,52,.10);
+}
+/* inset:0 lands on the card's padding box, and with no border of its own that
+   is the full card — so the band sits exactly where the border used to */
+.page-menu .carte::before{
+  content:""; position:absolute; inset:0; pointer-events:none;
+  border:var(--m-frame) solid transparent;
+  /* width/height are load-bearing, not decoration: border-image-slice counts
+     in the image's own pixels, and an SVG with only a viewBox has no intrinsic
+     size for it to count against — the corners then resolve against the
+     browser's 300x150 default and the arcs stretch right across the card.
+
+     The corner is the printed menu's, measured off the A5 sheet: the outer
+     rule does not turn a corner at all, it is *scooped* away by a quarter-arc
+     centred on the corner point itself, radius roughly three times the gap
+     between the two rules (25 / 38 / r40 here, against 22 / 34 / r35 in
+     points on the original). The inner rule keeps its square corner and is
+     left standing proud inside the scoop, with the arc crossing it — the two
+     small breaks at 60.8 and 64.8 are that crossing, drawn as a weave.
+     Curving the arc the other way is what makes it read as a rounded card. */
+  border-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 200 200'%3E%3Cg fill='none' stroke='%23732334' stroke-width='2.8'%3E%3Cpath d='M25 70V65A40 40 0 0 0 65 25H70'/%3E%3Cpath d='M38 70V64.8M38 60.8V38h22.8M64.8 38H70'/%3E%3Cpath d='M175 70V65A40 40 0 0 1 135 25H130'/%3E%3Cpath d='M162 70V64.8M162 60.8V38h-22.8M135.2 38H130'/%3E%3Cpath d='M25 130v5a40 40 0 0 1 40 40h5'/%3E%3Cpath d='M38 130v5.2M38 139.2V162h22.8M64.8 162H70'/%3E%3Cpath d='M175 130v5a40 40 0 0 0-40 40h-5'/%3E%3Cpath d='M162 130v5.2M162 139.2V162h-22.8M135.2 162H130'/%3E%3Cpath d='M70 25h60M70 38h60M70 175h60M70 162h60'/%3E%3Cpath d='M25 70v60M38 70v60M175 70v60M162 70v60'/%3E%3C/g%3E%3C/svg%3E") 70 / var(--m-frame) stretch;
+  animation:carte-frame 1.5s var(--ease) .25s both;
+}
+/* The frame draws itself on once, on load — the card's top edge is on screen
+   at load on every size checked, so it is seen without being tied to the
+   scroll. Deliberately NOT a reveal: the observer choreography in script.js
+   drives the courses, and hanging the frame off it would redraw the border
+   every time a filter re-runs the cascade, and would animate it under the
+   reader's thumb on the way down the page.
+
+   One clip rectangle does the whole thing. It starts as a zero-width sliver at
+   the top centre; the first beat opens it left and right while it drops a
+   little, so the top rule draws outward from the middle and the two sides
+   start down together; the second carries it to the bottom. Clipping a
+   pseudo-element rather than .carte itself keeps the menu text unclipped and
+   leaves the card's shadow alone. */
+@keyframes carte-frame{
+  from{ clip-path:inset(0 50% 100% 50%); }
+  42%{ clip-path:inset(0 0 58% 0); }
+  to{ clip-path:inset(0 0 0 0); }
+}
+
+/* ── course tabs ──────────────────────────── */
+/* No rule above them: they sit just inside the frame, and a second line that
+   close to it reads as a mistake rather than a divider. */
+.page-menu .carte__tabs{
+  border-top:none; padding-top:0;
+  border-bottom:1px solid var(--m-rule);
+}
+.page-menu .ctab{
+  color:var(--m-wine); border-color:var(--m-rule);
+}
+.page-menu .ctab::before{ background:var(--m-wine); }
+.page-menu .ctab:hover{ border-color:var(--m-wine); color:var(--m-red); }
+.page-menu .ctab.is-on{ color:var(--m-paper); border-color:var(--m-wine); }
+.page-menu .ctab:focus-visible{ outline:2px solid var(--m-red); outline-offset:3px; }
+
+/* ── course headings ──────────────────────── */
+/* Centred, because the flourish underneath has to hang from a centre and the
+   printed sheet centres every one of them.
+
+   The composition is three things in a fixed relationship, and the spacing is
+   what makes it read as printed rather than as a web heading: the title sits
+   TIGHT to its divider so the two are one object, then a wide gap, then the
+   lines. The count is the one element the printed sheet has no equivalent for
+   — script.js still writes it, so it stays, but it is ordered last and kept
+   quiet enough that it annotates the block instead of splitting it. */
+.page-menu .course__head{
+  display:flex; flex-direction:column; align-items:center; gap:0;
+  text-align:center;
+  border-bottom:none; padding-bottom:0;
+  margin-bottom:clamp(26px,3.2vw,42px);
+}
+.page-menu .course__head h2,
+.page-menu .course__head h4{
+  /* Fraunces at the top of its optical-size axis is the display cut: high
+     contrast, ball terminals, the vintage slab feel of the printed titles.
+     600 is the ceiling the @font-face declares, so nothing is synthesised. */
+  font-variation-settings:'opsz' 144;
+  font-weight:600;
+  font-size:clamp(25px,3vw,40px);
+  letter-spacing:.075em; text-transform:uppercase;
+  color:var(--m-red);
+  line-height:1.1;
+  text-wrap:balance;
+}
+/* The divider, drawn as the printed sheet draws it: two hollow diamonds with
+   a crossed double-scroll between them, sitting on a rule that runs the full
+   width of the course.
+
+   The ornament is fixed-size art and the rule is elastic, so they are separate
+   layers — and because the diamonds are hollow the rule cannot simply run
+   underneath, it has to stop at each diamond's outer vertex and start again
+   after it. Those two stops are the calc()s below: the ornament's width is its
+   height times its aspect (76/20), and its outer vertices sit at 11.45% and
+   88.55% across it, so each rule segment is half the course minus 38.55% of
+   the ornament. All of it keys off --orn-h, so changing the size at a
+   breakpoint keeps the rule and the diamonds in register. */
+.page-menu .course__head::after{
+  content:""; order:2;
+  --orn-h:34px;
+  --orn-w:calc(var(--orn-h) * 3.8);
+  /* The rule is drawn only by the two gradients — the ornament deliberately
+     carries no stub of its own. Both were tried, matched to the same 1.785px
+     at the same offset, and the join still showed a step: a stroke rasterised
+     out of a scaled SVG and a crisp gradient rectangle do not land on the same
+     pixels. One renderer owns the line instead, and the segments run 1px past
+     each diamond's outer vertex so the tip covers the join.
+
+     The weight and offset still come from the SVG's own numbers so the rule
+     matches the ornament's stroke: 1.05 of 20 units thick (5.25%) centred at
+     5 of 20 (25%), hence 5.25% tall starting half a weight above that. */
+  --orn-seg:calc(50% - var(--orn-w) * .38816 + 1px);
+  --orn-rule-w:calc(var(--orn-h) * .0525);
+  --orn-rule:calc(var(--orn-h) * .19875);
+  display:block; width:100%; height:var(--orn-h); margin-top:clamp(6px,.7vw,10px);
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='76' height='20' viewBox='0 0 76 20'%3E%3Cg fill='none' stroke='%23732334' stroke-width='1.05' stroke-linecap='round'%3E%3Cpath d='M12.2 .2 15.9 4.5 12.2 8.8 8.5 4.5Z'/%3E%3Cpath d='M63.8 .2 67.5 4.5 63.8 8.8 60.1 4.5Z'/%3E%3Cpath d='M15.9 4.5C24 4.9 31 6.2 38 7.2C43 8 48 8.8 50.8 10.4C53.6 12.1 53.4 14.6 50 15.1C46 15.7 41.6 13.6 39.4 10.8C38.6 9.8 38.4 11 38.8 12.2C39.8 14.2 41.8 15.2 42.8 16.4C43.9 17.9 42.5 19.4 41.1 18.5C40 17.8 40.7 16.5 41.9 17'/%3E%3Cpath d='M60.1 4.5C52 4.9 45 6.2 38 7.2C33 8 28 8.8 25.2 10.4C22.4 12.1 22.6 14.6 26 15.1C30 15.7 34.4 13.6 36.6 10.8C37.4 9.8 37.6 11 37.2 12.2C36.2 14.2 34.2 15.2 33.2 16.4C32.1 17.9 33.5 19.4 34.9 18.5C36 17.8 35.3 16.5 34.1 17'/%3E%3C/g%3E%3C/svg%3E") center top / auto var(--orn-h) no-repeat,
+    linear-gradient(var(--m-wine),var(--m-wine)) left var(--orn-rule) / var(--orn-seg) var(--orn-rule-w) no-repeat,
+    linear-gradient(var(--m-wine),var(--m-wine)) right var(--orn-rule) / var(--orn-seg) var(--orn-rule-w) no-repeat;
+}
+.page-menu .course__count{
+  order:3; margin:clamp(9px,1.1vw,13px) 0 0;
+  font-family:var(--serif); font-style:italic; font-size:11.5px;
+  letter-spacing:.04em;
+  color:var(--m-ink-soft); opacity:.6;
+}
+.page-menu .course__count::before{ content:"("; margin-right:.25em; }
+.page-menu .course__count::after{ content:")"; margin-left:.25em; }
+/* script.js writes the tally only when a course has lines, so a course the
+   owner has emptied leaves the element in place with nothing in it — without
+   this the brackets above would render on their own as a stray "()". */
+.page-menu .course__count:empty{ display:none; }
+/* the heading wipes open from its own centre now that it has one */
+.page-menu .course__head{ clip-path:inset(0 50% 0 50%); }
+.page-menu .course.in .course__head{ clip-path:inset(0 0 0 0); }
+
+/* ── a menu line ──────────────────────────── */
+.page-menu .mi{ border-bottom:1px solid var(--m-rule-soft); }
+.page-menu .mi__row h3,
+.page-menu .mi__row h5{
+  font-weight:500; letter-spacing:.03em;
+  color:var(--m-wine);
+}
+/* the printed sheet leads with dashes, not dots */
+.page-menu .mi__leader{
+  background-image:repeating-linear-gradient(to right,
+    var(--m-rule) 0 5px, transparent 5px 10px);
+  background-size:auto; opacity:1; transform:translateY(-4px);
+}
+.page-menu .mi__price,
+.page-menu .mi__cell{ color:var(--m-wine); font-weight:600; }
+.page-menu .mi__desc{
+  font-family:var(--serif); font-style:italic; font-weight:400;
+  font-size:13.8px; color:var(--m-ink-soft); opacity:1;
+}
+.page-menu .mi:hover h3,
+.page-menu .mi:hover h5{ color:var(--m-red); }
+.page-menu .mi__tag{
+  color:var(--m-red); border-color:var(--m-rule); opacity:1;
+}
+
+/* An item with nothing but a name and a price gets the printed food sheet's
+   treatment instead: the price above the name, flanked by two short rules.
+   It is the one layout on the sheet a leader line cannot carry, and it only
+   ever lands on the handful of lines short enough to want it — anything with
+   a description, a pour list or a size grid keeps the leader row.
+   :has() is doing the selecting so that render.js and the CMS know nothing
+   about it: the shape of the item decides, and an owner adding a description
+   later moves the line back to a leader row on its own. */
+.page-menu .mi:has(.mi__price):not(:has(:is(.mi__desc,.mi__pours,.mi__opts))) .mi__row{
+  flex-direction:column; align-items:center; gap:5px; text-align:center;
+}
+.page-menu .mi:has(.mi__price):not(:has(:is(.mi__desc,.mi__pours,.mi__opts))) .mi__leader{
+  display:none;
+}
+.page-menu .mi:has(.mi__price):not(:has(:is(.mi__desc,.mi__pours,.mi__opts))) .mi__row h3{
+  order:2;
+}
+.page-menu .mi:has(.mi__price):not(:has(:is(.mi__desc,.mi__pours,.mi__opts))) .mi__price{
+  order:1;
+  padding-inline:2.6em;
+  background:
+    linear-gradient(var(--m-wine),var(--m-wine)) left center / 1.6em 1.2px no-repeat,
+    linear-gradient(var(--m-wine),var(--m-wine)) right center / 1.6em 1.2px no-repeat;
+}
+
+/* ── priced by size ───────────────────────── */
+.page-menu .course__sizes span{ color:var(--m-wine); opacity:.75; }
+
+/* ── pours, options ───────────────────────── */
+.page-menu .mi__pours li{ border-left-color:var(--m-rule); }
+.page-menu .mi__pours span{ color:var(--m-ink-soft); opacity:1; }
+.page-menu .mi__pours b,
+.page-menu .mi__opts li b{ color:var(--m-wine); opacity:1; }
+.page-menu .mi__opts li{ border-bottom-color:var(--m-rule-soft); }
+.page-menu .mi__opts li span{ color:var(--m-ink-soft); opacity:1; }
+.page-menu .mi__toggle::before,
+.page-menu .mi__toggle::after{ background:var(--m-wine); }
+.page-menu .mi__toggle:focus-visible{ outline-color:var(--m-red); }
+
+/* ── build your own ───────────────────────── */
+/* The builder is inside the card, so it changes with it. Its behaviour is
+   untouched — this is colour only. */
+.page-menu .build__label{ color:var(--m-red); opacity:1; }
+.page-menu .chip{
+  color:var(--m-wine); border-color:var(--m-rule);
+}
+.page-menu .chip::before{ background:rgba(115,35,52,.10); }
+.page-menu .chip:hover{ border-color:var(--m-wine); }
+.page-menu .chip:focus-visible{ outline:2px solid var(--m-red); outline-offset:3px; }
+.page-menu .chip.is-on{ border-color:var(--m-wine); color:var(--m-red); }
+.page-menu .chip em{ color:var(--m-ink-soft); opacity:1; }
+.page-menu .build__hint,
+.page-menu .build__note{ color:var(--m-ink-soft); opacity:1; }
+.page-menu .build__ticket{
+  border-color:var(--m-rule);
+  background:rgba(255,255,255,.5);
+}
+.page-menu .build__ticketlabel{
+  color:var(--m-red); border-bottom-color:var(--m-rule);
+}
+.page-menu .build__lines li span{ color:var(--m-ink-soft); opacity:1; }
+.page-menu .build__lines li b{ color:var(--m-wine); opacity:1; }
+.page-menu .build__lines li.is-base span{ color:var(--m-wine); }
+.page-menu .build__sum{ border-top-color:var(--m-rule); }
+.page-menu .build__sum span{ color:var(--m-ink-soft); opacity:1; }
+.page-menu .build__sum strong{ color:var(--m-red); }
+.page-menu .build__reset{ color:var(--m-wine); opacity:.7; }
+.page-menu .build__reset:hover{ opacity:1; border-bottom-color:var(--m-rule); }
+
+/* ── the foot of the card ─────────────────── */
+.page-menu .carte__foot{ border-top-color:var(--m-rule); }
+.page-menu .carte__foot p{ color:var(--m-wine); opacity:1; }
+.page-menu .carte__foot .btn--ghostlight{
+  border-color:var(--m-wine); color:var(--m-wine);
+}
+.page-menu .carte__foot .btn--ghostlight::before{ background:var(--m-wine); }
+.page-menu .carte__foot .btn--ghostlight:hover{ color:var(--m-paper); }
+.page-menu .carte__foot .btn--ghostlight:focus-visible{
+  outline:2px solid var(--m-red); outline-offset:3px;
+}
+
+/* ── the card on a phone ──────────────────── */
+/* The frame and the card padding are the only things that have to give: at
+   375px they were eating 80px of the 335px the card gets, and a menu is the
+   one page where the line length is the product. Everything else — the single
+   column, the scrolling tab strip, the full-width descriptions — is already
+   handled by the shared breakpoints further down this file. */
+@media (max-width: 560px){
+  .page-menu .carte{ padding:calc(var(--m-frame) + 10px); }
+  .page-menu .course__head h2,
+  .page-menu .course__head h4{ letter-spacing:.05em; }
+  /* The flourish is fixed-width art: give it less room to dominate a narrow
+     course and let the rule either side of it carry more of the width. Only
+     --orn-h moves — the segment widths and the rule offset are derived from
+     it, so the diamonds and the rule stay in register on their own. */
+  .page-menu .course__head::after{ --orn-h:26px; }
+}
 
 /* ═══════════ FAQ ═══════════
    faq.html. Native <details>, so the accordion is keyboard- and
@@ -2242,6 +2565,10 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
     animation-delay:0s !important;
     --lift-delay:0s;
   }
+  /* The blanket rule at the top of this block collapses the duration but not
+     the delay, so without this the menu card would sit with no border at all
+     for a quarter of a second and then snap one on. */
+  .page-menu .carte::before{ animation-delay:0s !important; }
   /* the reel stops drifting and becomes an ordinary swipeable strip */
   .reel__track{ animation:none !important; }
   .reel__viewport{ overflow-x:auto; scrollbar-width:none; }
