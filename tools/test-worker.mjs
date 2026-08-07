@@ -147,6 +147,39 @@ console.log("\nit cannot take the site down\n");
         flat.includes("context.waitUntil(inflight)"), true);
 }
 
+console.log("\nit never hands back a validator it cannot honour\n");
+{
+  /* This one was live, and it restored the entire blink for returning visitors
+     while every other check here passed.
+
+     Cloudflare's ETag describes the file on disk. The middleware's output
+     depends on the photos table as well, so the two disagree the moment the
+     owner uploads anything — and a browser holding the old ETag is answered
+     304 and shown the page it already had, naming the previous photograph.
+
+     A first visit is unaffected, which is what makes it invisible: it can only
+     be reproduced by someone who loaded the page before the upload. */
+  const flat = mw.replace(/\s+/g, " ");
+  check("the asset server is never asked a conditional question for a page this rewrites",
+        /headers\.delete\("if-none-match"\)/.test(flat) &&
+        /headers\.delete\("if-modified-since"\)/.test(flat), true);
+  check("and the stripped request is the one passed to next()",
+        /next\(unconditional\(request\)\)/.test(flat), true);
+  check("the page's own ETag is dropped before it goes out",
+        /response\.headers\.delete\("ETag"\)/.test(flat), true);
+  check("and so is Last-Modified, which answers the same question",
+        /response\.headers\.delete\("Last-Modified"\)/.test(flat), true);
+
+  /* Order matters and is easy to lose in a tidy-up: the drop has to happen
+     before the early return for a database that answered with nothing, or the
+     "no photographs" page is cached under the file's ETag and served to
+     everyone after the first upload. */
+  const dropAt = mw.indexOf('response.headers.delete("ETag")');
+  const bailAt = mw.indexOf("if (!map || !map.size) return response;");
+  check("dropped before the no-photographs early return, not after",
+        dropAt > 0 && bailAt > 0 && dropAt < bailAt, true);
+}
+
 console.log("\nand the build tells it what it already put in the pages\n");
 {
   const bake = readFileSync("tools/bake-photos.mjs", "utf8");

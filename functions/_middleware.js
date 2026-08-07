@@ -151,12 +151,51 @@ function publicUrl(path) {
     String(path).split("/").map(encodeURIComponent).join("/");
 }
 
+/* ── why the validators have to go ─────────────────────────────────────────────
+   Found in production, and it put the whole blink back for exactly the people
+   who had seen the site before.
+
+   Cloudflare builds the ETag from the static file on disk. That file does not
+   change when the owner uploads a photograph — only what this rewrites into it
+   does. So the body varies and its ETag does not, which is the one thing an
+   ETag is a promise about.
+
+   A returning browser sends If-None-Match, the asset server compares it to the
+   unchanged file, and answers 304 with no body. The browser reuses the HTML it
+   already had, naming the *previous* photograph, and render.js swaps it a
+   moment later. The visitor watches the picture change — the precise failure
+   this file was written to end, reintroduced by a header.
+
+   A first visit was always correct, which is what made it invisible: it only
+   happens to someone who has been here before.
+
+   Two halves, and both are needed. Stripping the request's validators stops
+   the asset server producing a 304 from a comparison that cannot be right.
+   Dropping the response's validators stops the browser storing a new one, so
+   a visitor already holding the stale ETag heals on their next request rather
+   than one blink later.
+
+   The cost is that these pages revalidate with a full body instead of a 304 —
+   a few kB on six small pages, already sent on every visit because the
+   Cache-Control is max-age=0, must-revalidate. The photographs, the stylesheet
+   and the scripts are untouched by any of this: _routes.json means this code
+   never runs for them, and they keep their validators and their long cache
+   lives. */
+function unconditional(request) {
+  if (!request.headers.has("if-none-match") &&
+      !request.headers.has("if-modified-since")) return request;
+  const headers = new Headers(request.headers);
+  headers.delete("if-none-match");
+  headers.delete("if-modified-since");
+  return new Request(request, { headers });
+}
+
 export async function onRequest(context) {
   const { request, next } = context;
 
   let response;
   try {
-    response = await next();
+    response = await next(unconditional(request));
   } catch (err) {
     /* next() failing is the asset server failing; there is nothing useful to
        add and nothing to rewrite. */
@@ -176,6 +215,15 @@ export async function onRequest(context) {
        they just uploaded. Rewriting its markup would show them the picture
        from the last build instead. */
     if (new URL(request.url).pathname.endsWith("admin.html")) return response;
+
+    /* Past this line the page's content depends on the database, so the file's
+       validators no longer describe it. Dropped before the map is even read,
+       and not only when a rewrite happens: "nothing to rewrite" is itself an
+       answer that changes the moment the owner uploads something, and it would
+       otherwise be cached under the same ETag as the page that does get
+       rewritten. */
+    response.headers.delete("ETag");
+    response.headers.delete("Last-Modified");
 
     const [map, already] = await Promise.all([currentPhotos(context), baked(context)]);
     if (!map || !map.size) return response;
