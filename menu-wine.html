@@ -51,9 +51,11 @@
 
 <!-- ══════════ NAV ══════════ -->
 <header class="nav" id="nav">
-  <a class="nav__brand" href="index.html">
-    <span class="nav__word">Aromati</span>
-    <span class="nav__tag">café · wine bar</span>
+  <!-- The mark is a masked shape, not an image: styles.css holds the two inks
+       as data: URIs and colours them per state. The link needs the name spelled
+       out because the span is decoration. -->
+  <a class="nav__brand" href="index.html" aria-label="Aromati — café and wine bar">
+    <span class="logo" aria-hidden="true"></span>
   </a>
   <nav class="nav__links">
     <a href="index.html#story">Story</a>

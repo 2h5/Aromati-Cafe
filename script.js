@@ -850,7 +850,7 @@
 
     var HINTS = {
       "Avocado toast": "Smashed avocado on grilled sourdough.",
-      "Bagel": "Six ways, toasted to order.",
+      "Bagel": "Plain or everything, toasted to order.",
       "Croissant sandwich": "Smashed avocado on a plain croissant."
     };
 

@@ -46,9 +46,12 @@
 
 <!-- ══════════ NAV ══════════ -->
 <header class="nav" id="nav">
-  <a class="nav__brand" href="#top">
-    <span class="nav__word">Aromati</span>
-    <span class="nav__tag">café · wine bar</span>
+  <!-- The mark is a masked shape, not an image: styles.css holds the two inks
+       as data: URIs and colours them per state — the bar wears the printed
+       two-tone, the mobile menu knocks it out in cream. The link needs the
+       name spelled out because the span is decoration. -->
+  <a class="nav__brand" href="#top" aria-label="Aromati — café and wine bar">
+    <span class="logo" aria-hidden="true"></span>
   </a>
   <nav class="nav__links">
     <a href="#story">Story</a>
@@ -128,10 +131,11 @@
     <div class="hero__scrim"></div>
     <div class="hero__content">
       <p class="hero__eyebrow reveal"><span data-copy="hero.eyebrow">Murray Hill · Manhattan</span></p>
-      <h1 class="hero__title" aria-label="Aromati">
-        <span class="line"><span>A</span><span>R</span><span>O</span><span>M</span><span>A</span><span>T</span><span>I</span></span>
+      <!-- The lockup says "cafè wine bar" itself, so the gold line that used to
+           sit under the name went with the letters. -->
+      <h1 class="hero__title" aria-label="Aromati — café and wine bar">
+        <span class="logo" aria-hidden="true"></span>
       </h1>
-      <p class="hero__sub reveal" data-copy="hero.sub">Café &nbsp;✦&nbsp; Wine Bar</p>
       <p class="hero__desc reveal" data-copy="hero.desc">Two floors on East 34th Street where Georgian cooking,<br/>natural wine and coffee share one table.</p>
       <div class="hero__actions reveal">
         <a href="menu-food.html" class="btn btn--solid"><span data-copy="hero.ctaPrimary">See the Menus</span></a>

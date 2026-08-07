@@ -106,6 +106,16 @@ the features around it, not adding a new architecture.
   `assets/web/georgian-salad.jpg` and `adjaruli.jpg` are each shared by a small
   slot and a large one — swapping a file by name alone will quietly shrink the
   large one too.
+- The brand mark is vector and its colour is CSS, never a file per colour. The
+  lockup was traced out of `assets/logos/AROMATI - LOGO white BG.pdf` at 1:1;
+  `assets/logos/aromati-lockup.svg` is the readable copy, and styles.css holds
+  the same paths split into their two inks as mask `data:` URIs so each state
+  names its own colours. The bar wears the printed two-tone everywhere; the one
+  override is the mobile menu, where the mark is knocked out in cream because
+  the curtain under it is dark. Exporting a light PNG and a dark PNG would work
+  until the third
+  state, and it would put the mark back above the fold as a late-loading
+  request. It is inline for the same reason the two critical fonts are.
 
 ## Main pieces
 
@@ -413,5 +423,7 @@ Migrations: `supabase/migrations/20260801000000_init_cms.sql`,
 `supabase/migrations/20260801000100_seed_content.sql`,
 `supabase/migrations/20260801000200_allowlist_owner.sql`,
 `supabase/migrations/20260801000300_advisor_fixes.sql`,
-`supabase/migrations/20260801000400_photos.sql` and
-`supabase/migrations/20260804000000_menu_item_hidden.sql`.
+`supabase/migrations/20260801000400_photos.sql`,
+`supabase/migrations/20260804000000_menu_item_hidden.sql`,
+`supabase/migrations/20260806000000_sizes_max_3.sql` and
+`supabase/migrations/20260806000100_allowlist_second_editor.sql`.

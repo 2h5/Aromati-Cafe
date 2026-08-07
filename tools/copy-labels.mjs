@@ -29,8 +29,6 @@ export const COPY_FIELDS = {
   /* ── Home page ─────────────────────────────────────────────────────── */
 
   "hero.eyebrow":     { page: "index", section: "Hero", label: "Small line above the name" },
-  "hero.sub":         { page: "index", section: "Hero", label: "Line under the name",
-                        help: "The wide spacing around the ✦ is deliberate — keep it if you edit this." },
   "hero.desc":        { page: "index", section: "Hero", label: "Opening sentence",
                         help: "Starting a new line here puts one on the page." },
   "hero.ctaPrimary":  { page: "index", section: "Hero", label: "First button" },

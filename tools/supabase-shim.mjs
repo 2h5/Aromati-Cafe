@@ -114,19 +114,23 @@ const BOOTSTRAP = `
   grant select on storage.buckets to anon, authenticated;
 `;
 
-/* The real owner account, created by hand in the dashboard on 2026-08-01.
-   20260801000200_allowlist_owner.sql references it, so it has to exist before
-   the migrations run — which is also the real order of events, and the reason
-   that file is separate from the schema. */
+/* The real accounts, created by hand in the dashboard — the owner on
+   2026-08-01, the second editor on 2026-08-06. The two allowlist migrations
+   reference them, so they have to exist before the migrations run, which is
+   also the real order of events and the reason those files are separate from
+   the schema. Adding a third account to the dashboard means adding it here too,
+   or its migration fails on the foreign key. */
 export const OWNER_UID = "a69c4370-3872-4b61-aba2-4049e34f9549";
+export const EDITOR_UID = "e47472aa-730d-46b3-b648-cc1dfd4ccaaa";
 
 /* Applying a migration as the owner of everything, which is what the Supabase
    SQL editor and `supabase db push` both do. */
 export async function freshDatabase() {
   const db = new PGlite();
   await db.exec(BOOTSTRAP);
-  await db.query(`insert into auth.users (id, email) values ($1, $2)`,
-                 [OWNER_UID, "owner@aromatiNY.com"]);
+  await db.query(`insert into auth.users (id, email) values ($1, $2), ($3, $4)`,
+                 [OWNER_UID, "owner@aromatiNY.com",
+                  EDITOR_UID, "editor@aromatiNY.com"]);
   return db;
 }
 

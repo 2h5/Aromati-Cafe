@@ -1,13 +1,18 @@
 /* The seed migration, generated from the Phase 1 seed data.
    node tools/gen-seed-sql.mjs
 
-   84 menu items, 17 courses, 62 copy fields. Typing those into SQL by hand is
+   113 menu items, 17 courses, 62 copy fields. Typing those into SQL by hand is
    the transcription risk Phase 1 spent an extractor to remove, and doing it at
    the seeding step would reintroduce it at the last possible moment — with the
    database as the new source of truth, so the mistake would then be permanent.
 
    Same principle as tools/extract-menus.mjs: the data is read, never retyped.
    Run it again whenever data/seed-*.js changes and commit the result.
+
+   The counts moved on 2026-08-06, when the menu was resynced to the printed
+   sheets in assets/menus/ — 84 items to 113, and the options table to empty,
+   because the crêpe and its seven toppings are not on the current dessert
+   sheet. The options block below is skipped when nothing needs it.
 
    Two things this file is careful about.
 

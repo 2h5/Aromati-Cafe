@@ -333,11 +333,16 @@ create table public.menu_courses (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
 
-  -- The price cells are grid-template-columns: repeat(2, var(--cell)). A third
-  -- size does not error, it overflows the row and the price lands under the
-  -- next item.
-  constraint menu_courses_sizes_max_2
-    check (sizes is null or cardinality(sizes) <= 2),
+  -- The price cells are grid-template-columns: repeat(var(--cols), var(--cell)),
+  -- and styles.css sizes the cell for up to three columns (the coffee list is
+  -- Small/Medium/Large; everything else is Small/Large). A fourth does not
+  -- error, it overflows the row and the price lands under the next item.
+  --
+  -- This was <= 2 until 2026-08-06, when the grid learned to count. A database
+  -- created before then is brought here by 20260806000000_sizes_max_3.sql;
+  -- that migration is a no-op against a database built from this file.
+  constraint menu_courses_sizes_max_3
+    check (sizes is null or cardinality(sizes) <= 3),
 
   -- An empty array is not "no sizes", it is a course whose header row renders
   -- blank. Use NULL.

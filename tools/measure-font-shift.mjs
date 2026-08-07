@@ -55,9 +55,14 @@ const PAGES = ["index.html", "faq.html", "menu-food.html", "menu-drinks.html", "
 /* What is watched, and why. The nav is on every page and fixed in place, so
    anything that moves there moves on every navigation. The wordmark and the
    Menus button are measured separately from the bar because the bar's own
-   height never changed — the movement was inside it. */
+   height never changed — the movement was inside it.
+
+   .nav__brand is the drawn lockup now rather than two lines of type, so it has
+   no font to swap and should measure identically before and after. It stays on
+   the list precisely for that: if it ever moves again, the mark has gone back
+   to being text somewhere. */
 const WATCH = [
-  { sel: ".nav__brand", axis: "width",  why: "the wordmark" },
+  { sel: ".nav__brand", axis: "width",  why: "the brand mark" },
   { sel: ".nav__links", axis: "width",  why: "the section links" },
   { sel: "#menusBtn",   axis: "width",  why: "the Menus button" },
   { sel: ".mhead",      axis: "height", why: "the masthead seam" },
@@ -77,9 +82,12 @@ function probe(stress) {
 (function () {
   var WATCH = ${JSON.stringify(WATCH)};
   if (${stress ? "true" : "false"}) {
-    /* textContent, like everything else here — see the one security rule. */
-    var t = document.querySelector(".mhead__title") || document.querySelector(".hero__title");
-    var l = document.querySelector(".mhead__lede")  || document.querySelector(".hero__sub");
+    /* textContent, like everything else here — see the one security rule.
+       The home page has no title to stress any more — .hero__title is the drawn
+       lockup and holds no copy — so there it is the opening sentence that grows
+       and the hero that has to absorb it. */
+    var t = document.querySelector(".mhead__title");
+    var l = document.querySelector(".mhead__lede")  || document.querySelector(".hero__desc");
     if (t) t.textContent = ${JSON.stringify(LONG_TITLE)};
     if (l) l.textContent = ${JSON.stringify(LONG_LEDE)};
   }

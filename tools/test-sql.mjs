@@ -98,10 +98,18 @@ for (const f of files) {
     business_hours: 7,
     site_settings: 14,
     menu_courses: 17,
-    menu_items: 84,
-    menu_item_pours: 26,
-    menu_item_options: 7,
-    site_copy: 62
+    /* Resynced to the printed sheets in assets/menus/ on 2026-08-06: 84 items
+       became 113, and the options table emptied — the crêpe and its seven
+       toppings are not on the current dessert sheet. Zero is asserted rather
+       than dropped, so an options row reappearing without a decision is still
+       something this notices. */
+    menu_items: 113,
+    menu_item_pours: 31,
+    menu_item_options: 0,
+    /* 62 until 2026-08-06, when the hero's "Café ✦ Wine Bar" line stopped
+       being copy: the brand lockup on the hero says it in the artwork, so the
+       field had nothing left to edit and came out of data/seed-copy.js. */
+    site_copy: 61
   };
   const wrong = [];
   for (const [table, n] of Object.entries(expected)) {
@@ -132,6 +140,25 @@ for (const f of files) {
   const shape = async (what, sql) => {
     try { await db.exec(sql); } catch (e) { broke.push(`${what} — ${e.message}`); }
   };
+
+  /* Three columns, which the coffee and tea lists have used since 2026-08-06.
+     Asserted here as well as in the refusal list below, because "four is
+     refused" would still pass if the real cap had slipped back to two — and
+     two is the shape that silently drops a price off the live coffee board. */
+  try {
+    const three = await one(`
+      insert into public.menu_courses (page, course_key, tab_label, heading, sizes, sort_order)
+      values ('drinks', 'zz-three', 'Three', 'Three', array['Small','Medium','Large'], 992)
+      returning id`);
+    await shape("2 priced by size, across three columns",
+      `insert into public.menu_items (course_id, name, prices, sort_order)
+       values ('${three.id}', 'Latte', '["6","6.50","7"]'::jsonb, 1)`);
+    /* The gap case on a three-column course: the printed sheet prices the
+       cappuccino in two of them. */
+    await shape("2 priced by size, with the third column empty",
+      `insert into public.menu_items (course_id, name, prices, sort_order)
+       values ('${three.id}', 'Cappuccino', '["5","6",""]'::jsonb, 2)`);
+  } catch (e) { broke.push(`a three-column course — ${e.message}`); }
 
   await shape("1 flat price",
     `insert into public.menu_items (course_id, name, price, sort_order)
@@ -194,15 +221,17 @@ for (const f of files) {
   ];
 
   /* The size columns themselves, which is a different constraint from the
-     prices that fill them and belongs on menu_courses. Three of anything is
-     refused because `.mi__cells` is a two-column CSS grid: a third size does
-     not overflow, it wraps under the first, and the board silently stops
-     lining up. The empty array is the subtler one — it is not "no sizes", it
-     is a course that renders a size header with nothing in it. */
+     prices that fill them and belongs on menu_courses. The ceiling is four, not
+     three: `.mi__cells` is repeat(var(--cols), var(--cell)) and styles.css
+     narrows the cell once, at data-cols="3", to keep the long drink names on
+     one line. There is no fourth step, so a fourth size does not overflow —
+     it wraps under the first and the board silently stops lining up. The empty
+     array is the subtler one — it is not "no sizes", it is a course that
+     renders a size header with nothing in it. */
   const coursesMustRefuse = [
-    ["three size columns on one course",
+    ["four size columns on one course",
      `insert into public.menu_courses (page, course_key, tab_label, heading, sizes, sort_order)
-      values ('drinks', 'zz-three', 'Three', 'Three', array['S','M','L'], 995)`],
+      values ('drinks', 'zz-four', 'Four', 'Four', array['S','M','L','XL'], 995)`],
     ["a course with an empty size array",
      `insert into public.menu_courses (page, course_key, tab_label, heading, sizes, sort_order)
       values ('drinks', 'zz-empty', 'Empty', 'Empty', array[]::text[], 996)`],

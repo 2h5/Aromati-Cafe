@@ -135,15 +135,129 @@
     return li;
   }
 
+  /* ── the section ornament ─────────────────────
+     The divider under every course title. This is not a drawing of the printed
+     one — it is the printed one: the paths below were lifted out of the vector
+     art in assets/menus/menu – A5 - COFFEE.pdf, which carries no fonts and no
+     images, so every mark on that sheet is geometry that can be read straight
+     out of the content stream. Two hand-drawn approximations came before it and
+     neither survived comparison with the sheet; this one cannot drift from it,
+     because it is the same curve data at the same proportions.
+
+     The divider is three <svg>s over one coordinate system — the left rule,
+     the motif, the right rule — each a window onto its own part of the same
+     271.97 × 19.73 art, at the same vertical scale. It was a single <svg>
+     until the divider had to be as long as the title above it: one box can
+     only grow whole, so a long course name got a fatter rule and a bigger
+     scroll than a short one, on the same board. Split, the motif keeps one
+     size everywhere and only the two rules run long or short.
+
+     That is not the old arrangement coming back. The rules were CSS gradients
+     once, with the art as a background image between them, and the two
+     renderers never landed the join on the same pixel at every zoom. These are
+     the sheet's own paths in all three boxes, and the boxes overlap by exactly
+     what the art overlaps by, so the joins fall inside the diamonds where they
+     already fell. What the stretch costs is the round cap at each rule's inner
+     end, which is not square-on any more — it is under a pixel wide at every
+     size this is drawn at, and it is buried in a diamond.
+
+     The art is filled outlines rather than strokes, as Illustrator wrote it:
+     the diamonds are a ring with the centre wound the other way, so the paper
+     shows through them under the default nonzero fill rule — the same reason
+     they are hollow on the sheet.
+
+     fill="currentColor" is what makes it inheritable: styles.css sets the
+     colour on .course__orn and every path follows, so the burgundy lives in one
+     place rather than being baked into the art. aria-hidden because it says
+     nothing — it is the space between two headings, made visible.
+
+     The viewBox is the art's own measurements in points, 271.97 × 19.73, so the
+     proportions are the sheet's: the rule is 1.8 units thick and sits on the
+     diamonds' waist, and the scroll hangs below it. */
+
+  var ORN_NS = "http://www.w3.org/2000/svg";
+
+  /* Each piece carries the window onto the art that it draws, in the art's own
+     units: x, then width, out of the full 271.97. The heights are all 19.73 —
+     every box is the full height of the art, so the three sit on one baseline
+     however wide they are drawn. */
+  var ORN_RULE_L = "0 0 106.47 19.73";      /* flat outer end .. round inner end */
+  var ORN_RULE_R = "165.5 0 106.47 19.73";
+  var ORN_MOTIF  = "104.67 0 61.61 19.73";  /* both diamonds and the scroll */
+
+  var ORN_PATHS = [
+    /* the rule, left of the ornament — flat at the outer end, a round
+       cap at the end that meets the diamond */
+    "M0 4.1L105.57 4.1C106.07 4.1 106.47 4.51 106.47 5C106.47 5.5 106.07 5.91 105.57 5.91L0 5.91",
+    /* and right of it */
+    "M165.5 4.1L271.07 4.1C271.57 4.1 271.97 4.51 271.97 5C271.97 5.5 271.57 5.91 271.07 5.91L165.51 5.91",
+    /* the scroll: two halves, each running from its own diamond, crossing
+       the centre and curling back on itself */
+    "M140.59 11.28C140.96 11.52 141.33 11.75 141.7 11.98C142 12.17 142.29 12.36 142.58 12.55C143.95 13.46 145.14 14.25 146.55 13.93C147.24 13.78 147.84 13.34 148.15 12.76C148.34 12.41 148.51 11.86 148.26 11.17C147.8 9.95 145.58 9.72 144.22 9.95C143 10.15 141.7 10.61 140.59 11.28M150.19 11.86C150.19 12.47 150.04 13.07 149.74 13.62C149.17 14.66 148.16 15.42 146.95 15.69C144.79 16.18 143.08 15.05 141.58 14.05C141.31 13.87 141.03 13.69 140.75 13.51C140.19 13.16 139.63 12.8 139.07 12.44C138.46 13.05 138.01 13.76 137.81 14.53C137.38 16.22 138.13 17.17 138.99 17.48C139.54 17.68 140.22 17.64 140.46 17.15C140.68 16.7 141.22 16.52 141.66 16.74C142.11 16.96 142.29 17.51 142.07 17.95C141.44 19.22 139.88 19.73 138.36 19.17C136.73 18.57 135.38 16.76 136.06 14.08C136.32 13.09 136.85 12.2 137.54 11.44L137.43 11.36C136.79 10.94 136.25 10.52 135.73 10.11C132.97 7.95 130.36 5.91 113.6 5.91C113.1 5.91 112.7 5.5 112.7 5C112.7 4.51 113.1 4.1 113.6 4.1C130.99 4.1 133.83 6.33 136.84 8.69C137.35 9.1 137.84 9.48 138.42 9.86L138.95 10.21C140.44 9.14 142.26 8.45 143.92 8.17C145.87 7.84 149.08 8.2 149.95 10.54C150.11 10.98 150.19 11.42 150.19 11.86",
+    "M122.56 11.86C122.56 12.23 122.68 12.54 122.8 12.76C123.11 13.34 123.71 13.78 124.4 13.93C125.81 14.25 127 13.47 128.37 12.55C128.66 12.36 128.95 12.17 129.25 11.98C129.62 11.75 129.99 11.52 130.36 11.28C129.25 10.61 127.95 10.15 126.73 9.95C125.37 9.72 123.15 9.95 122.69 11.17C122.6 11.42 122.56 11.65 122.56 11.86M158.25 5C158.25 5.5 157.85 5.91 157.35 5.91C140.59 5.91 137.98 7.95 135.23 10.11C134.7 10.52 134.16 10.95 133.52 11.37L133.41 11.44C134.11 12.2 134.63 13.09 134.89 14.09C135.57 16.76 134.23 18.57 132.59 19.17C131.07 19.73 129.51 19.22 128.88 17.95C128.66 17.51 128.84 16.96 129.29 16.74C129.73 16.52 130.28 16.7 130.5 17.15C130.74 17.64 131.42 17.68 131.96 17.48C132.82 17.17 133.57 16.22 133.14 14.53C132.94 13.76 132.49 13.05 131.88 12.44C131.32 12.8 130.76 13.16 130.2 13.51C129.92 13.69 129.64 13.87 129.37 14.05C127.87 15.05 126.17 16.18 124 15.69C122.8 15.42 121.78 14.66 121.21 13.62C120.7 12.67 120.62 11.57 121 10.55C121.87 8.2 125.08 7.84 127.03 8.17C128.69 8.45 130.51 9.14 132 10.21L132.53 9.86C133.11 9.48 133.6 9.1 134.12 8.69C137.12 6.33 139.97 4.1 157.35 4.1C157.85 4.1 158.25 4.51 158.25 5",
+    /* the diamonds, hollow — an outer ring with the centre wound the other
+       way, which is what makes the paper show through */
+    "M109.59 7.75L112.33 5L109.59 2.26L106.84 5ZM114.5 5C114.5 5.24 114.41 5.47 114.24 5.64L110.22 9.66C110.05 9.83 109.83 9.92 109.59 9.92C109.35 9.92 109.12 9.83 108.95 9.66L104.93 5.64C104.76 5.47 104.67 5.24 104.67 5C104.67 4.76 104.76 4.54 104.93 4.37L108.95 .35C109.3 0 109.87 0 110.22 .35L114.24 4.37C114.41 4.54 114.5 4.77 114.5 5",
+    "M161.37 7.75L164.11 5L161.37 2.26L158.63 5ZM166.28 5C166.28 5.24 166.19 5.47 166.02 5.64L162 9.66C161.83 9.83 161.6 9.92 161.37 9.92C161.13 9.92 160.9 9.83 160.73 9.66L156.71 5.64C156.36 5.29 156.36 4.72 156.71 4.37L160.73 .35C161.08 0 161.65 0 162 .35L166.02 4.37C166.19 4.54 166.28 4.76 166.28 5"
+  ];
+
+  function svgEl(tag, attrs) {
+    var n = document.createElementNS(ORN_NS, tag);
+    for (var k in attrs) if (attrs.hasOwnProperty(k)) n.setAttribute(k, attrs[k]);
+    return n;
+  }
+
+  /* One piece of the divider. `stretch` is the two rules: preserveAspectRatio
+     "none" lets the box be any width and the path fills it, which is what
+     makes a rule long or short. The motif is left on the default, so it is
+     scaled by its height alone and comes out the same size on every course.
+
+     className is read-only on an SVG element, so every attribute here goes
+     through setAttribute — el() above cannot build these. */
+  function ornPiece(cls, viewBox, paths, stretch) {
+    var svg = svgEl("svg", {
+      "class": cls,
+      viewBox: viewBox,
+      focusable: "false"
+    });
+    if (stretch) svg.setAttribute("preserveAspectRatio", "none");
+    var ink = svgEl("g", { fill: "currentColor" });
+    paths.forEach(function (d) { ink.appendChild(svgEl("path", { d: d })); });
+    svg.appendChild(ink);
+    return svg;
+  }
+
+  function ornament() {
+    /* aria-hidden on the wrapper rather than on each piece: it says nothing —
+       it is the space between two headings, made visible. */
+    var orn = el("span", "course__orn");
+    orn.setAttribute("aria-hidden", "true");
+    orn.appendChild(ornPiece("orn__rule", ORN_RULE_L, [ORN_PATHS[0]], true));
+    orn.appendChild(ornPiece("orn__motif", ORN_MOTIF, ORN_PATHS.slice(2), false));
+    orn.appendChild(ornPiece("orn__rule", ORN_RULE_R, [ORN_PATHS[1]], true));
+    return orn;
+  }
+
   /* ── one course ──────────────────────────────── */
 
   function renderCourse(course) {
     var section = el("section", "course" + (course.sizes ? " course--sized" : ""));
     section.setAttribute("data-course", course.key);
     section.setAttribute("data-label", course.tabLabel);
+    /* How many size columns this course draws. styles.css lays out both the
+       header row and every price row from --cols, so setting it once here is
+       what keeps the two grids in step — the coffee list is Small/Medium/Large
+       and everything else is still Small/Large. data-cols is the same number as
+       an attribute, because a selector cannot match on a custom property and
+       the narrower cell for three columns has to be chosen in CSS. */
+    if (course.sizes) {
+      section.style.setProperty("--cols", String(course.sizes.length));
+      section.setAttribute("data-cols", String(course.sizes.length));
+    }
 
     var head = el("header", "course__head");
     head.appendChild(el("h2", null, course.heading));
+    head.appendChild(ornament());
     /* Filled in by script.js once the board is filtered — left empty here for
        the same reason it is empty in the markup today. */
     head.appendChild(el("span", "course__count"));
@@ -187,8 +301,17 @@
     courses.forEach(function (course) {
       if (course.isStatic) {
         var kept = statics[course.staticId];
-        if (kept) frag.appendChild(kept);
-        else missing.push(course.staticId);
+        if (kept) {
+          /* A hand-written course gets the same divider as a generated one,
+             from the same function — the art is not worth a second copy in the
+             markup, and a copy is the thing that goes stale. */
+          var staticHead = kept.querySelector(".course__head");
+          if (staticHead && !staticHead.querySelector(".course__orn")) {
+            var count = staticHead.querySelector(".course__count");
+            staticHead.insertBefore(ornament(), count);
+          }
+          frag.appendChild(kept);
+        } else missing.push(course.staticId);
         return;
       }
       frag.appendChild(renderCourse(course));

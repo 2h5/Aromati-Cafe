@@ -65,7 +65,24 @@ const INTENDED = [
    remaining copy is still required to match exactly. */
 const REMOVED = [
   { page: "index.html", sel: ".mmenu__links .mml__n",
-    why: "decorative mobile-menu numbers removed, 2026-08-04" }
+    why: "decorative mobile-menu numbers removed, 2026-08-04" },
+
+  /* The brand became the drawn lockup on 2026-08-06. Where the bar used to set
+     the name in type it now paints the studio artwork, so "Aromati" and
+     "café · wine bar" are no longer strings on any page — the name is on the
+     link as an aria-label, which is not page text and is not compared here.
+     One entry per page, deliberately: an allowance that applied everywhere
+     would keep forgiving this on a page that had quietly lost its bar. */
+  { page: "index.html",       sel: ".nav__brand", why: "brand set as the lockup, 2026-08-06" },
+  { page: "faq.html",         sel: ".nav__brand", why: "brand set as the lockup, 2026-08-06" },
+  { page: "menu-food.html",   sel: ".nav__brand", why: "brand set as the lockup, 2026-08-06" },
+  { page: "menu-drinks.html", sel: ".nav__brand", why: "brand set as the lockup, 2026-08-06" },
+  { page: "menu-wine.html",   sel: ".nav__brand", why: "brand set as the lockup, 2026-08-06" },
+
+  /* Same day, same reason, on the hero: the seven letters of AROMATI and the
+     gold "Café ✦ Wine Bar" under them are both inside the lockup now. */
+  { page: "index.html", sel: ".hero__title", why: "hero wordmark is the lockup, 2026-08-06" },
+  { page: "index.html", sel: ".hero__sub",   why: "the lockup carries this line, 2026-08-06" }
 ];
 
 /* Content added since the baseline, named by selector rather than by the words
@@ -85,6 +102,38 @@ const ADDED = [
   { page: "menu-food.html",    sel: "[data-order-group]", why: "delivery links, 2026-08-01" },
   { page: "menu-drinks.html",  sel: "[data-order-group]", why: "delivery links, 2026-08-01" },
   { page: "menu-wine.html",    sel: "[data-order-group]", why: "delivery links, 2026-08-01" }
+];
+
+/* Content the owner has since replaced outright. The subtree is cut from BOTH
+   sides — baseline and rendered — and this check then says nothing about it.
+
+   ── why this is not the re-pinning that the note above forbids ──
+   Those two things look alike and are not. Re-pinning BASE would re-bless the
+   whole of every page at a newer commit, including the parts this check exists
+   to watch, and it would do so silently and permanently. This names one subtree
+   on three pages and leaves everything else on those pages — nav, masthead,
+   footer, hours, address, delivery links, the copy fields — compared against
+   the original baseline exactly as before.
+
+   ── why the board had to come out ──
+   The question this file asks is "did moving the menu from markup into the
+   renderer change what the page says". For the boards that question is now
+   unanswerable and no longer interesting: on 2026-08-06 the menu was resynced
+   to the printed sheets in assets/menus/, which replaced 84 items with 113 and
+   rewrote nearly every price and description. Practically none of the baseline
+   text survives, so the comparison reports a few hundred differences that are
+   all correct. Enumerating them in INTENDED would be transcribing the menu a
+   third time, and a list that long stops being read.
+
+   What covers the boards instead is the printed sheets themselves, plus
+   tools/test-menu-shapes.mjs for how each price shape renders and
+   tools/check-live-project.mjs for whether the database agrees with the seeds.
+
+   Like the lists above, an entry that matches nothing is a failure. */
+const RESEEDED = [
+  { page: "menu-food.html",   sel: "#carteBody", why: "menu resynced to assets/menus/, 2026-08-06" },
+  { page: "menu-drinks.html", sel: "#carteBody", why: "menu resynced to assets/menus/, 2026-08-06" },
+  { page: "menu-wine.html",   sel: "#carteBody", why: "menu resynced to assets/menus/, 2026-08-06" }
 ];
 
 /* Every readable string inside the board, in order. Currency symbols dropped:
@@ -133,6 +182,18 @@ let failures = 0;
 const usedIntent = new Set();
 const usedAdded = new Set();
 const usedRemoved = new Set();
+const usedReseeded = new Set();
+
+/* Cut every RESEEDED subtree out of one side. Returns nothing — the clone is
+   modified in place, and the entry is banked as used the moment it matches on
+   either side, so a selector that has stopped existing still gets reported. */
+function dropReseeded(root, page) {
+  for (const gone of RESEEDED.filter((r) => r.page === page)) {
+    const hits = [...root.querySelectorAll(gone.sel)];
+    if (hits.length) usedReseeded.add(gone);
+    for (const n of hits) n.parentNode.removeChild(n);
+  }
+}
 
 for (const page of PAGES) {
   const before = boardOf(
@@ -145,6 +206,7 @@ for (const page of PAGES) {
 
   const rewrites = INTENDED.filter((r) => r.page === page);
   const textBefore = before.cloneNode(true);
+  dropReseeded(textBefore, page);
   for (const remove of REMOVED.filter((r) => r.page === page)) {
     const hits = [...textBefore.querySelectorAll(remove.sel)];
     if (hits.length) usedRemoved.add(remove);
@@ -159,6 +221,7 @@ for (const page of PAGES) {
   /* Cut the added blocks out of a copy, so the live tree is left whole for the
      markup-drift check further down. */
   const trimmed = after.cloneNode(true);
+  dropReseeded(trimmed, page);
   for (const add of ADDED.filter((x) => x.page === page)) {
     const hits = [...trimmed.querySelectorAll(add.sel)];
     if (hits.length) usedAdded.add(add);
@@ -192,7 +255,15 @@ for (const page of PAGES) {
     igLinks: root.querySelectorAll('a[href*="instagram.com"]').length
   });
 
-  const sa = shape(before), sb = shape(after);
+  /* Shape is counted on both sides with the reseeded subtrees removed, and
+     nothing else removed — ADDED and REMOVED are text allowances and are cut
+     from one side only, so applying them here would invent a difference. */
+  const shapeBefore = before.cloneNode(true);
+  const shapeAfter = after.cloneNode(true);
+  dropReseeded(shapeBefore, page);
+  dropReseeded(shapeAfter, page);
+
+  const sa = shape(shapeBefore), sb = shape(shapeAfter);
   const shapeDiffs = Object.keys(sa).filter((k) => sa[k] !== sb[k]);
 
   /* The hours, phone, address and Instagram handle are still written out in the
@@ -276,6 +347,16 @@ if (deadAdds.length) {
   for (const r of deadAdds) {
     console.log(`        ${r.page}: ${r.sel} — ${r.why}`);
     console.log("        the block is gone; drop the entry, or it hides the next one");
+  }
+}
+
+const deadReseeded = RESEEDED.filter((r) => !usedReseeded.has(r));
+if (deadReseeded.length) {
+  failures++;
+  console.log("\nFAIL  a reseeded-content entry matched nothing on either side");
+  for (const r of deadReseeded) {
+    console.log(`        ${r.page}: ${r.sel} — ${r.why}`);
+    console.log("        the subtree is gone; drop the entry, or it blindfolds this page");
   }
 }
 

@@ -19,7 +19,6 @@
 
 var SEED_COPY = {
   "hero.eyebrow": "Murray Hill · Manhattan",
-  "hero.sub": "Café  ✦  Wine Bar",
   "hero.desc": "Two floors on East 34th Street where Georgian cooking,\nnatural wine and coffee share one table.",
   "hero.ctaPrimary": "See the Menus",
   "hero.ctaSecondary": "The Wine Bar",

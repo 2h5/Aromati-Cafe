@@ -266,17 +266,36 @@ console.log("\nthe six price shapes, drawn from database rows\n");
 }
 
 /* ══ 4. the two blocks that are out of scope to change ═══════════════════
-   Build Your Own and the crêpe options row are hand-written markup the editor
-   never touches. They are listed in memory.md as out of scope to build — which
-   also means out of scope to break, and a rebuild of the board around them is
-   exactly how they would be broken. */
+   Build Your Own is hand-written markup the editor never touches. It is listed
+   in memory.md as out of scope to build — which also means out of scope to
+   break, and a rebuild of the board around it is exactly how it would be
+   broken. The expandable options row is generated, but the behaviour that
+   opens it is script.js's and is rebound on every rebuild, so it is checked in
+   the same place for the same reason.
+
+   The options row is supplied here rather than found on the board. It used to
+   be the crêpe, a real dessert; the 2026-08-06 resync to the printed sheets in
+   assets/menus/ retired it, and no item on the site carries options now. The
+   code path is still live — the editor can put options back — so the fixture
+   keeps it covered instead of letting the check quietly find nothing. */
 {
   console.log("\nthe hand-written blocks, after a rebuild around them");
+  const OPTS_ON = "Protein Plate";
   const p = boot("menu-food.html", {
     fetcher: serve(seedRows({ menu: (pages) => {
       /* a real change, so the board is genuinely replaced rather than compared
          equal and left alone */
       pages.food[1].items[0].name = "CHANGED SO THE BOARD IS REBUILT";
+
+      const host = pages.food[0].items.find((it) => it.name === OPTS_ON);
+      if (!host) {
+        throw new Error(
+          `test-menu-shapes: no item named "${OPTS_ON}" to hang the options ` +
+          `fixture on — the seed data moved, point OPTS_ON at an item that exists`
+        );
+      }
+      host.optionsId = "shapesOpts";
+      host.options = [{ name: "A topping", price: "1.00" }];
     } }))
   });
   await settle();
@@ -301,16 +320,18 @@ console.log("\nthe six price shapes, drawn from database rows\n");
     else fail("Build Your Own has no total element to check");
   }
 
-  /* The crêpe row is a generated item, so it comes back through render.js —
+  /* The options row is a generated item, so it comes back through render.js —
      but the behaviour that opens it is script.js's, rebound on every rebuild. */
-  const crepe = p.doc.querySelector("#carteBody .mi--opts .mi__toggle");
-  if (!crepe) {
-    fail("the expandable row is gone from the food board");
+  const toggle = p.doc.querySelector("#carteBody .mi--opts .mi__toggle");
+  if (!toggle) {
+    fail(`the expandable row did not render on the food board`,
+         `the fixture is hung on "${OPTS_ON}" — renderItem should have given ` +
+         `it a .mi__toggle`);
   } else {
-    check("the expandable row starts closed", crepe.getAttribute("aria-expanded"), "false");
-    crepe.dispatchEvent(new p.window.MouseEvent("click", { bubbles: true }));
+    check("the expandable row starts closed", toggle.getAttribute("aria-expanded"), "false");
+    toggle.dispatchEvent(new p.window.MouseEvent("click", { bubbles: true }));
     await settle();
-    check("one click opens it after the rebuild", crepe.getAttribute("aria-expanded"), "true");
+    check("one click opens it after the rebuild", toggle.getAttribute("aria-expanded"), "true");
     check("and threw nothing", p.thrown, []);
   }
 }

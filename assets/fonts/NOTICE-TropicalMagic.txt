@@ -1,0 +1,22 @@
+Tropical Magic — the display face on the menu course headings.
+
+Source file:  Tropical Magic Free Version.otf  (supplied by the owner)
+In this repo: tropical-magic.woff2, converted from that OTF with woff2
+              (Google's compressor, via the wawoff2 bindings). No subsetting —
+              latin + latin-1 supplement, 236 glyphs, 24.6 kB.
+              It is also inlined as base64 in styles.css; the file here is the
+              source of that, and is not fetched by the site.
+
+LICENCE — NOT ESTABLISHED, unlike the two OFL files next to this one.
+
+The OTF's embedding permission bit (OS/2 fsType) is 0, i.e. the font carries no
+technical restriction on embedding. That is the font's own metadata and is not
+a licence. "Free Version" cuts of a commercial family are very often free for
+personal use only, with webfont embedding sold separately — and this is a
+commercial site.
+
+Before this goes anywhere public, get the foundry's licence for the free version
+in writing and record it here. If it does not cover web embedding, buy the
+webfont licence or drop the face: the stack in styles.css falls back to Fraunces
+(OFL, see OFL-Fraunces.txt), which is what these headings were set in before,
+and nothing else on the site depends on it.
