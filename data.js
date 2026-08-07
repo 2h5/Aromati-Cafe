@@ -378,13 +378,42 @@ var AROMATI_DATA = (function () {
       String(path).split("/").map(encodeURIComponent).join("/");
   }
 
+  /* Has this exact photograph already been written into the markup?
+
+     tools/bake-photos.mjs runs after the build and puts the owner's current
+     photograph straight into the built page's src, then stamps the slot in
+     dist/data/seed-photos.js with the storage path it used. This reads that
+     stamp back.
+
+     It is the difference between a site that paints once and a site that
+     paints twice. Without it the bake is worse than useless: the page would
+     open on the correct picture and then be handed *the same picture* from the
+     bucket URL — a fetch, a decode and a repaint that change nothing a visitor
+     can see, on every load, forever.
+
+     Comparing the path rather than trusting a flag is what makes it
+     self-correcting. Equal means the markup is current and there is no
+     override to report. Different means the owner has uploaded something since
+     this build, so the override applies exactly as it always has and the site
+     is live again the moment they hit save — the files just catch up later.
+
+     In the source tree nothing is ever stamped, so this is always false and
+     file://, `vite dev` and a fresh clone behave precisely as they did before
+     any of this existed. */
+  function alreadyInMarkup(slot, storagePath) {
+    if (typeof SEED_PHOTOS !== "object" || !SEED_PHOTOS) return false;
+    var entry = SEED_PHOTOS[slot];
+    return !!entry && entry.baked === storagePath;
+  }
+
   function shapePhotos(rows) {
     var out = seedPhotos() || {};
     rows.forEach(function (row) {
       if (typeof row.slot !== "string" || !row.slot) return;
       var photo = out[row.slot] || (out[row.slot] = { alt: "", url: null });
       if (typeof row.alt === "string" && row.alt) photo.alt = row.alt;
-      if (typeof row.storage_path === "string" && row.storage_path) {
+      if (typeof row.storage_path === "string" && row.storage_path &&
+          !alreadyInMarkup(row.slot, row.storage_path)) {
         photo.url = publicUrl(row.storage_path);
       }
     });
@@ -558,17 +587,9 @@ var AROMATI_DATA = (function () {
 
      `nowNY` is exported because it is the site's only clock. script.js reads
      it for the open/closed pill and render.js for the search listing; a second
-     implementation in either would be a second answer.
-
-     `configured` is exported for one question with one right answer: is a
-     second paint coming? render.js has to know, because photo-boot.js holds
-     the above-the-fold photograph until it arrives and would otherwise hold it
-     until the deadline on every file:// open. This is the function that
-     actually decides whether refresh() reaches for the network, so asking it
-     cannot disagree with what happens. */
+     implementation in either would be a second answer. */
   return {
     current: current, refresh: refresh, stable: stable,
-    nowNY: nowNY, CACHE_KEY: CACHE_KEY,
-    configured: function () { return configured() && typeof fetch === "function"; }
+    nowNY: nowNY, CACHE_KEY: CACHE_KEY
   };
 })();

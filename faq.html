@@ -27,11 +27,6 @@
      photograph paint and get swapped. It must stay above the body and must
      stay external — script-src is 'self' with no 'unsafe-inline'. See the file
      itself for why hiding anything on the critical path is safe here. -->
-<!-- config.js has to be here rather than at the foot of the page: photo-boot.js
-     reads it to decide whether a second answer is coming from the CMS, and it
-     cannot hold the hero waiting for a database that is not configured. It
-     defines two strings and runs nothing. -->
-<script src="config.js"></script>
 <script src="photo-boot.js"></script>
 </head>
 <body class="page-doc">
@@ -114,7 +109,7 @@
 
   <!-- ══════════ MASTHEAD ══════════ -->
   <header class="mhead">
-    <div class="mhead__bg"><img data-photo="faq.masthead" data-photo-critical data-photo-decorative src="assets/web/dining-corner.jpg" alt="" aria-hidden="true"/></div>
+    <div class="mhead__bg"><img data-photo="faq.masthead" data-photo-decorative src="assets/web/dining-corner.jpg" alt="" aria-hidden="true"/></div>
     <div class="mhead__scrim"></div>
     <div class="mhead__inner">
       <div class="section-head section-head--light reveal">
@@ -263,6 +258,7 @@
 </button>
 
 <script src="assets/js/lenis.min.js"></script>
+<script src="config.js"></script>
 <script src="data/seed-settings.js"></script>
 <script src="data/seed-hours.js"></script>
 <script src="data/seed-copy.js"></script>

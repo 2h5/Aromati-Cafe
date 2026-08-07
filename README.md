@@ -228,19 +228,17 @@ enough.
 npm test
 ```
 
-31 harnesses, no network, no Docker. They run the real files — the real pages
+30 harnesses, no network, no Docker. They run the real files — the real pages
 in jsdom, the real renderer, and the migrations against Postgres
 compiled to WebAssembly. `memory.md` records the current verification workflow;
 the individual commands live in `package.json`.
 
-Three of them drive a real headless Chrome and are in `npm test` like the rest:
+Two of them drive a real headless Chrome and are in `npm test` like the rest:
 `npm run check:layout`, which measures the nav and the masthead before and after
-the fonts settle; `npm run test:replay`, which replaces a menu board over a live
-page and checks nothing is left behind; and `npm run test:photobrowser`, which
-throttles the CMS and watches the hero to see whether any photograph is ever
-painted and then replaced. **All three skip cleanly where there is no Chrome**,
-which is exactly when a regression would go out unnoticed — so they are the
-second guard on what they cover, never the only one.
+the fonts settle, and `npm run test:replay`, which replaces a menu board over a
+live page and checks nothing is left behind. **Both skip cleanly where there is
+no Chrome**, which is exactly when a regression would go out unnoticed — so they
+are the second guard on what they cover, never the only one.
 
 The standard every harness is held to: **it has been sabotaged and required to
 fail, naming the right check.** A harness nobody has broken on purpose is a

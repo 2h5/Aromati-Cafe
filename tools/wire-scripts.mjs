@@ -12,23 +12,16 @@ import { readFileSync, writeFileSync } from "node:fs";
 
 const PAGES = ["index.html", "faq.html", "menu-food.html", "menu-drinks.html", "menu-wine.html"];
 
-/* The whole set, in the order it has to load. The seeds first because render.js
-   reads them; data.js before render.js because render.js asks it what to paint.
-
-   config.js is NOT in this list and must not be added to it. It lives in
-   <head>, immediately above photo-boot.js, because photo-boot.js reads it
-   before the body is parsed to decide whether a CMS answer is coming and
-   therefore whether it may hold the above-the-fold photograph. Moving it back
-   down here does not break anything loudly: photo-boot.js reads `undefined`,
-   quietly stops holding the hero on a first visit, and the swap this site was
-   rebuilt to remove comes back with every test still green. The check below is
-   the guard.
+/* The whole set, in the order it has to load. config.js first because data.js
+   reads it; the seeds next because render.js reads them; data.js before
+   render.js because render.js asks it what to paint.
 
    This list has grown a phase at a time — the copy in Phase 1, data.js and
    config.js in Phase 4, the photographs in Phase 6 — and it is written out
    here in full rather than patched around, so this file stays the one place
    that knows what a page loads and in what order. */
 const COMMON = [
+  "config.js",
   "data/seed-settings.js",
   "data/seed-hours.js",
   "data/seed-copy.js",
@@ -36,22 +29,8 @@ const COMMON = [
 ];
 const ANCHOR = '<script src="script.js"></script>';
 
-/* config.js above photo-boot.js, both in <head>, or the hold is silently dead.
-   Asserted rather than written, because the tags carry a comment explaining
-   themselves and regenerating them would throw it away. */
-function checkHead(file, html) {
-  const head = html.slice(0, html.indexOf("</head>"));
-  const cfg = head.indexOf('<script src="config.js">');
-  const boot = head.indexOf('<script src="photo-boot.js">');
-  if (cfg < 0 || boot < 0 || cfg > boot) {
-    throw new Error(`${file}: <head> must load config.js and then photo-boot.js — ` +
-      "photo-boot.js reads AROMATI_CONFIG to decide whether to hold the hero");
-  }
-}
-
 for (const file of PAGES) {
   let html = readFileSync(file, "utf8");
-  checkHead(file, html);
   const wanted = [...COMMON];
   /* seed-menu.js only where there is a board to build. */
   if (html.includes('id="carteBody"')) wanted.push("data/seed-menu.js");

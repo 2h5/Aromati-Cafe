@@ -331,85 +331,79 @@ Three things about it are load-bearing and easy to undo by accident:
   only puts the blink back on a site where everything still passes.
 - **Nothing may stay hidden.** The reveal timeout is armed before anything is
   hidden, and every error path reveals everything. If that timer is ever doing
-  the work on a normal load, the photograph is arriving 1200ms late and nothing
-  reports it — `test:photoboot` asserts `render.js` reports each slot on every
+  the work on a normal load, the photograph is arriving 700ms late and nothing
+  reports it — `test:photoboot` asserts `render.js` releases each slot on every
   path through it, which is what keeps the timer a net rather than the
   mechanism.
 
-### The *second* blink: cached, then replaced again
+**A first-ever visitor is not covered and cannot be**, at runtime: the URL
+exists only in a database the browser has not queried. For that visitor the fix
+is the one already written above — run `node tools/extract-photos.mjs` after an
+upload and commit, so the shipped file *is* the current photograph and there is
+nothing to swap. The hero replacement uploaded on 6 August 2026 exposed this
+gap and has now been extracted as `assets/web/hero-wine-frame.webp`.
 
-Reported 6 August 2026, after the fix above had shipped. The hero still changed
-on every reload, and the owner's description was exact: it blinks whenever the
-photograph on screen is not the one the site shipped with.
+### The blink is fixed at build time, not in the browser
 
-There were always two swaps and the section above only closed one:
+Settled 7 August 2026, after four attempts in the browser. **Do not try to fix
+this in `photo-boot.js` or `render.js` again.** Every one of those attempts is
+in the history of this branch and every one of them failed, in a different way,
+for the same underlying reason.
 
-    shipped → cached → whatever the CMS says now
+The browser must paint before it can ask the database what the photograph is.
+That leaves exactly two options and no third: show the shipped picture and swap
+when the answer arrives, or show nothing until it does. Each attempt was a
+rearrangement of those two:
 
-`data.js` writes the cache at the *end* of a visit, so what it holds is what the
-database said **last** time. Every edit puts it one behind again — which is why
-the blink came back on every single reload for as long as the owner kept
-working, and why a fix that only helps the second load is not a fix.
+- **Hold the slot until the refresh settles.** Correct, and it works — but a
+  freshly uploaded photograph is not in anyone's HTTP cache, so the wait is a
+  round trip *plus* an image download. Measured on the live site: data back at
+  207ms, picture not decoded until ~1200ms. The deadline sat between them.
+- **Hold the above-the-fold image on a cold visit.** Fired on returning
+  visitors too and `hero.main` has no upload, so the hero sat behind a dark
+  panel on every load, waiting out a request that always answered "nothing
+  changed", then appeared with a jolt. A new blink, for nothing.
+- **Assign the new src only after decoding off-DOM.** Right in principle;
+  `decode()` on a detached image rejects often enough that it turned "swap the
+  picture in" into "never swap it", which is worse.
+- **Raise the deadline.** Moves the boundary. A slower connection crosses it.
 
-So the hold now runs one step further. A slot is released not when its *cached*
-picture decodes but when the refresh has come back and the **final** picture
-decodes. `render.js` owns that ordering — `settlePhotos`, and the `readyButHeld`
-map above it. Three things there are load-bearing:
+`tools/bake-photos.mjs` removes the question instead of answering it: after
+`vite build` it downloads the current photographs and writes them into the
+built pages' `src`. The HTML the browser receives already names the right
+picture, so it paints once, with no JavaScript involved and nothing to replace.
+This is what every server-rendered or statically generated site does, and the
+reason none of them have this bug.
 
-- **`settlePhotos(repainting)` must be told which answer arrived.** On "nothing
-  changed" the decoded pictures go up. On "here is a different photograph" the
-  same slots must *stay* hidden and be handed to the new picture's own decode.
-  Releasing first and repainting after is the original bug, rebuilt out of the
-  code written to prevent it. Sabotage this and `test:photosettle` fails seven
-  checks.
-- **A refresh that lands after the deadline does not apply its photographs.**
-  `photo-boot.js` records *why* everything became visible (`isSealed`), and
-  `render.js` drops the photographs from a late answer while applying
-  everything else. The visitor is by then looking at the cached picture and
-  dropping a new one on top is the blink. `data.js` has already cached the
-  fresh content, so the next load opens on it with no wait. One visit shows
-  one-edit-old photographs; nobody watches a photograph change.
-- **The cold visit is covered too, and only the cold visit.** With a CMS
-  configured *and no readable cache*, `photo-boot.js` hides
-  `[data-photo-critical]` — one image per page, above the fold — even with
-  nothing to say it will change. That image arrives one request late on a first
-  visit and sits on the oxblood panel `.hero__media` / `.mhead__bg` provide
-  until it does. Only that one image pays; everything below the fold keeps the
-  shipped picture and swaps if it must, because holding the whole page is the
-  SPA loading screen this site exists not to be. The entrance choreography is
-  *not* held and plays on time over the panel — `test:photosettle` asserts the
-  boot stylesheet never names anything but a photograph.
+Four things about it are load-bearing:
 
-  **`!cacheKnown` is the load-bearing half of that condition** and it was
-  missing for a day. Gated on "is a CMS configured" alone, the rule fired on
-  returning visitors too — and `hero.main` on this site has no upload, so the
-  hero sat behind the dark panel on every single load, waiting out a request
-  that came back saying nothing had changed, then appeared with a jolt.
-  Measured in Chrome at 177ms held with `complete=true` — the picture had been
-  decoded and ready the whole time — revealed at 225ms. A new blink, paid by
-  every visitor on every load, in exchange for nothing.
+- **It writes to `dist/` only.** The source tree keeps what is committed, so
+  `file://`, `vite dev`, a fresh clone and a deleted database all behave as
+  they always did, and a build never shows up in `git status`. `test:bake`
+  asserts a bake writes to no file in the repository.
+- **It stamps `baked` into `dist/data/seed-photos.js`,** and `data.js` compares
+  that against the database's `storage_path`. Equal means the markup already
+  has this picture and **no override is reported**. Without the stamp the bake
+  is worse than useless — the page would open on the correct photograph and
+  then be handed the same photograph from the bucket URL, a second fetch and
+  repaint on every load. Sabotaging the stamp fails three checks in
+  `test:bake`.
+- **A path that differs turns the runtime layer back on,** which is what covers
+  the window between an upload and the next build. The two halves are not
+  alternatives; the runtime one is the stopgap and the bake is the fix.
+- **It never half-bakes and never fails a deploy.** An unreachable database or
+  a photograph the bucket will not serve leaves `dist/` exactly as vite built
+  it and exits 0 — the same floor as everything else here: when the live layer
+  is unavailable, serve what is in git. A page is rewritten only after its
+  photograph is on disk, because a rewritten page naming a missing file is a
+  broken image on the live site, which is worse than the blink.
 
-  A cache carrying an empty photos map is **not** an absence of information. It
-  is the CMS's own answer: these slots show what they ship with. So a returning
-  visitor is held to what the cache actually says, and only an unreadable or
-  absent cache counts as silence. What that gives up is narrow and
-  self-correcting: when a slot goes from empty to filled, one visitor with an
-  older cache sees one swap, and their cache is written before they leave.
-  `test:photobrowser` holds the line in both directions.
-
-This is why `config.js` moved into `<head>`, above `photo-boot.js`: without it
-the boot script cannot tell whether an answer is coming, and holding the hero
-over `file://` would be a dark panel until the deadline on every open.
-`wire-scripts.mjs` refuses to run if the two tags drift apart, because the
-failure is otherwise silent — the hold quietly stops happening and every test
-stays green.
-
-**Baking the photographs into the markup is still the better fix** and is still
-worth doing: run `node tools/extract-photos.mjs` after an upload and commit, so
-the shipped file *is* the current photograph and no visitor waits for anything.
-The runtime hold is what covers the window between an edit and the next deploy.
-The hero uploaded on 6 August 2026 has been extracted as
-`assets/web/hero-wine-frame.webp`.
+**Photographs are the only content that needs a rebuild.** Words, hours, prices
+and menu items are live on the next page load with no flicker, because they are
+rendered from data rather than replacing something already painted. `photoNote()`
+in `admin.js` tells the owner this, and tells them rebuilds are metered — the
+host allows 500 a month. Nothing triggers one automatically; that is deliberate,
+so nine uploads in a sitting cannot become nine builds.
 
 Do not treat a general CMS-to-files sync tool as current work. The CMS is the
 editing surface, and text edits reach the seed files through the existing
@@ -493,12 +487,11 @@ also run `node tools/check-live-project.mjs`. For headline or responsive layout
 changes, run `node tools/measure-headlines.mjs` and inspect the result in a real
 browser. Automated checks cannot replace the browser pass for visual behavior.
 
-### The thirty-one harnesses
+### The thirty harnesses
 
 `npm test` currently covers: `check:fonts`, `test:fonts`, `check:csp`,
 `check:vendor`, `test:pages`, `test:hours`, `test:copy`, `test:ordering`,
-`test:guards`, `test:admin`, `test:photos`, `test:photoboot`, `test:photosettle`,
-`test:photobrowser`,
+`test:guards`, `test:admin`, `test:photos`, `test:photoboot`, `test:bake`,
 `test:sql`,
 `test:rls`,
 `test:dbguards`, `test:live`, `test:policies`, `check:policies`, `check:seed`,
@@ -522,13 +515,13 @@ Tools: `tools/add-content-hooks.mjs`, `tools/check-csp.mjs`,
 `tools/gen-seed-sql.mjs`, `tools/measure-font-shift.mjs`,
 `tools/measure-headlines.mjs`, `tools/page-boot.mjs`, `tools/photo-slots.mjs`,
 `tools/strip-menu-markup.mjs`, `tools/supabase-shim.mjs`,
-`tools/test-admin.mjs`, `tools/test-copy.mjs`, `tools/test-db-guards.mjs`,
+`tools/bake-photos.mjs`, `tools/test-admin.mjs`, `tools/test-bake.mjs`,
+`tools/test-copy.mjs`, `tools/test-db-guards.mjs`,
 `tools/test-fonts.mjs`, `tools/test-guards.mjs`, `tools/test-hostile-content.mjs`,
 `tools/test-hours-exceptions.mjs`, `tools/test-hours-live.mjs`,
 `tools/test-hours.mjs`, `tools/test-live.mjs`,
 `tools/test-menu-hidden.mjs`, `tools/test-menu-shapes.mjs`,
 `tools/test-ordering.mjs`, `tools/test-photo-boot.mjs`,
-`tools/test-photo-browser.mjs`, `tools/test-photo-settle.mjs`,
 `tools/test-photos.mjs`,
 `tools/test-policies.mjs`, `tools/test-replay.mjs`, `tools/test-resilience.mjs`,
 `tools/test-rls.mjs`, `tools/test-sql.mjs`, `tools/verify-phase1.mjs` and

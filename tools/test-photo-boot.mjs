@@ -38,7 +38,7 @@ function check(what, got, want) {
 
 const BOOT = readFileSync("photo-boot.js", "utf8");
 const PAGE = `<!doctype html><html><head></head><body>
-  <img data-photo="hero.main" data-photo-critical src="assets/web/hero-dining.jpg">
+  <img data-photo="hero.main" src="assets/web/hero-dining.jpg">
   <img data-photo="story.one" src="assets/web/story.jpg">
   <img data-photo="strip.a" src="assets/web/strip.jpg" data-photo-decorative>
 </body></html>`;
@@ -54,18 +54,6 @@ function boot(cache, opts = {}) {
     pretendToBeVisual: true,
     runScripts: "dangerously"
   });
-
-  /* config.js, which now loads in <head> immediately above the file under test.
-     photo-boot.js reads it to answer one question — is a second answer coming
-     from a database? — and the answer decides whether the above-the-fold image
-     is held on a visitor who has no cache to say that it should be. Absent by
-     default, because that is the file:// case and the emptied-key case, and
-     both have to keep behaving as they did in Phase 1. */
-  if (opts.config) {
-    dom.window.eval('var AROMATI_CONFIG = { url: "https://p.supabase.co", anonKey: "' +
-                    "k".repeat(40) + '" };');
-  }
-
   const store = {};
   if (cache !== null) store["aromati:content:v3"] = typeof cache === "string"
     ? cache : JSON.stringify(cache);
@@ -195,126 +183,31 @@ console.log("\nthe two copies of the cache key\n");
         bootKey && bootKey[1], dataKey && dataKey[1]);
 }
 
-console.log("\nrender.js reports every slot it is given\n");
+console.log("\nrender.js lets go of every slot it is given\n");
 {
   /* The boot script's safety net is a timeout, and a timeout that is doing the
-     work every time is a bug wearing a seatbelt: the photograph appears a
-     second late on every visit and nothing reports it. So the renderer has to
-     account for each slot on every path it can take through one.
-
-     `slotReady` rather than `releaseSlot` is what is looked for now. Under the
-     two-stage hold a slot that is ready is not necessarily a slot that may be
-     shown — it may still be waiting on the refresh — and a path that released
-     directly would be a path that shows the cached photograph early, which is
-     the bug. Exactly one place decides, and it is slotReady.
-
-     Whitespace-collapsed before anything is looked for. A needle carrying its
+     work every time is a bug wearing a seatbelt: the photograph appears 700ms
+     late on every visit and nothing reports it. So the renderer has to release
+     each slot on every path it can take through a slot. */
+  const RENDER = readFileSync("render.js", "utf8");
+  /* Whitespace-collapsed before anything is looked for. A needle carrying its
      own indentation is a needle that breaks on a reformat, on a CRLF checkout,
      or on someone wrapping a line — and it breaks by quietly not matching,
-     which reads as the code having lost a report it still has. */
-  const RENDER = readFileSync("render.js", "utf8");
-  /* From heldNow to the end of the section: setPhoto and renderPhotos, which
-     are the per-slot paths. Deliberately not the whole photographs section —
-     slotReady, settlePhotos and releaseSlot itself live above it, and they are
-     the machinery that is *allowed* to release. */
-  const half = RENDER.slice(RENDER.indexOf("function heldNow"),
+     which reads as the code having lost a release it still has. */
+  const half = RENDER.slice(RENDER.indexOf("/* ── photographs ──"),
                             RENDER.indexOf("/* ── go ──"))
                      .replace(/\s+/g, " ");
   const paths = [
-    ["a slot with no data at all", "if (!photo) { slotReady(img, slot); return; }"],
-    ["a url the https rule refuses", "} else { slotReady(img, slot); }"],
-    ["a held slot, once its picture has decoded", "img.decode().then(ready, ready);"],
-    ["a src that is already correct", 'if (img.getAttribute("src") === url) { ready(); return; }'],
-    ["a replacement that never loads", "}, function () {"]
+    ["a slot with no data at all", "if (!photo) { releaseSlot(slot); return; }"],
+    ["a url the https rule refuses", "} else { releaseSlot(slot); }"],
+    ["a held slot, once its picture has decoded", "img.decode().then(function () { releaseSlot(slot); },"],
+    ["a src that is already correct", 'if (img.getAttribute("src") === url) { releaseSlot(slot); return; }']
   ];
   for (const [what, needle] of paths) {
-    check(what + " is reported", half.includes(needle), true);
+    check(what + " is released", half.includes(needle), true);
   }
-
-  /* The one thing that must not come back. Releasing a slot from inside the
-     photograph paths is how the cached picture gets shown before the refresh
-     has had its say — the whole of the reported bug in one call. Everything in
-     here goes through slotReady, which knows whether it is allowed yet. */
-  check("nothing in the photograph paths releases a slot directly",
-        /releaseSlot\(slot\)/.test(half), false);
-}
-
-console.log("\nthe above-the-fold hold, and what gates it\n");
-{
-  /* With no config there is no second answer coming, so holding the hero would
-     be a dark panel until the deadline on a page that is already correct —
-     file://, and any deploy with config.js emptied. */
-  const cold = boot(null);
-  check("no database configured holds nothing", cold.hiddenSlots(), []);
-  check("and the boot script says so", cold.api.isLive(), false);
-}
-{
-  const live = boot(null, { config: true });
-  check("a configured database holds the above-the-fold image on a cold visit",
-        live.hiddenSlots(), ["[data-photo-critical]"]);
-  check("and only that — nothing else is touched on a first visit",
-        live.preloads(), []);
-  live.api.reveal(live.api.CRITICAL);
-  check("the reserved key reveals its own rule", live.hiddenSlots(), []);
-}
-{
-  const live = boot(REPLACED, { config: true });
-  check("a returning visitor is held to exactly what the cache says",
-        live.hiddenSlots(), ["hero.main"]);
-  live.fireTimers();
-  check("and the deadline lifts it", live.hiddenSlots(), []);
-}
-{
-  /* The regression. Reported from a real site on 7 August 2026: the hero sat
-     behind the dark panel on every load, the masthead animated over it, and
-     the photograph appeared with a jolt afterwards.
-
-     The cause was this rule firing on a visitor whose cache already said the
-     hero has no replacement. The picture was decoded and ready — measured at
-     `complete=true` while still hidden — and was held anyway, waiting out a
-     request whose answer was "nothing changed". Every load, for nothing.
-
-     A cache carrying an empty photos map is not an absence of information. It
-     is the CMS's own answer, and the answer is that these slots show what they
-     ship with. */
-  const settled = boot({ photos: {} }, { config: true });
-  check("a cache that says 'no replacements' holds nothing at all",
-        settled.hiddenSlots(), []);
-}
-{
-  const partial = boot({ photos: { "story.one": { alt: "b", url: null } } }, { config: true });
-  check("and a cache that answers for a slot with null holds nothing either",
-        partial.hiddenSlots(), []);
-}
-{
-  /* But a cache that cannot be read is not an answer, it is silence — and
-     silence about the one image above the fold is the cold visit, which is
-     still held. This is the line the fix must not cross: it narrows the hold
-     to visitors who know something, not away entirely. */
-  const broken = boot("{ not json", { config: true });
-  check("an unreadable cache is silence, and silence still holds the hero",
-        broken.hiddenSlots(), ["[data-photo-critical]"]);
-  const noPhotos = boot({ menu: {} }, { config: true });
-  check("so is a cache with no photos key at all",
-        noPhotos.hiddenSlots(), ["[data-photo-critical]"]);
-}
-
-console.log("\nthe deadline records why it fired\n");
-{
-  const b = boot(REPLACED, { config: true });
-  check("nothing is sealed while the page is still waiting", b.api.isSealed(), false);
-  b.fireTimers();
-  check("the deadline seals the page", b.api.isSealed(), true);
-  /* render.js reads this and declines to apply photographs from a refresh that
-     lands afterwards. Without it the safety net puts the blink back: the
-     visitor is looking at the cached picture by then, and dropping the new one
-     in on top is exactly the swap this file exists to remove. */
-}
-{
-  const b = boot(REPLACED, { config: true });
-  b.api.revealAll();
-  check("but revealing early, on purpose, is not the same as giving up",
-        b.api.isSealed(), false);
+  check("and a replacement that never loads is released too",
+        (half.match(/releaseSlot\(slot\)/g) || []).length >= 7, true);
 }
 
 console.log(failures

@@ -778,77 +778,8 @@
   var boot = typeof AROMATI_PHOTO_BOOT === "object" && AROMATI_PHOTO_BOOT
     ? AROMATI_PHOTO_BOOT : null;
 
-  /* The boot script's reserved key for "the one image above the fold", which it
-     holds as a group because nothing in <head> can query the DOM. Named from
-     there rather than written out again; defaulted so this file still runs
-     against an older cached copy of photo-boot.js that has never heard of it. */
-  var CRITICAL = (boot && boot.CRITICAL) || ":critical";
-
   function releaseSlot(slot) {
     if (boot) { try { boot.reveal(slot); } catch (err) { /* stays visible */ } }
-  }
-
-  /* ── the two-stage hold ──────────────────────
-     A photograph is hidden by <head> and released here, and the question this
-     block answers is *when*.
-
-     The obvious answer — as soon as its picture has decoded — is the one this
-     file used to give, and it is why a returning visitor still watched the
-     hero change. What decoded first was the *cached* picture, one edit behind
-     the database by construction, and the refresh landing a moment later
-     replaced it in full view. See the long note in photo-boot.js.
-
-     So a slot that is ready is not necessarily a slot that may be shown. It is
-     released when both are true:
-
-       - its picture is in and decoded, and
-       - the refresh has spoken: fresh content applied, "nothing changed", a
-         failure, or the boot script's deadline.
-
-     `settled` is that second condition. Before it, a ready slot is remembered
-     and stays hidden. After it, ready means shown, immediately. */
-
-  var readyButHeld = {};     // slot → true; decoded, deliberately still hidden
-  var criticalReady = {};    // slot → true, within the current paint only
-  var settled = false;
-
-  function slotReady(img, slot) {
-    if (img.hasAttribute("data-photo-critical")) criticalReady[slot] = true;
-    if (settled) releaseSlot(slot);
-    else readyButHeld[slot] = true;
-    revealCriticalIfReady();
-  }
-
-  /* The group hold lifts only when every above-the-fold image on the page has
-     its final picture. Counted by name rather than by a countdown, so that the
-     second paint — which starts its own pass and re-fills this map — cannot be
-     fooled by the first paint's answers. */
-  function revealCriticalIfReady() {
-    if (!settled || !boot || !boot.isHeld(CRITICAL)) return;
-    var imgs = document.querySelectorAll("[data-photo][data-photo-critical]");
-    for (var i = 0; i < imgs.length; i++) {
-      if (!criticalReady[imgs[i].getAttribute("data-photo")]) return;
-    }
-    releaseSlot(CRITICAL);
-  }
-
-  /* The refresh has spoken.
-
-     `repainting` is the difference between its two answers, and getting it
-     backwards is the whole bug in miniature. When the refresh says "nothing
-     changed", the pictures already decoded are the final ones and go up now.
-     When it says "here is a different photograph", those same slots must stay
-     hidden — releasing them first and repainting a moment later would show the
-     cached picture and then replace it, which is the blink arriving by way of
-     the code written to prevent it. There, the hold is handed straight to the
-     new picture's own decode: `settled` is set, so each slot goes up the
-     instant its *final* photograph is ready, and not before. */
-  function settlePhotos(repainting) {
-    settled = true;
-    if (repainting) { readyButHeld = {}; return; }
-    Object.keys(readyButHeld).forEach(releaseSlot);
-    readyButHeld = {};
-    revealCriticalIfReady();
   }
 
   /* Put a picture in without ever showing it half-arrived.
@@ -856,91 +787,69 @@
      Two cases, and they want opposite things:
 
      A slot the boot script is holding is blank right now. Nothing is on screen
-     to protect, so the src goes straight in and the slot is reported ready as
-     soon as the picture has decoded — the visitor's first sight of that box is
-     a finished photograph.
+     to protect, so the src goes straight in and the slot is revealed as soon
+     as the picture is ready — the visitor's first sight of that box is the
+     finished photograph.
 
-     A slot that is *not* held is showing the shipped photograph: a below-the-
-     fold image on a first visit, or one whose hold has already been lifted.
+     A slot that is *not* held is showing the shipped photograph: a first-ever
+     visit, or a replacement uploaded since this visitor last had a cache.
      Setting src there would leave the old picture up and swap when the new one
      decodes, which is the blink. So the image is decoded off-DOM first and
      only then assigned, making the change a single frame rather than a wait
      with an old photograph in it.
 
-     `heldNow` asks about the group hold as well as the slot's own, because an
-     above-the-fold image on a cold visit is hidden without ever having been
-     named — and it matters which branch it takes. Down the held branch the src
-     goes in immediately and the reveal happens on the picture that is actually
-     in the element; down the other branch the element still holds the shipped
-     picture while the replacement decodes off-DOM, and revealing there would
-     reveal the wrong one.
-
      decode() is not universal and can reject on a perfectly good image if the
      element is detached mid-flight. Both paths fall back to a plain assignment,
      which is what the site did before any of this existed. */
-  function heldNow(img, slot) {
-    if (!boot) return false;
-    try {
-      return boot.isHeld(slot) ||
-        (img.hasAttribute("data-photo-critical") && boot.isHeld(CRITICAL));
-    } catch (err) { return false; }
-  }
-
   function setPhoto(img, slot, url) {
-    var ready = function () { slotReady(img, slot); };
-
-    if (heldNow(img, slot)) {
+    if (boot && boot.isHeld(slot)) {
       img.setAttribute("src", url);
       if (img.decode) {
-        img.decode().then(ready, ready);
+        img.decode().then(function () { releaseSlot(slot); },
+                          function () { releaseSlot(slot); });
       } else {
-        img.addEventListener("load", ready);
-        img.addEventListener("error", ready);
+        img.addEventListener("load", function () { releaseSlot(slot); });
+        img.addEventListener("error", function () { releaseSlot(slot); });
       }
       return;
     }
 
-    if (img.getAttribute("src") === url) { ready(); return; }
+    if (img.getAttribute("src") === url) { releaseSlot(slot); return; }
 
     var pre = new Image();
     if (!pre.decode) {
       img.setAttribute("src", url);
-      ready();
+      releaseSlot(slot);
       return;
     }
     pre.src = url;
     pre.decode().then(function () {
       img.setAttribute("src", url);
-      ready();
+      releaseSlot(slot);
     }, function () {
       /* The replacement is unreachable — storage down, object deleted, the CSP
          origin out of step with config.js. Leaving the shipped photograph up is
-         the right answer and needs no action; whatever is in the element is
-         what this slot is going to show, so it counts as ready. */
-      ready();
+         the right answer and needs no action; the slot is not held, so there is
+         nothing to reveal either. */
+      releaseSlot(slot);
     });
   }
 
   function renderPhotos(photos) {
-    /* Each pass answers for itself. A critical image that reported ready with
-       the cached picture has said nothing about the fresh one that is about to
-       replace it, and leaving that answer in place would lift the group hold
-       over a photograph still mid-swap. */
-    criticalReady = {};
-
     Array.prototype.forEach.call(document.querySelectorAll("[data-photo]"), function (img) {
       var slot = img.getAttribute("data-photo");
       var photo = photos[slot];
 
-      /* A slot with no entry at all is showing what it shipped with, and that
-         is final — there is nothing else coming for it. It reports ready so
-         the group hold is not waiting on a slot that will never answer. */
-      if (!photo) { slotReady(img, slot); return; }
+      /* A slot with no entry at all still has to be released. It cannot
+         normally be held — the boot script only hides what it found a URL for —
+         but "cannot normally" is not a reason to leave the one path that would
+         strand a photograph off the page. */
+      if (!photo) { releaseSlot(slot); return; }
 
       if (typeof photo.url === "string" && SAFE_URL.test(photo.url)) {
         setPhoto(img, slot, photo.url);
       } else {
-        slotReady(img, slot);
+        releaseSlot(slot);
       }
 
       /* data-photo-decorative is this *drawing* of the slot, not the slot: the
@@ -970,14 +879,12 @@
      with cache-or-seed, and again only if the network comes back with
      something different. `boardChanged` is what tells script.js whether the
      choreography has to be replayed — see below. */
-  function paint(content, skipPhotos) {
+  function paint(content) {
     var boardChanged = false;
 
     if (content.copy) step("copy", function () { renderCopy(content.copy); });
 
-    if (content.photos && !skipPhotos) {
-      step("photos", function () { renderPhotos(content.photos); });
-    }
+    if (content.photos) step("photos", function () { renderPhotos(content.photos); });
 
     if (content.settings) {
       step("contact", function () { renderContact(content.settings); });
@@ -1028,17 +935,7 @@
        there is nothing to write that the markup does not already say. */
   });
 
-  /* Whether a second answer is coming at all. This, not photo-boot.js's own
-     guess, is the authority: it is the file that decides whether to fetch.
-
-     Without one — data.js absent, config.js empty, opened from file:// — the
-     first paint is the only paint, so nothing is waiting on anything and every
-     hold lifts now. This is the line that makes a drift between the two
-     `configured` tests cost milliseconds instead of a dark hero. */
-  if (!source || typeof source.configured !== "function" || !source.configured()) {
-    settlePhotos();
-    if (!source) return;
-  }
+  if (!source) return;
 
   /* ── second paint: only if the network disagreed ──
      refresh() calls back with null when there is nothing to do, which is the
@@ -1061,29 +958,8 @@
   }
 
   source.refresh(function (fresh) {
-    /* Did the page already give up waiting? Then every photograph on it is
-       visible, and the visitor is looking at the cached ones. Applying fresh
-       photographs now would change a picture in front of them — the exact
-       blink the hold exists to remove, reintroduced by the timeout meant to
-       protect against a different failure.
-
-       So the photographs are dropped and everything else on the refresh is
-       applied as normal. data.js has already written the fresh content to the
-       cache, so the next load opens on the right picture with no wait. The
-       cost is bounded and one-sided: one visit shows one-edit-old photographs,
-       and nobody ever watches a photograph change. */
-    var late = false;
-    try { late = !!(boot && boot.isSealed()); } catch (err) { late = false; }
-
-    /* Before the paint, not after: `settled` is what tells slotReady a decoded
-       picture may be shown, and the pictures the paint below is about to set
-       are the final ones. They have to be released on their own decode rather
-       than sit in readyButHeld waiting for a settle that has been and gone. */
-    var repainting = !!fresh && !late && !!fresh.photos;
-    settlePhotos(repainting);
-
     if (!fresh) return;
-    var boardChanged = paint(fresh, late);
+    var boardChanged = paint(fresh);
 
     /* Two announcements, because they answer two different questions.
 

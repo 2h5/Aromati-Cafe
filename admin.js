@@ -1004,7 +1004,7 @@ var AROMATI_ADMIN = (function () {
       indexHead: menuIndexHead, refreshHead: menuRefreshHead,
       indexFoot: menuIndexFoot,
       emptyIndex: "This page has no sections yet." },
-    { id: "photos",  name: "Photos",  sections: photoSections,
+    { id: "photos",  name: "Photos",  sections: photoSections, note: photoNote,
       emptyIndex: "No photograph slots yet.",
       emptyEditor: "No photograph slots in the database yet. The site is showing " +
         "the pictures in its own markup, which is correct — but nothing here can " +
@@ -1405,6 +1405,42 @@ var AROMATI_ADMIN = (function () {
 
   /* The one rule about how the text is read, said once at the top of the pane
      rather than repeated under every box. */
+  /* The one thing on this page that does not simply take effect.
+
+     Words, hours, prices and menu items are live the moment they are saved —
+     the site reads them on the next page load and nothing else has to happen.
+     A photograph is different, and the difference is worth spelling out here
+     rather than leaving it to be discovered.
+
+     A replaced photograph *is* live immediately. What it is not, until the
+     site is rebuilt, is baked into the page — so on that first load a visitor
+     can see the previous picture for a moment before it changes. Four attempts
+     were made to remove that flicker in the browser and it cannot be removed
+     there: the page has to be painted before the database can be asked. The
+     rebuild is what removes it, by putting the new photograph into the file
+     itself. See tools/bake-photos.mjs.
+
+     Rebuilds are metered by the host, which is why nothing here starts one
+     automatically and why this says so plainly. An owner who knows a rebuild
+     is a real, countable thing will batch their uploads; one who does not will
+     upload nine photographs one at a time and wonder why the allowance went. */
+  function photoNote() {
+    return makeNote(function (node) {
+      node.appendChild(el("strong", null, "Photographs need the site rebuilt. "));
+      node.appendChild(document.createTextNode(
+        "A new photograph goes live straight away, but until the site is " +
+        "rebuilt visitors may see the old one for a moment first. Rebuilding " +
+        "puts the picture into the page itself and the flicker stops."));
+      node.appendChild(el("br"));
+      node.appendChild(el("br"));
+      node.appendChild(el("strong", null, "Rebuilds are limited. "));
+      node.appendChild(document.createTextNode(
+        "The host allows 500 a month and every one counts, so finish all the " +
+        "photographs you want to change first, then rebuild once — not once " +
+        "per picture. Nothing here starts a rebuild on its own."));
+    });
+  }
+
   function copyNote() {
     return makeNote(function (node) {
       node.appendChild(el("strong", null, "How your typing is read. "));

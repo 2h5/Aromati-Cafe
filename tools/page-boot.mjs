@@ -34,13 +34,7 @@ export const CACHE_KEY = (readFileSync("data.js", "utf8")
 if (!CACHE_KEY) throw new Error("page-boot: no CACHE_KEY found in data.js");
 
 export function boot(page, {
-  fetcher, cache = null, key = "k".repeat(40), seedOnly = false, now = FROZEN,
-  /* Called with the window after every stub is in place and before a single
-     one of the page's scripts has run. It exists for the one thing a harness
-     cannot reach any other way: photo-boot.js arms its deadline in <head>, so
-     a test that wants to ask what happens when that deadline fires has to
-     replace setTimeout before the file is evaluated. */
-  patch = null
+  fetcher, cache = null, key = "k".repeat(40), seedOnly = false, now = FROZEN
 } = {}) {
   /* pretendToBeVisual buys requestAnimationFrame, which the tab filter needs:
      it commits the new selection inside a rAF. Without it a click schedules a
@@ -86,28 +80,6 @@ export function boot(page, {
      a real code path the site supports — and it keeps the choreography out of
      tests that are about what is on the page, not about how it arrives. */
   window.matchMedia = () => ({ matches: true, addListener() {}, addEventListener() {} });
-
-  /* jsdom has no image pipeline: nothing is fetched, nothing decodes, and
-     HTMLImageElement has no decode(). render.js's whole photograph path hangs
-     off decode() — it is how a slot reports that its final picture is in and
-     may be shown — so without this every held slot would sit hidden until
-     photo-boot.js's deadline, and every assertion about what a visitor sees
-     would quietly become an assertion about the timeout. Resolving on the next
-     tick is what a browser does with a warm HTTP cache, which is the path
-     these harnesses are about.
-
-     It resolves on a timer rather than immediately, and that is not padding.
-     A resolved promise settles in a microtask, which means the browser never
-     gets a frame in between — so a harness built on Promise.resolve() cannot
-     see a photograph that was revealed and then replaced, because both happen
-     before anything could have been painted. In a browser the gap between
-     those two moments is a network fetch and a decode, and the visitor sees
-     the wrong picture for all of it. Four milliseconds is enough to make the
-     gap observable; it was found by sabotaging render.js's settle order and
-     watching the old, immediate version of this stub report no problem. */
-  window.HTMLImageElement.prototype.decode = function () {
-    return new Promise((r) => window.setTimeout(r, 4));
-  };
   window.IntersectionObserver = class { observe() {} unobserve() {} disconnect() {} };
   window.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
   window.scrollTo = () => {};
@@ -142,8 +114,6 @@ export function boot(page, {
      even ask". */
   inject(`var AROMATI_CONFIG = { url: "https://stub.invalid", anonKey: ${
     seedOnly ? '""' : JSON.stringify(key)} };`);
-
-  if (patch) patch(window);
 
   /* Read off the page rather than listed here, for the same reason
      verify-phase1.mjs does it: a page that starts loading a new file must not
