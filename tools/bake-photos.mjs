@@ -77,6 +77,18 @@ console.log("\nbaking the owner's photographs into dist/\n");
 
 if (!existsSync(OUT)) skip(`there is no ${OUT}/ — run \`vite build\` first`);
 
+/* `fetch` is global from Node 18. Cloudflare Pages picks the Node version from
+   .nvmrc — which this repo now pins — but a builder that ignores it, or a
+   machine running something older, must not take the deploy down with it. The
+   site without a bake is the site as committed, which is correct; the site not
+   deployed at all is an outage. So this is a skip and not a crash, and it says
+   which version it wanted so the cause is in the build log rather than being
+   inferred from a stack trace. */
+if (typeof fetch !== "function") {
+  skip(`this Node (${process.version}) has no global fetch — Node 18+ is required; ` +
+       "see .nvmrc");
+}
+
 /* ── where the photographs live ──────────────────────────────────────────────
    Read out of config.js rather than an environment variable, because config.js
    is the file the site itself reads and the one a person edits when the project

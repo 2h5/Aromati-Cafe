@@ -217,6 +217,23 @@ console.log("\nnothing reachable means nothing changes\n");
         read("data/seed-photos.js").includes(JSON.stringify(STORED)), false);
 }
 
+console.log("\nthe build machine is told which Node to use\n");
+{
+  /* Not a detail. Cloudflare Pages picks a very old default Node for a project
+     that does not pin one, and old Node has no global `fetch` — so the bake
+     would fail on the deploy machine and nowhere else, which is the worst
+     place for a failure to live. The tool skips rather than crashing if it
+     lands there anyway, but the pin is what stops it landing there. */
+  check(".nvmrc exists", existsSync(".nvmrc"), true);
+  const pinned = existsSync(".nvmrc")
+    ? parseInt(readFileSync(".nvmrc", "utf8").trim().replace(/^v/, ""), 10) : 0;
+  check("and pins Node 18 or newer", pinned >= 18, true);
+
+  const tool = readFileSync("tools/bake-photos.mjs", "utf8");
+  check("the tool survives an old Node rather than failing the deploy",
+        /typeof fetch !== "function"/.test(tool), true);
+}
+
 console.log("\nthe editor is not rewritten\n");
 {
   /* admin.html builds its thumbnails from the photos table at runtime — it is
