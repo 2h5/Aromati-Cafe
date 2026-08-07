@@ -60,7 +60,18 @@ function classicScripts(root) {
    editor out of search results; the meta tag alone is the weaker half.
    tools/check-csp.mjs reads these from the source tree, so it passes whether or
    not they ever reached the build — it cannot catch this, and did not. */
-const ROOT_FILES = ["_headers", "robots.txt"];
+/* _routes.json joined them in Phase 7. Once a project has any Function at all,
+   Cloudflare invokes it for *every* request by default — every stylesheet,
+   every photograph, every seed script — and each one is billed as a Worker
+   request. The middleware has nothing to say about any of those; it rewrites
+   photograph src attributes in HTML. This file confines it to the five public
+   pages, which is the difference between a handful of invocations per visit
+   and forty.
+
+   It fails the same silent way as the other two: without it everything works,
+   costs more, and says nothing. tools/test-worker.mjs asserts it lists exactly
+   the pages that exist. */
+const ROOT_FILES = ["_headers", "robots.txt", "_routes.json"];
 
 /* 3. The built-in photographs, at the path the *editor* asks for them by.
 

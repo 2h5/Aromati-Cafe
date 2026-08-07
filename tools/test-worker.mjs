@@ -158,6 +158,37 @@ console.log("\nand the build tells it what it already put in the pages\n");
      than doing nothing on the path where nothing has changed. */
 }
 
+console.log("\nthe middleware only runs where it has something to do\n");
+{
+  /* A project with any Function invokes it for every request by default —
+     every stylesheet, every photograph, every seed script — and each is billed
+     as a Worker request. _routes.json confines it to the pages it rewrites.
+
+     Checked against the pages that actually exist rather than a list written
+     here, because the failure is silent in the direction that matters: a page
+     added and not listed simply never gets its photographs rewritten, and
+     looks completely normal while doing it. */
+  const PUBLIC = ["index.html", "faq.html", "menu-food.html", "menu-drinks.html",
+                  "menu-wine.html"].filter(existsSync);
+  if (!existsSync("_routes.json")) fail("_routes.json is missing");
+  else {
+    const routes = JSON.parse(readFileSync("_routes.json", "utf8"));
+    const want = ["/", ...PUBLIC.map((p) => "/" + p)].sort();
+    check("every public page invokes the middleware",
+          [...(routes.include || [])].sort(), want);
+    check("and the editor does not", (routes.include || []).includes("/admin.html"), false);
+
+    /* Pages serves "/" for index.html and redirects /index.html to it, so the
+       bare root has to be listed or the home page — the one with the hero —
+       is the single page the middleware never sees. */
+    check("the bare root is listed, which is the path the home page is served on",
+          (routes.include || []).includes("/"), true);
+  }
+
+  const vite = readFileSync("vite.config.js", "utf8");
+  check("and the build copies it into dist/", vite.includes('"_routes.json"'), true);
+}
+
 console.log(failures
   ? `\n${failures} problem(s) — the deployed site may lose its policy, or blink\n`
   : "\nthe middleware agrees with config.js, _headers and data.js\n");
