@@ -67,6 +67,15 @@ const REMOVED = [
   { page: "index.html", sel: ".mmenu__links .mml__n",
     why: "decorative mobile-menu numbers removed, 2026-08-04" },
 
+  /* The 2026-08-04 removal only reached index.html. The other four pages carry
+     their own copy of the drawer, so they kept the numbers — and once the CSS
+     that positioned them was gone with the home page's, they rendered as a bare
+     line of digits above each word. Same removal, three days late. */
+  { page: "faq.html",         sel: ".mmenu__links .mml__n", why: "as index.html, 2026-08-07" },
+  { page: "menu-food.html",   sel: ".mmenu__links .mml__n", why: "as index.html, 2026-08-07" },
+  { page: "menu-drinks.html", sel: ".mmenu__links .mml__n", why: "as index.html, 2026-08-07" },
+  { page: "menu-wine.html",   sel: ".mmenu__links .mml__n", why: "as index.html, 2026-08-07" },
+
   /* The brand became the drawn lockup on 2026-08-06. Where the bar used to set
      the name in type it now paints the studio artwork, so "Aromati" and
      "café · wine bar" are no longer strings on any page — the name is on the
