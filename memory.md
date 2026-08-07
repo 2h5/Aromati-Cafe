@@ -267,21 +267,23 @@ this is the part that is easy to get wrong:
 | An upload with no `source_path` | the framed copy on the site | framing works inwards only, and the panel says so before the button is pressed |
 
 The last row is the one that cannot be fixed after the fact, and as of 4 August
-2026 it is still empty — but no longer because nothing has been uploaded. Ten
+2026 it is still empty — but no longer because nothing has been uploaded. Eleven
 slots carry a `storage_path`: `cafe.card2`, `cafe.card3`, `cafe.card4`,
-`gallery.g2`, `gallery.g3`, `kitchen.plate2`, `menuDrinks.masthead`, `story.a`,
-`story.b` and `wine.board`. Every one also carries a `source_path`, so every one
+`gallery.g2`, `gallery.g3`, `hero.main`, `kitchen.plate2`,
+`menuDrinks.masthead`, `story.a`, `story.b` and `wine.board`. Every one also
+carries a `source_path`, so every one
 can still be widened. The row can only be reached by an upload whose 2600px
 original comes out over the bucket's 3 MB limit.
 `tools/check-live-project.mjs` names that state explicitly and fails on it.
 
 ### Keeping the offline floor in step with the uploads
 
-On 4 August 2026 those ten framed uploads were pulled out of the bucket and
+On 4 August 2026 the first ten framed uploads were pulled out of the bucket and
 committed as the files the site ships with — `assets/web/*-framed.webp` — and
 the markup was repointed at them. Before that, a visitor who arrived while
 Supabase was unreachable saw ten photographs the owner had replaced months
-earlier. Now the fallback shows the same pictures the live site does.
+earlier. `hero.main` was synced the same way on 6 August. Now all eleven live
+overrides are byte-for-byte identical to the fallbacks the pages ship with.
 
 **This does not stay true by itself.** After any future upload, run
 `node tools/extract-photos.mjs` and commit, or the gap opens again silently —
@@ -338,8 +340,8 @@ Three things about it are load-bearing and easy to undo by accident:
 exists only in a database the browser has not queried. For that visitor the fix
 is the one already written above — run `node tools/extract-photos.mjs` after an
 upload and commit, so the shipped file *is* the current photograph and there is
-nothing to swap. The friend's hero replacement on 6 August 2026 is exactly the
-case: uploaded, never extracted.
+nothing to swap. The hero replacement uploaded on 6 August 2026 exposed this
+gap and has now been extracted as `assets/web/hero-wine-frame.webp`.
 
 Do not treat a general CMS-to-files sync tool as current work. The CMS is the
 editing surface, and text edits reach the seed files through the existing

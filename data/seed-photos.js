@@ -22,7 +22,7 @@
    very different shape from what it replaces. */
 
 var SEED_PHOTOS = {
-  "hero.main": { src: "assets/web/hero-dining.jpg", alt: "The upstairs dining room at Aromati — cane chairs, tufted leather, burgundy walls", width: 1535, height: 1024 },
+  "hero.main": { src: "assets/web/hero-wine-frame.webp", alt: "The upstairs dining room at Aromati — cane chairs, tufted leather, burgundy walls", width: 1672, height: 941 },
 
   "story.a": { src: "assets/web/dining-corner-framed.webp", alt: "Burgundy wall, organic mirror and cane chairs inside Aromati", width: 1023, height: 682 },
   "story.b": { src: "assets/web/golden-hour-framed.webp", alt: "Golden hour light across the window tables at Aromati", width: 1088, height: 680 },

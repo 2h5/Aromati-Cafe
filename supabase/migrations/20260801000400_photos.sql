@@ -109,7 +109,7 @@ create trigger photos_alt_check
 -- ----------------------------------------------------------------------------
 
 insert into public.photos (slot, label, alt, is_decorative, width, height, sort_order) values
-  ('hero.main', 'The photograph behind the opening headline', 'The upstairs dining room at Aromati — cane chairs, tufted leather, burgundy walls', false, 1535, 1024, 10),
+  ('hero.main', 'The photograph behind the opening headline', 'The upstairs dining room at Aromati — cane chairs, tufted leather, burgundy walls', false, 1672, 941, 10),
   ('story.a', 'The Idea — the upper photograph', 'Burgundy wall, organic mirror and cane chairs inside Aromati', false, 1023, 682, 20),
   ('story.b', 'The Idea — the lower photograph', 'Golden hour light across the window tables at Aromati', false, 1088, 680, 30),
   ('kitchen.plate1', 'The Kitchen strip — 1st photograph', 'Adjaruli khachapuri — cheese boat with egg yolk and butter', false, 1100, 566, 40),
