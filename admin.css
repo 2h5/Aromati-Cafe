@@ -158,6 +158,17 @@ button{ font-family: inherit; }
 }
 .topbar__who{ font-size: 13px; color: rgba(247,242,234,.66); }
 .topbar__spacer{ flex: 1 1 auto; }
+/* What Publish has to say. It sits beside the button rather than in the
+   savebar, because the savebar counts unsaved changes and publishing is about
+   what is already saved — putting one in the other's furniture would tell the
+   owner the two are the same thing. [hidden] wins over the flex display. */
+.topbar__msg{ font-size: 13px; color: rgba(247,242,234,.72); }
+/* Not var(--danger): that red is #8a2116, chosen to be read on the light
+   panels where every other error in this editor appears. The topbar is
+   maroon-900, and a dark red on it is a message nobody can see — which is the
+   one thing an error must never be. */
+.topbar__msg--bad{ color: #f0a48f; }
+.topbar__msg[hidden]{ display: none; }
 .topbar__link{
   display: inline-flex; align-items: baseline; gap: 5px;
   color: var(--gold-soft); font-size: 13px; text-decoration: none;

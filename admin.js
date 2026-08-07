@@ -1437,10 +1437,10 @@ var AROMATI_ADMIN = (function () {
       node.appendChild(el("strong", null, "One thing to know. "));
       node.appendChild(document.createTextNode(
         "Until the site is republished, a visitor may glimpse the previous " +
-        "picture for a moment before the new one appears. Republishing puts " +
-        "the photograph into the page itself and that flicker stops. It is a " +
-        "separate step, done by whoever looks after the site — so change all " +
-        "the photographs you want to change, then ask for it once."));
+        "picture for a moment before the new one appears. Publishing puts the " +
+        "photograph into the page itself and that flicker stops. Press " +
+        "Publish at the top of this page when you are done — once is enough, " +
+        "however many photographs you changed."));
     });
   }
 
@@ -4884,6 +4884,65 @@ var AROMATI_ADMIN = (function () {
     window.setTimeout(function () { updateSavebar(); }, 2600);
   }
 
+  /* ── publishing ───────────────────────────────
+     Asks for the site to be rebuilt, which is what puts the owner's saved
+     photographs into the pages themselves. The deploy hook that does it is an
+     unauthenticated URL and cannot be held by a file the browser downloads, so
+     the request goes to the publish-site Edge Function, which holds the URL and
+     asks Postgres whether this account is the owner before using it.
+
+     The one thing worth guarding: a build bakes what is *saved*, so publishing
+     over unsaved changes would produce a site missing the very edit the owner
+     just made, with nothing to show for the wait. It refuses and says why
+     rather than doing it. */
+  function publishMessage(text, bad) {
+    var node = byId("publishMsg");
+    if (!node) return;
+    node.textContent = text;
+    node.className = "topbar__msg" + (bad ? " topbar__msg--bad" : "");
+    node.hidden = !text;
+  }
+
+  function publish() {
+    var btn = byId("publishBtn");
+    if (!btn || btn.disabled) return;
+
+    if (changeCount() > 0) {
+      publishMessage("Save your changes first — publishing builds the site from what is saved.", true);
+      return;
+    }
+
+    btn.disabled = true;
+    publishMessage("Publishing…", false);
+
+    /* The function's own wording is better than anything that could be guessed
+       out here: it is the only thing that knows whether the account was
+       refused, the secret was missing, or the build service was down. Read it
+       when it can be read, and fall back to something honest when it cannot. */
+    function refused(err) {
+      btn.disabled = false;
+      var ctx = err && err.context;
+      if (ctx && typeof ctx.json === "function") {
+        ctx.json().then(function (body) {
+          publishMessage((body && body.error) || "Publishing failed. Try again in a minute.", true);
+        }, function () {
+          publishMessage("Publishing failed. Try again in a minute.", true);
+        });
+        return;
+      }
+      publishMessage("Publishing failed. Try again in a minute.", true);
+    }
+
+    sb.functions.invoke("publish-site", { method: "POST" }).then(function (res) {
+      if (res && res.error) { refused(res.error); return; }
+      btn.disabled = false;
+      /* "asked for", not "done". Nothing here can learn whether the build
+         succeeded — see PHOTOGRAPHS.md §3, which lists that as a real cost of
+         this design rather than an edge case. Do not promise more. */
+      publishMessage("Publishing. The site updates in about a minute.", false);
+    }, refused);
+  }
+
   function discard() {
     if (changeCount() === 0) return;
     if (!window.confirm("Throw away every change you have made since the last save?")) return;
@@ -5099,6 +5158,7 @@ var AROMATI_ADMIN = (function () {
     restoreTab();
     restoreSections();
     wireGate();
+    on(byId("publishBtn"), "click", publish);
     on(byId("signOut"), "click", signOut);
     on(byId("saveBtn"), "click", save);
     on(byId("discardBtn"), "click", discard);
