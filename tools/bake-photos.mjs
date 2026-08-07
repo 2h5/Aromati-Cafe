@@ -119,7 +119,7 @@ const publicUrl = (p) =>
 
 let rows;
 try {
-  rows = await rest("photos?select=slot,storage_path");
+  rows = await rest("photos?select=slot,storage_path,alt");
 } catch (err) {
   skip(`the database did not answer — ${err.message}`);
 }
@@ -157,7 +157,10 @@ for (const row of uploaded) {
     const file = `assets/baked-${row.slot.replace(/[^a-z0-9]+/gi, "-")}-${stamp}${ext}`;
 
     writeFileSync(resolve(OUT, file), bytes);
-    baked.set(row.slot, { file, path: row.storage_path, bytes: bytes.length });
+    baked.set(row.slot, {
+      file, path: row.storage_path, bytes: bytes.length,
+      alt: typeof row.alt === "string" && row.alt ? row.alt : null,
+    });
   } catch (err) {
     failed.push(`${row.slot} (${err.message})`);
   }
@@ -165,25 +168,71 @@ for (const row of uploaded) {
 
 if (!baked.size) skip(`not one photograph could be fetched — ${failed.join(", ")}`);
 
+/* The owner types the description, and here it is written into markup rather
+   than handed to setAttribute, which is the one place in this project where
+   that difference matters. render.js can put any string on an element safely
+   because the DOM does the quoting; a build step splicing text into a page has
+   to do it itself. Without this, a description containing a quote ends the
+   attribute and everything after it is parsed as markup — the exact injection
+   the whole of render.js is written to avoid, reintroduced by a build tool.
+
+   tools/test-hostile-content.mjs owns this case for the runtime path; the bake
+   is checked in tools/test-bake.mjs. */
+function attr(text) {
+  return String(text)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 /* ── rewrite the pages ───────────────────────────────────────────────────────
-   The src on the <img> carrying that slot, and nothing else on the line. The
-   attribute is replaced by position rather than by rebuilding the tag, so
-   alt, loading, decoding, data-parallax-img and everything else the markup
-   says about that image survives untouched — this is a build step editing a
-   page it did not write, and the less of it it understands the better. */
+   The src on the <img> carrying that slot, and the description beside it, and
+   nothing else on the line. Attributes are replaced by position rather than by
+   rebuilding the tag, so loading, decoding, data-parallax-img and everything
+   else the markup says about that image survives untouched — this is a build
+   step editing a page it did not write, and the less of it it understands the
+   better.
+
+   ── why the description is baked at all ──
+   Both halves of a photograph live in the database, and until 2026-08-07 only
+   one of them was baked. That was invisible because renderPhotos() set the
+   description at runtime, so it always arrived one way or another. The moment
+   that runtime step is removed — PHOTOGRAPHS.md §6 step 4 — an unbaked
+   description stops reaching the site at all, and it stops in the quietest way
+   available: the picture is right, the page looks finished, and what a screen
+   reader announces is whatever the markup happened to say months ago.
+
+   data-photo-decorative is skipped, for the same reason render.js skips it: the
+   home page repeats its nine plates in a second, aria-hidden group so the strip
+   can scroll forever, and describing those would have a screen reader read the
+   whole kitchen twice. Their empty alt is deliberate and is left alone.
+
+   A row with no description written yet also leaves the markup's own alt
+   alone — the sentence committed to git is a better answer than none. */
 function rewritePage(html, page) {
   let count = 0;
+  let described = 0;
   const out = html.replace(
     /<img\b[^>]*>/g,
     (tag) => {
       const slot = (tag.match(/\bdata-photo="([^"]+)"/) || [])[1];
       if (!slot || !baked.has(slot)) return tag;
       if (!/\bsrc="[^"]*"/.test(tag)) return tag;
+      const row = baked.get(slot);
       count++;
-      return tag.replace(/\bsrc="[^"]*"/, `src="${baked.get(slot).file}"`);
+      let out = tag.replace(/\bsrc="[^"]*"/, `src="${row.file}"`);
+      if (row.alt && !/\bdata-photo-decorative\b/.test(out) && /\balt="[^"]*"/.test(out)) {
+        out = out.replace(/\balt="[^"]*"/, `alt="${attr(row.alt)}"`);
+        described++;
+      }
+      return out;
     }
   );
-  if (count) say(`${page.padEnd(17)} ${count} photograph${count === 1 ? "" : "s"}`);
+  if (count) {
+    say(`${page.padEnd(17)} ${count} photograph${count === 1 ? "" : "s"}` +
+        (described ? `, ${described} description${described === 1 ? "" : "s"}` : ""));
+  }
   return out;
 }
 

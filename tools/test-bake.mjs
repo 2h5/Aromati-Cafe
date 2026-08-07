@@ -162,6 +162,78 @@ console.log("\nthe markup around the photograph is left alone\n");
         tagOf(read("index.html"), "story.a"), wasStory);
 }
 
+console.log("\nthe description is baked with the picture\n");
+{
+  /* Both halves of a photograph live in the database and until 2026-08-07 only
+     one of them was baked. It did not show, because renderPhotos() set the
+     description at runtime. The moment that runtime step goes — PHOTOGRAPHS.md
+     §6 step 4 — an unbaked description stops reaching the site in the quietest
+     way there is: the picture is right, the page looks finished, and a screen
+     reader reads whatever the markup said months ago. */
+  stageDist();
+  const r = run({ rows: [{ slot: SLOT, storage_path: STORED, alt: "A corner table under the window" }] });
+  const tag = (read("index.html").match(/<img\b[^>]*data-photo="hero\.main"[^>]*>/) || [""])[0];
+
+  check("the tool succeeds", r.code, 0);
+  check("the owner's description is in the markup",
+        tag.includes('alt="A corner table under the window"'), true);
+  check("and it says so", /1 description\b/.test(r.out), true);
+}
+
+console.log("\na description is text the owner typed, not markup\n");
+{
+  /* render.js can hand any string to setAttribute because the DOM quotes it.
+     A build step splicing text into a page has to quote it itself, and if it
+     does not, a description containing one double quote closes the attribute
+     and everything after it is parsed as markup — the injection the whole of
+     render.js is written to prevent, walked back in through the build. */
+  stageDist();
+  const nasty = 'He said "hi" & <script>alert(1)</script>';
+  const r = run({ rows: [{ slot: SLOT, storage_path: STORED, alt: nasty }] });
+  const html = read("index.html");
+  const tag = (html.match(/<img\b[^>]*data-photo="hero\.main"[^>]*>/) || [""])[0];
+
+  check("the tool succeeds", r.code, 0);
+  check("the quote is escaped, so the attribute still ends where it should",
+        tag.includes("&quot;hi&quot;"), true);
+  check("the ampersand is escaped", tag.includes("&amp;"), true);
+  check("no runnable script reached the page", /<script>alert\(1\)<\/script>/.test(html), false);
+  check("the tag is still one tag", (tag.match(/>/g) || []).length, 1);
+}
+
+console.log("\nwhat is decorative stays decorative\n");
+{
+  /* The home page repeats its nine plates in a second, aria-hidden group so the
+     strip can scroll forever. Describing those would have a screen reader read
+     the whole kitchen twice, which is why render.js skips them and why the bake
+     has to skip them for the same reason rather than by accident. */
+  stageDist();
+  const r = run({ rows: [{ slot: "kitchen.plate2", storage_path: "kitchen.plate2/1.webp", alt: "Khinkali on a plate" }] });
+  const tags = read("index.html").match(/<img\b[^>]*data-photo="kitchen\.plate2"[^>]*>/g) || [];
+
+  check("the tool succeeds", r.code, 0);
+  check("both drawings of the slot were found", tags.length, 2);
+  check("the one that is announced gets the description",
+        tags.some((t) => !/data-photo-decorative/.test(t) && t.includes('alt="Khinkali on a plate"')), true);
+  check("the aria-hidden copy keeps its empty alt",
+        tags.some((t) => /data-photo-decorative/.test(t) && /alt=""/.test(t)), true);
+}
+
+console.log("\nno description written yet leaves the one in git alone\n");
+{
+  /* An empty column is not an instruction to erase the sentence a person wrote
+     into the markup. It means nobody has typed one, and the committed answer is
+     better than none. */
+  stageDist();
+  const r = run({ rows: [{ slot: SLOT, storage_path: STORED, alt: "" }] });
+  const tag = (read("index.html").match(/<img\b[^>]*data-photo="hero\.main"[^>]*>/) || [""])[0];
+
+  check("the tool succeeds", r.code, 0);
+  check("the markup's own description survives",
+        tag.includes('alt="The upstairs dining room'), true);
+  check("and nothing is claimed about descriptions", /description/.test(r.out), false);
+}
+
 console.log("\nthe source tree is never written to\n");
 {
   /* The rule that keeps this safe to run. A build step that edits committed
