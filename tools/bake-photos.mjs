@@ -236,6 +236,20 @@ for (const [slot, info] of baked) {
 
 writeFileSync(seedFile, seed);
 
+/* ── what the edge middleware needs to know ──────────────────────────────────
+   functions/_middleware.js rewrites the src of any slot whose photograph has
+   changed since this build. To know which those are it has to know what this
+   build put in — otherwise every baked photograph gets rewritten from a
+   same-origin file to a Supabase URL on every request: correct, and slower
+   than doing nothing, on the common path where nothing has changed at all.
+
+   Written as data rather than compiled into the middleware so that a deploy of
+   the same code against a different set of photographs cannot go stale. */
+writeFileSync(
+  resolve(OUT, "_baked.json"),
+  JSON.stringify(Object.fromEntries([...baked].map(([s, b]) => [s, b.path])), null, 1)
+);
+
 /* Then read it back and ask the only question that matters, the same way
    vite.config.js does: does every baked slot actually name a file that is
    there? A rewrite that silently matched nothing leaves a page that loads and

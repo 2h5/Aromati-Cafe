@@ -228,7 +228,7 @@ enough.
 npm test
 ```
 
-30 harnesses, no network, no Docker. They run the real files — the real pages
+31 harnesses, no network, no Docker. They run the real files — the real pages
 in jsdom, the real renderer, and the migrations against Postgres
 compiled to WebAssembly. `memory.md` records the current verification workflow;
 the individual commands live in `package.json`.
@@ -239,6 +239,21 @@ the fonts settle, and `npm run test:replay`, which replaces a menu board over a
 live page and checks nothing is left behind. **Both skip cleanly where there is
 no Chrome**, which is exactly when a regression would go out unnoticed — so they
 are the second guard on what they cover, never the only one.
+
+**The middleware is not exercised by `npm test`.** `functions/_middleware.js` runs
+only on Cloudflare — not over `file://`, not under `vite dev`, and HTMLRewriter
+does not exist in Node, so a stub of it would be a test of the stub.
+`npm run test:worker` guards what can be checked honestly: that its copies of
+the project, the policy and the storage URL still match `config.js`, `_headers`
+and `data.js`. To exercise the rewrite for real:
+
+```
+npm run build
+npx wrangler pages dev dist
+```
+
+Then check a photograph changed since the build is served pointing at Supabase,
+and one that has not is served from `assets/baked-…`.
 
 The standard every harness is held to: **it has been sabotaged and required to
 fail, naming the right check.** A harness nobody has broken on purpose is a

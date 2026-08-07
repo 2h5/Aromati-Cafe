@@ -398,6 +398,48 @@ Four things about it are load-bearing:
   photograph is on disk, because a rewritten page naming a missing file is a
   broken image on the live site, which is worse than the blink.
 
+### The edge middleware closes the window the bake cannot
+
+`tools/bake-photos.mjs` makes the files correct *as of the build*. On a site
+nobody is maintaining — a one-time fee, the owner self-serving through the CMS,
+no developer to run a build — "as of the build" is a shrinking guarantee: every
+photograph changed afterwards flickers, forever, because nothing rebuilds.
+
+`functions/_middleware.js` covers that window. It rewrites the `src` of any slot
+whose photograph has changed since the build, as the page streams out, so the
+HTML that reaches the browser already names the current picture. Verified end
+to end under `wrangler pages dev`: a slot stale in the manifest is served
+pointing at Supabase and the browser paints it once — one sample, no swap,
+where the same case without the middleware measured a swap at 2383ms.
+
+Load-bearing, and each was nearly got wrong:
+
+- **It is middleware, not an advanced-mode `_worker.js`.** Cloudflare does not
+  apply `_headers` to what a Function returns, so `_worker.js` would have
+  silently dropped the Content-Security-Policy — on a site whose entire XSS
+  story is that policy. Middleware calls `next()` and returns the asset
+  server's own response. The policy is *also* re-asserted in code rather than
+  trusted, and `test:worker` fails the build if it stops matching `_headers`.
+  (The CSP is real: an inline probe script was blocked by it while testing.)
+- **`publicUrl` must be spelled exactly as `data.js` spells it.** render.js
+  skips a slot when the src it finds equals the URL it would build, and that
+  comparison is the only thing stopping the rewrite and the runtime layer from
+  both acting on one photograph. `test:worker` runs both functions over the
+  same awkward paths — spaces, `&`, non-ASCII — and requires identical output.
+  Dropping the encode fails three checks.
+- **It reads `dist/_baked.json`** — written by the bake — so it only touches
+  slots that have actually changed. Without it every baked photograph is
+  rewritten from a same-origin file to a Supabase URL on every request:
+  correct, and slower than doing nothing on the common path.
+- **No failure path returns an error.** A database that is down, slow or
+  answering nonsense costs a stale photograph and nothing else; the response
+  from the static host is returned untouched. A stale map is served *while* a
+  refresh runs, so a visitor never waits on Supabase.
+
+The two halves compose without coordination: the bake handles the steady state
+and serves same-origin assets, the middleware handles the delta. Neither needs
+the other to be correct.
+
 **Photographs are the only content that needs a rebuild.** Words, hours, prices
 and menu items are live on the next page load with no flicker, because they are
 rendered from data rather than replacing something already painted. `photoNote()`
@@ -487,11 +529,11 @@ also run `node tools/check-live-project.mjs`. For headline or responsive layout
 changes, run `node tools/measure-headlines.mjs` and inspect the result in a real
 browser. Automated checks cannot replace the browser pass for visual behavior.
 
-### The thirty harnesses
+### The thirty-one harnesses
 
 `npm test` currently covers: `check:fonts`, `test:fonts`, `check:csp`,
 `check:vendor`, `test:pages`, `test:hours`, `test:copy`, `test:ordering`,
-`test:guards`, `test:admin`, `test:photos`, `test:photoboot`, `test:bake`,
+`test:guards`, `test:admin`, `test:photos`, `test:photoboot`, `test:bake`, `test:worker`,
 `test:sql`,
 `test:rls`,
 `test:dbguards`, `test:live`, `test:policies`, `check:policies`, `check:seed`,
@@ -516,7 +558,7 @@ Tools: `tools/add-content-hooks.mjs`, `tools/check-csp.mjs`,
 `tools/measure-headlines.mjs`, `tools/page-boot.mjs`, `tools/photo-slots.mjs`,
 `tools/strip-menu-markup.mjs`, `tools/supabase-shim.mjs`,
 `tools/bake-photos.mjs`, `tools/test-admin.mjs`, `tools/test-bake.mjs`,
-`tools/test-copy.mjs`, `tools/test-db-guards.mjs`,
+`tools/test-copy.mjs`, `tools/test-worker.mjs`, `tools/test-db-guards.mjs`,
 `tools/test-fonts.mjs`, `tools/test-guards.mjs`, `tools/test-hostile-content.mjs`,
 `tools/test-hours-exceptions.mjs`, `tools/test-hours-live.mjs`,
 `tools/test-hours.mjs`, `tools/test-live.mjs`,
