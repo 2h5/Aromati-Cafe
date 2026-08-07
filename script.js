@@ -215,10 +215,55 @@
     burger.addEventListener("click", function () {
       setMobileMenu(!mmenu.classList.contains("open"));
     });
+    /* ── the close that does not happen ──
+       A link to a section on this page moves the scroll and nothing else, so the
+       curtain rises over a page that is still there and the close plays out in
+       full. That one is right, and it is left exactly as it was.
+
+       A link to another page is not that. The browser destroys this document the
+       moment the next one is ready to paint, which lands somewhere in the middle
+       of a 640ms close and takes the curtain with it — so the retraction was
+       never being watched to the end, it was being cut off at a different point
+       every time depending on how fast the page came back. Nothing in the drawer
+       can win that: the animation belongs to a document that is about to stop
+       existing.
+
+       Both attempts at making it fit were wrong in the same way. Compressing the
+       close only moved where the cut landed. Fading the drawer out was worse,
+       because what a fade reveals is the page being *left* — so the eye got two
+       transitions, and the middle one was a page nobody asked to see.
+
+       So on a link that loads, the curtain simply stays down. It is already
+       covering the screen, it is already the right colour, and the new page
+       paints straight over it. Nothing animates, so nothing can be interrupted,
+       and the page being left is never shown again. */
+    function leavesDocument(a, e) {
+      if (e.defaultPrevented || e.button !== 0) return false;
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return false;
+      if (a.target && a.target !== "_self") return false;
+      if (a.hasAttribute("download")) return false;
+      var url;
+      try { url = new URL(a.getAttribute("href"), location.href); }
+      catch (err) { return false; }
+      // tel:, mailto:, another origin — the dialer or a new tab opens over the
+      // top and this document stays, so the drawer still has to close itself
+      if (url.protocol !== location.protocol || url.host !== location.host) return false;
+      // a fragment on this page scrolls; it does not load
+      return !(url.hash && url.pathname === location.pathname && url.search === location.search);
+    }
     mmenu.querySelectorAll("a").forEach(function (a) {
-      a.addEventListener("click", function () {
+      a.addEventListener("click", function (e) {
+        if (leavesDocument(a, e)) return;
         setMobileMenu(false);
       });
+    });
+    /* Go Back out of a page reached that way and the browser can restore this
+       one from its cache exactly as it was left — curtain down, scroll locked,
+       over a page the visitor now wants to see. It is the one case where the
+       document does survive the link, so it is the one case where the curtain
+       has to be taken down by hand. */
+    window.addEventListener("pageshow", function (e) {
+      if (e.persisted && mmenu.classList.contains("open")) setMobileMenu(false);
     });
     document.addEventListener("keydown", function (e) {
       if (!mmenu.classList.contains("open")) return;
