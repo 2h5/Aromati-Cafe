@@ -12,6 +12,45 @@ page and the first thing anyone looks at.
 
 ---
 
+## 0. Where this stands — 7 Aug 2026
+
+**Working, verified on the deployed site**, not inferred from the code.
+
+All four layers are live at `aromati-cafe.pages.dev`, served by a Git-connected
+Cloudflare Pages project building from `main`. Last verified against production
+after commit `3203841`:
+
+| Check | Expected | Observed |
+| --- | --- | --- |
+| Middleware ran | no `ETag` header | none |
+| Returning visitor gets fresh HTML | `200` + body | `200`, 33924 bytes |
+| Handshake present, charset still first | meta at byte ~79 | byte 79, charset byte 43 |
+| Slots declared | every slot with an upload | 9 |
+| Build compiled the Function | `Compiled Worker successfully` | present in build log |
+
+Three bugs found and fixed, in order: the two-swap problem (§3.1), the ETag that
+outlived its photograph (§3.2), and photo-boot hiding a correct photograph
+(§3.3). The last two were both found *in production, after the layer above them
+had been verified* — see §6 for why that keeps happening.
+
+### Open
+
+- [ ] **The CMS wording is now out of date and overstates the problem.** See §7.
+      Nothing else is outstanding.
+
+### Deliberately not done
+
+- **An accurate "publishes left this month" counter** in the editor. It would
+  need a Cloudflare API token held somewhere the browser can reach, which means
+  a Supabase Edge Function to hold it. Explained and declined — the number is
+  not actionable for the owner, because uploading a photograph does not consume
+  a build at all.
+- **Rebuilding on every photo change** (a Supabase webhook → deploy hook). The
+  middleware makes it unnecessary for correctness, and it would spend the
+  monthly build quota on something the owner never sees.
+
+---
+
 ## 1. Why this is hard at all
 
 Every photograph ships in the markup as a real `src`:
@@ -336,13 +375,58 @@ history is three bugs whose tests all passed.
 
 ---
 
-## 7. What the owner is told
+## 7. What the owner is told — ⚠️ needs rewriting
 
-`photoNote()` in `admin.js` renders a note on the Photos panel. It says the
-photograph is live straight away, and that until the site is republished a
-visitor may briefly glimpse the previous picture.
+`photoNote()` in `admin.js` (~line 1429) renders the note on the Photos panel.
+**It was written before the middleware existed and is now wrong.** No code has
+been changed for this yet; this section is the brief.
 
-That wording is deliberately conservative: it describes the 60-second window
-without promising a number, and it does **not** mention a deployment quota,
-because uploading a photograph does not cause a Cloudflare build at all. Only a
-git push does.
+### What it currently says
+
+> **Your photograph is live straight away.** Save it and visitors see it on
+> their next visit — there is nothing else you need to do for the picture to be
+> on the site.
+>
+> **One thing to know.** Until the site is republished, a visitor may glimpse
+> the previous picture for a moment before the new one appears. Republishing
+> puts the photograph into the page itself and that flicker stops. It is a
+> separate step, done by whoever looks after the site — so change all the
+> photographs you want to change, then ask for it once.
+
+### Why it is wrong now
+
+The second paragraph describes the world before layer 2. With the middleware
+live:
+
+- **The flicker does not happen at all**, republished or not. The middleware
+  rewrites the `src` at the edge, so the HTML already names the new photograph.
+- **Republishing is no longer needed for correctness.** It is now purely a
+  performance nicety: the bake moves the picture from a cross-origin Supabase
+  fetch to a same-origin file with a long cache life.
+- **"Ask whoever looks after the site" is the wrong instruction** for a site
+  sold on a one-time fee with nobody maintaining it. It tells the owner to
+  chase a person who by design does not exist, for something they do not need.
+- The only genuinely true caveat is the **60-second window** (§4) — the
+  middleware's photo-map TTL — during which a returning visitor may still get
+  the previous picture.
+
+### What it should say instead
+
+Roughly, and in the editor's existing voice:
+
+- Your photograph is live straight away. Nothing else to do.
+- Give it about a minute to reach everyone. If you reload immediately you may
+  still see the old one; that is normal and clears itself.
+- No republishing, no quota, nobody to ask.
+
+Constraints when writing it:
+
+- It must **not** name a deployment quota. Uploading a photograph does not
+  cause a Cloudflare build. Only a git push does.
+- It must **not** promise instantaneous global propagation either — the
+  60-second TTL is real and a returning visitor inside it sees the old picture.
+- Keep it honest about the one case that still degrades: if the site is ever
+  moved to a host with no Functions, or deployed by direct upload, the old
+  behaviour returns (§6, item 7).
+- `tools/test-admin.mjs` covers the Photos panel; check whether it asserts on
+  this text before changing it.
