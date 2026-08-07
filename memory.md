@@ -305,147 +305,97 @@ fails by going quiet deserves more suspicion than one that throws.
 
 ### The shipped photograph must never be painted and then replaced
 
-Noticed on 6 August 2026, on the hero: the photograph the site ships with
-appeared for a beat on every load and was then swapped for the owner's. The
-data was never wrong. The replacement was already in `localStorage` before the
-page began parsing — it was simply not *asked for* until far too late.
+Noticed on 6 August 2026, on the hero: the photograph the site ships with was
+painted, then replaced by the owner's while the visitor watched. The owner
+calls it "the blink".
 
-The shipped file is a real `src` in the markup, which is what makes the site
-correct from `file://`, with no database and with JavaScript off. That is not
-going away. But `render.js` is at the bottom of the body, so the browser
-fetched the shipped file from line 129, painted it, parsed four hundred more
-lines, and only then set the replacement.
+**Settled 7 August 2026, and the answer is not the one this file used to give.**
+Four layers were built to hide that swap — `photo-boot.js` in `<head>`,
+`functions/_middleware.js` at the edge, `_routes.json` to confine it, and
+`renderPhotos()` in `render.js`. They worked. They were also 854 lines, a
+render-blocking script on every page, a CSSOM workaround for `script-src`, and
+`ETag` stripped from every HTML response. All four are deleted. **Do not
+reintroduce any of them.** `PHOTOGRAPHS.md` is the full account and is the file
+to read before touching this.
 
-`photo-boot.js` is the answer and is the **only** script in `<head>`. It reads
-the same cache key `data.js` writes, preloads the replacements, and hides
-exactly the slots that are about to change until `render.js` has the real
-picture decoded. A repeat visitor never sees the shipped photograph at all.
+The reason, in one line: **every one of those layers existed to make a runtime
+swap invisible, and a swap that must be *made* invisible can always fail to
+be.** The old version of this section listed eight ways it silently would, and
+three such bugs were found in production *after* the layer above them had been
+verified. Layering does not converge on correct; it asymptotes.
 
-Three things about it are load-bearing and easy to undo by accident:
+**What is there now is one layer.** `tools/bake-photos.mjs` runs after
+`vite build`, downloads the owner's current photographs into
+`dist/assets/baked-<slot>-<hash>.<ext>`, and writes those paths — and the
+owner's descriptions — into the built pages. The markup that leaves the server
+is already right, and nothing runs afterwards that can change it. The blink is
+not suppressed; it is unreachable.
 
-- **It must stay external and stay above the body.** `script-src` is `'self'`
-  with no `'unsafe-inline'`; an inline version fails `check:csp`. Moved below
-  the body it silently does nothing.
-- **The cache key is written twice**, here and in `data.js`. They are compared
-  at runtime and asserted by `test:photoboot`. Bumping the version in one file
-  only puts the blink back on a site where everything still passes.
-- **Nothing may stay hidden.** The reveal timeout is armed before anything is
-  hidden, and every error path reveals everything. If that timer is ever doing
-  the work on a normal load, the photograph is arriving 700ms late and nothing
-  reports it — `test:photoboot` asserts `render.js` releases each slot on every
-  path through it, which is what keeps the timer a net rather than the
-  mechanism.
-
-**A first-ever visitor is not covered and cannot be**, at runtime: the URL
-exists only in a database the browser has not queried. For that visitor the fix
-is the one already written above — run `node tools/extract-photos.mjs` after an
-upload and commit, so the shipped file *is* the current photograph and there is
-nothing to swap. The hero replacement uploaded on 6 August 2026 exposed this
-gap and has now been extracted as `assets/web/hero-wine-frame.webp`.
-
-### The blink is fixed at build time, not in the browser
-
-Settled 7 August 2026, after four attempts in the browser. **Do not try to fix
-this in `photo-boot.js` or `render.js` again.** Every one of those attempts is
-in the history of this branch and every one of them failed, in a different way,
-for the same underlying reason.
-
-The browser must paint before it can ask the database what the photograph is.
-That leaves exactly two options and no third: show the shipped picture and swap
-when the answer arrives, or show nothing until it does. Each attempt was a
-rearrangement of those two:
-
-- **Hold the slot until the refresh settles.** Correct, and it works — but a
-  freshly uploaded photograph is not in anyone's HTTP cache, so the wait is a
-  round trip *plus* an image download. Measured on the live site: data back at
-  207ms, picture not decoded until ~1200ms. The deadline sat between them.
-- **Hold the above-the-fold image on a cold visit.** Fired on returning
-  visitors too and `hero.main` has no upload, so the hero sat behind a dark
-  panel on every load, waiting out a request that always answered "nothing
-  changed", then appeared with a jolt. A new blink, for nothing.
-- **Assign the new src only after decoding off-DOM.** Right in principle;
-  `decode()` on a detached image rejects often enough that it turned "swap the
-  picture in" into "never swap it", which is worse.
-- **Raise the deadline.** Moves the boundary. A slower connection crosses it.
-
-`tools/bake-photos.mjs` removes the question instead of answering it: after
-`vite build` it downloads the current photographs and writes them into the
-built pages' `src`. The HTML the browser receives already names the right
-picture, so it paints once, with no JavaScript involved and nothing to replace.
-This is what every server-rendered or statically generated site does, and the
-reason none of them have this bug.
-
-Four things about it are load-bearing:
-
-- **It writes to `dist/` only.** The source tree keeps what is committed, so
-  `file://`, `vite dev`, a fresh clone and a deleted database all behave as
-  they always did, and a build never shows up in `git status`. `test:bake`
-  asserts a bake writes to no file in the repository.
-- **It stamps `baked` into `dist/data/seed-photos.js`,** and `data.js` compares
-  that against the database's `storage_path`. Equal means the markup already
-  has this picture and **no override is reported**. Without the stamp the bake
-  is worse than useless — the page would open on the correct photograph and
-  then be handed the same photograph from the bucket URL, a second fetch and
-  repaint on every load. Sabotaging the stamp fails three checks in
-  `test:bake`.
-- **A path that differs turns the runtime layer back on,** which is what covers
-  the window between an upload and the next build. The two halves are not
-  alternatives; the runtime one is the stopgap and the bake is the fix.
-- **It never half-bakes and never fails a deploy.** An unreachable database or
-  a photograph the bucket will not serve leaves `dist/` exactly as vite built
-  it and exits 0 — the same floor as everything else here: when the live layer
-  is unavailable, serve what is in git. A page is rewritten only after its
-  photograph is on disk, because a rewritten page naming a missing file is a
-  broken image on the live site, which is worse than the blink.
-
-### The edge middleware closes the window the bake cannot
-
-`tools/bake-photos.mjs` makes the files correct *as of the build*. On a site
-nobody is maintaining — a one-time fee, the owner self-serving through the CMS,
-no developer to run a build — "as of the build" is a shrinking guarantee: every
-photograph changed afterwards flickers, forever, because nothing rebuilds.
-
-`functions/_middleware.js` covers that window. It rewrites the `src` of any slot
-whose photograph has changed since the build, as the page streams out, so the
-HTML that reaches the browser already names the current picture. Verified end
-to end under `wrangler pages dev`: a slot stale in the manifest is served
-pointing at Supabase and the browser paints it once — one sample, no swap,
-where the same case without the middleware measured a swap at 2383ms.
+**Nothing may set an `img` `src` after paint.** That single rule is the whole
+design. A future change that puts a runtime swap back puts the blink back with
+it, and every deleted line becomes necessary again.
 
 Load-bearing, and each was nearly got wrong:
 
-- **It is middleware, not an advanced-mode `_worker.js`.** Cloudflare does not
-  apply `_headers` to what a Function returns, so `_worker.js` would have
-  silently dropped the Content-Security-Policy — on a site whose entire XSS
-  story is that policy. Middleware calls `next()` and returns the asset
-  server's own response. The policy is *also* re-asserted in code rather than
-  trusted, and `test:worker` fails the build if it stops matching `_headers`.
-  (The CSP is real: an inline probe script was blocked by it while testing.)
-- **`publicUrl` must be spelled exactly as `data.js` spells it.** render.js
-  skips a slot when the src it finds equals the URL it would build, and that
-  comparison is the only thing stopping the rewrite and the runtime layer from
-  both acting on one photograph. `test:worker` runs both functions over the
-  same awkward paths — spaces, `&`, non-ASCII — and requires identical output.
-  Dropping the encode fails three checks.
-- **It reads `dist/_baked.json`** — written by the bake — so it only touches
-  slots that have actually changed. Without it every baked photograph is
-  rewritten from a same-origin file to a Supabase URL on every request:
-  correct, and slower than doing nothing on the common path.
-- **No failure path returns an error.** A database that is down, slow or
-  answering nonsense costs a stale photograph and nothing else; the response
-  from the static host is returned untouched. A stale map is served *while* a
-  refresh runs, so a visitor never waits on Supabase.
+- **The bake writes to `dist/` only.** The source tree keeps what is committed,
+  so `file://`, `vite dev`, a fresh clone and a deleted database all behave as
+  they always did, and a build never shows up in `git status`. `test:bake`
+  asserts a bake writes to no file in the repository.
+- **It bakes the description as well as the `src`.** Both halves live in the
+  database. Baking only one was invisible while `renderPhotos()` still set the
+  description at runtime, and would have gone silent the moment that was
+  removed: right picture, finished-looking page, and a screen reader reading
+  whatever the markup said in July. It escapes what it writes, because the
+  owner types that text and a build step splicing it into markup has to quote
+  it itself — `setPhoto` used to get that for free from `setAttribute`.
+  Sabotage-verified in `test:bake`.
+- **It never half-bakes and never fails a deploy.** An unreachable database or
+  a photograph the bucket will not serve leaves `dist/` as vite built it and
+  exits 0 — when the live layer is unavailable, serve what is in git. The
+  consequence is that **a bake that silently did nothing is a green build**, so
+  read the build log for `photographs baked in`.
+- **`.nvmrc` must stay.** Pages picks a very old default Node otherwise, and old
+  Node has no global `fetch`, so the bake works on every machine here and fails
+  on the one that matters.
 
-The two halves compose without coordination: the bake handles the steady state
-and serves same-origin assets, the middleware handles the delta. Neither needs
-the other to be correct.
+### The owner triggers the rebuild, from the editor
+
+A build is what makes an uploaded photograph live, so the owner has to be able
+to ask for one. **Publish**, in the editor's topbar, calls the `publish-site`
+Supabase Edge Function, which holds the Cloudflare deploy hook URL in
+`DEPLOY_HOOK_URL` and asks Postgres `is_owner()` before using it.
+
+- **The hook URL can never be in the browser.** It is an unauthenticated URL;
+  whoever holds it can spend the project's builds forever. `admin.js` is served
+  to anyone who asks — the sign-in gate is in front of the *editor*, not the
+  file.
+- **`verify_jwt` alone is not authorisation.** It proves somebody signed in.
+  `is_owner()` is the one answer to who may edit this site and it lives in
+  `admin_users`, not in a second list in the function.
+- **Publish refuses when there are unsaved changes.** A build bakes what is
+  *saved*; publishing over an unsaved edit spends a minute producing a site
+  missing the thing the owner just typed, with nothing looking wrong.
+- **The message promises a request, not a result** — "the site updates in about
+  a minute". Nothing in the browser can learn whether the build succeeded.
+- **The CORS preflight echoes `Access-Control-Request-Headers`.** A hardcoded
+  list is how the first version failed: `supabase-js` sends `x-client-info`, the
+  list did not name it, and the browser answered the preflight, compared, and
+  never sent the POST — a failure with no failed request in it.
+
+**One build per publish, not per photograph.** The owner changes as many
+photographs as they like and presses Publish once. A row-level database webhook
+was considered and rejected for exactly this.
+
+**The cost, written down because it is real.** For about forty seconds after
+Publish the site still serves the previous photograph — not a flicker, the old
+picture sitting still. And a build that fails for any unrelated reason means the
+photograph never appears. That coupling did not exist under the middleware and
+is the honest price of not having an invisible failure mode.
 
 **Photographs are the only content that needs a rebuild.** Words, hours, prices
 and menu items are live on the next page load with no flicker, because they are
-rendered from data rather than replacing something already painted. `photoNote()`
-in `admin.js` tells the owner this, and tells them rebuilds are metered — the
-host allows 500 a month. Nothing triggers one automatically; that is deliberate,
-so nine uploads in a sitting cannot become nine builds.
+rendered from data rather than replacing something already painted.
+
 
 Do not treat a general CMS-to-files sync tool as current work. The CMS is the
 editing surface, and text edits reach the seed files through the existing
@@ -529,7 +479,7 @@ also run `node tools/check-live-project.mjs`. For headline or responsive layout
 changes, run `node tools/measure-headlines.mjs` and inspect the result in a real
 browser. Automated checks cannot replace the browser pass for visual behavior.
 
-### The thirty-one harnesses
+### The twenty-nine harnesses
 
 `npm test` currently covers: `check:fonts`, `test:fonts`, `check:csp`,
 `check:vendor`, `test:pages`, `test:hours`, `test:copy`, `test:ordering`,
@@ -559,13 +509,12 @@ Tools: `tools/add-content-hooks.mjs`, `tools/check-csp.mjs`,
 `tools/measure-headlines.mjs`, `tools/page-boot.mjs`, `tools/photo-slots.mjs`,
 `tools/strip-menu-markup.mjs`, `tools/supabase-shim.mjs`,
 `tools/bake-photos.mjs`, `tools/test-admin.mjs`, `tools/test-bake.mjs`,
-`tools/test-copy.mjs`, `tools/test-worker.mjs`, `tools/test-db-guards.mjs`,
+`tools/test-copy.mjs`, `tools/test-db-guards.mjs`,
 `tools/test-fonts.mjs`, `tools/test-guards.mjs`, `tools/test-hostile-content.mjs`,
 `tools/test-hours-exceptions.mjs`, `tools/test-hours-live.mjs`,
 `tools/test-hours.mjs`, `tools/test-live.mjs`,
 `tools/test-menu-hidden.mjs`, `tools/test-menu-shapes.mjs`,
-`tools/test-ordering.mjs`, `tools/test-photo-boot.mjs`,
-`tools/test-photos.mjs`,
+`tools/test-ordering.mjs`, `tools/test-photos.mjs`,
 `tools/test-policies.mjs`, `tools/test-replay.mjs`, `tools/test-resilience.mjs`,
 `tools/test-rls.mjs`, `tools/test-sql.mjs`, `tools/verify-phase1.mjs` and
 `tools/wire-scripts.mjs`.

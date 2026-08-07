@@ -749,119 +749,27 @@
   }
 
   /* ── photographs ──────────────────────────────
-     Keyed by slot — the position on the page — never by filename, because the
-     same photograph fills two slots in two sections with two descriptions, and
-     those are two decisions rather than one duplicate.
+     There is no photograph code here any more, and that is the design rather
+     than an omission.
 
-     Only ever an *override*. The picture the site shipped with is in the
-     markup, so a page with no JavaScript, a visitor with no network and a
-     project with no database all show the right photographs; this replaces one
-     only where the owner has uploaded something. That is why an untouched site
-     needs no photos data at all to be correct.
+     This section used to replace an <img> src at runtime from whatever the
+     database said, and everything the site grew around photographs existed to
+     make that replacement invisible: a script in <head> that hid the slots
+     about to change, an edge worker that rewrote the markup on the way out, a
+     stamp in the seed file so the two would not both act. It worked, and it
+     could always fail to work, because a swap that has to be *made* invisible
+     can be caught. PHOTOGRAPHS.md §2 lists the eight ways it silently was.
 
-     A src is a code sink of the same family as an href — not because a script
-     runs from one, but because it is a URL the owner typed that a browser goes
-     and fetches. The same https-only rule applies, and for the same reason it
-     is applied in two places: the storage bucket decides what may be stored,
-     and this decides what may be rendered. */
+     tools/bake-photos.mjs writes the owner's current photographs and their
+     descriptions into the pages at build time, and the owner presses Publish
+     to ask for a build. So the markup that leaves the server is already right
+     and nothing needs to correct it afterwards. Nothing may set an img src
+     after paint — that one line is the whole design, and putting a swap back
+     here puts the blink back with it. See PHOTOGRAPHS.md §5.
 
-  /* photo-boot.js has been in <head> since before the body was parsed, and on
-     any repeat visit it has already hidden the slots it knows are about to
-     change and started fetching their replacements. This function is the other
-     half of that: it puts the picture in and tells the boot script the slot may
-     be shown again.
-
-     It has to be safe when the boot script is absent — opened from file://
-     with only some of the scripts, or an older cached copy of a page. Every
-     call into it goes through this, which degrades to the old behaviour of
-     setting src and moving on. */
-  var boot = typeof AROMATI_PHOTO_BOOT === "object" && AROMATI_PHOTO_BOOT
-    ? AROMATI_PHOTO_BOOT : null;
-
-  function releaseSlot(slot) {
-    if (boot) { try { boot.reveal(slot); } catch (err) { /* stays visible */ } }
-  }
-
-  /* Put a picture in without ever showing it half-arrived.
-
-     Two cases, and they want opposite things:
-
-     A slot the boot script is holding is blank right now. Nothing is on screen
-     to protect, so the src goes straight in and the slot is revealed as soon
-     as the picture is ready — the visitor's first sight of that box is the
-     finished photograph.
-
-     A slot that is *not* held is showing the shipped photograph: a first-ever
-     visit, or a replacement uploaded since this visitor last had a cache.
-     Setting src there would leave the old picture up and swap when the new one
-     decodes, which is the blink. So the image is decoded off-DOM first and
-     only then assigned, making the change a single frame rather than a wait
-     with an old photograph in it.
-
-     decode() is not universal and can reject on a perfectly good image if the
-     element is detached mid-flight. Both paths fall back to a plain assignment,
-     which is what the site did before any of this existed. */
-  function setPhoto(img, slot, url) {
-    if (boot && boot.isHeld(slot)) {
-      img.setAttribute("src", url);
-      if (img.decode) {
-        img.decode().then(function () { releaseSlot(slot); },
-                          function () { releaseSlot(slot); });
-      } else {
-        img.addEventListener("load", function () { releaseSlot(slot); });
-        img.addEventListener("error", function () { releaseSlot(slot); });
-      }
-      return;
-    }
-
-    if (img.getAttribute("src") === url) { releaseSlot(slot); return; }
-
-    var pre = new Image();
-    if (!pre.decode) {
-      img.setAttribute("src", url);
-      releaseSlot(slot);
-      return;
-    }
-    pre.src = url;
-    pre.decode().then(function () {
-      img.setAttribute("src", url);
-      releaseSlot(slot);
-    }, function () {
-      /* The replacement is unreachable — storage down, object deleted, the CSP
-         origin out of step with config.js. Leaving the shipped photograph up is
-         the right answer and needs no action; the slot is not held, so there is
-         nothing to reveal either. */
-      releaseSlot(slot);
-    });
-  }
-
-  function renderPhotos(photos) {
-    Array.prototype.forEach.call(document.querySelectorAll("[data-photo]"), function (img) {
-      var slot = img.getAttribute("data-photo");
-      var photo = photos[slot];
-
-      /* A slot with no entry at all still has to be released. It cannot
-         normally be held — the boot script only hides what it found a URL for —
-         but "cannot normally" is not a reason to leave the one path that would
-         strand a photograph off the page. */
-      if (!photo) { releaseSlot(slot); return; }
-
-      if (typeof photo.url === "string" && SAFE_URL.test(photo.url)) {
-        setPhoto(img, slot, photo.url);
-      } else {
-        releaseSlot(slot);
-      }
-
-      /* data-photo-decorative is this *drawing* of the slot, not the slot: the
-         home page's photo strip repeats its nine images in a second,
-         aria-hidden group so it can scroll forever, and describing those would
-         have a screen reader read the whole menu twice. An empty description
-         is left alone for the same reason it is ignored in data.js — the
-         markup's own alt is a better answer than none. */
-      if (img.hasAttribute("data-photo-decorative")) return;
-      if (typeof photo.alt === "string" && photo.alt) img.setAttribute("alt", photo.alt);
-    });
-  }
+     data.js still reads the photos table: the editor wants it, and the stamp
+     that told the old runtime to stand down still tells the *bake* what it
+     already baked. Nothing on a public page reads the result. */
 
   /* ── go ──────────────────────────────────────
      Each step guarded on its own: a failure in one must not stop the rest, and
@@ -884,7 +792,6 @@
 
     if (content.copy) step("copy", function () { renderCopy(content.copy); });
 
-    if (content.photos) step("photos", function () { renderPhotos(content.photos); });
 
     if (content.settings) {
       step("contact", function () { renderContact(content.settings); });

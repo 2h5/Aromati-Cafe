@@ -109,117 +109,95 @@ for (const [file] of PHOTO_SLOTS) {
         drawnTwice.every((s) => s.indexOf("kitchen.plate") === 0), true);
 }
 
-/* ── what render.js writes ────────────────────────────────────────────────── */
+/* ── what render.js must NOT write ─────────────────────────────────────────
+   This file used to prove that render.js replaced an <img> src from the
+   database, that it wrote the description beside it, and that it refused a src
+   that was not https. All of that was deleted on 2026-08-07 along with the
+   runtime swap it described — see PHOTOGRAPHS.md.
 
-/* The described drawing and the aria-hidden repeat of the same slot, which is
-   the home page's photo strip in miniature. */
-const STRIP =
-  '<img data-photo="p" src="assets/web/a.jpg" alt="A plate of khinkali">' +
-  '<img data-photo="p" data-photo-decorative src="assets/web/a.jpg" alt="">';
+   The rule that replaced it is narrower and stronger, and it is the one line
+   the whole design rests on: **nothing may set an img src after paint.** So
+   that is what is checked here. A photograph now reaches the page one way,
+   from tools/bake-photos.mjs at build time, and tools/test-bake.mjs owns that
+   half — including the https rule, which moved with the code that enforces it.
 
-function render(photos, markup = STRIP) {
-  const dom = new JSDOM(`<!doctype html><body>${markup}</body>`, { runScripts: "dangerously" });
+   The failure this guards against is a well-meant restoration: someone finds
+   that a photograph uploaded ten minutes ago is not live yet, reaches for the
+   obvious fix, and puts the blink back into a project that spent a week
+   removing it. */
+
+console.log("\nnothing in render.js writes a photograph into the page\n");
+{
+  const dom = new JSDOM(
+    '<!doctype html><body>' +
+    '<img data-photo="p" src="assets/web/a.jpg" alt="A plate of khinkali">' +
+    '<img data-photo="p" data-photo-decorative src="assets/web/a.jpg" alt="">' +
+    '</body>',
+    { runScripts: "dangerously" });
   const { window } = dom;
+
+  /* The database is answering, and answering with a replacement — the exact
+     condition the old code acted on. Nothing may act on it now. */
+  const url = "https://project.supabase.co/storage/v1/object/public/site-photos/p/1.webp";
   const s = window.document.createElement("script");
   s.textContent = `var SEED_PHOTOS = {};\n` +
-    `var AROMATI_DATA = { current: function () { return { photos: ${JSON.stringify(photos)} }; },\n` +
+    `var AROMATI_DATA = { current: function () { return { photos: ${JSON.stringify({ p: { alt: "Khinkali, pleated by hand", url } })} }; },\n` +
     `                     refresh: function (done) { done(null); } };\n` + RENDER;
   window.document.body.appendChild(s);
-  return [...window.document.querySelectorAll("[data-photo]")];
+
+  const imgs = [...window.document.querySelectorAll("[data-photo]")];
+  check("the markup's own photograph is still the one on the page",
+        imgs.map((i) => i.getAttribute("src")), ["assets/web/a.jpg", "assets/web/a.jpg"]);
+  check("and the markup's own description is untouched",
+        imgs[0].getAttribute("alt"), "A plate of khinkali");
 }
 
-console.log("\nwhat render.js writes into them\n");
-
+console.log("\nand the source says so too\n");
 {
-  const url = "https://project.supabase.co/storage/v1/object/public/site-photos/p/1.webp";
-  const [described, repeat] = render({ p: { alt: "Khinkali, pleated by hand", url } });
+  /* The DOM check above passes for the wrong reason if renderPhotos is simply
+     never *called* while still sitting in the file, so the source is read as
+     well. Both, because either alone is satisfied by a state nobody wants. */
+  const named = ["renderPhotos", "setPhoto", "releaseSlot", "AROMATI_PHOTO_BOOT"]
+    .filter((name) => RENDER.includes(name));
+  check("no runtime photograph code is left in render.js", named, []);
 
-  check("the uploaded photograph replaces the built-in one", described.getAttribute("src"), url);
-  check("in the aria-hidden repeat too", repeat.getAttribute("src"), url);
-  check("the description is written", described.getAttribute("alt"), "Khinkali, pleated by hand");
-  check("but not into the repeat, which stays silent", repeat.getAttribute("alt"), "");
-}
-
-{
-  const [img] = render({ p: { alt: "A new description", url: null } });
-  check("no upload leaves the built-in photograph alone",
-        img.getAttribute("src"), "assets/web/a.jpg");
-  check("and still writes the description", img.getAttribute("alt"), "A new description");
-}
-
-{
-  const [img] = render({ p: { alt: "", url: null } });
-  check("an empty description does not blank the one in the markup",
-        img.getAttribute("alt"), "A plate of khinkali");
-}
-
-{
-  const [img] = render({ somethingElse: { alt: "x", url: "https://a/b" } });
-  check("a slot the data never mentions is untouched",
-        [img.getAttribute("src"), img.getAttribute("alt")],
-        ["assets/web/a.jpg", "A plate of khinkali"]);
-}
-
-console.log("\na src is a URL the owner typed\n");
-{
-  /* Each of these is stored by a database that refuses them and rendered by a
-     renderer that refuses them, deliberately both — see render.js. What must
-     never happen is the page fetching, or navigating to, whatever this says. */
-  const refused = [
-    ["javascript:", "javascript:alert(1)"],
-    ["a data: URL", "data:image/svg+xml,<svg onload=alert(1)>"],
-    ["plain http", "http://example.com/photo.jpg"],
-    ["a protocol-relative address", "//example.com/photo.jpg"],
-    ["a relative path", "../../etc/passwd"],
-    ["something with a space in it", "https://example.com/a b.jpg"]
-  ];
-
-  /* The control. Six assertions that a thing did not happen are all satisfied
-     by a renderer that does nothing at all, so first: prove it does something.
-     This has caught a whole harness once already — see memory.md, Deviations. */
-  const [ok] = render({ p: { alt: "x", url: "https://example.com/photo.webp" } });
-  check("a good https address really is written",
-        ok.getAttribute("src"), "https://example.com/photo.webp");
-
-  for (const [what, url] of refused) {
-    const [img] = render({ p: { alt: "x", url } });
-    check(`${what} is refused, and the built-in photograph stands`,
-          img.getAttribute("src"), "assets/web/a.jpg");
-  }
+  /* A src assigned to anything at all, anywhere in the file. Written as a scan
+     rather than a list of names so that reintroducing the behaviour under a new
+     name is caught too — the restoration this guards against will not be called
+     renderPhotos. */
+  const writes = RENDER.match(/\.(setAttribute\(\s*["']src["']|src\s*=[^=])/g) || [];
+  check("nothing in render.js assigns a src", writes, []);
 }
 
 console.log("\nthe one security rule, in the code that writes photographs\n");
 {
-  /* render.js is scanned whole elsewhere; this is the photograph half of it,
-     read on its own so that adding an innerHTML here is caught by the harness
-     that owns this code rather than only by a general one. */
-  /* From the section marker, not from `function renderPhotos`. The code that
-     assigns a src is no longer all inside that one function — setPhoto() and
-     releaseSlot() sit above it and setPhoto is the thing that actually writes
-     the attribute now. Anchored at the function, this scan would have gone on
-     reporting "no HTML sink anywhere in it" while not reading the lines where
-     one would matter most. */
-  const photoHalf = RENDER.slice(RENDER.indexOf("/* ── photographs ──"),
-                                 RENDER.indexOf("/* ── go ──"));
+  /* The photograph half of render.js is gone, so the sink scan that used to
+     live here moved with it: tools/test-bake.mjs checks that the build step
+     escapes what it writes, which is where owner-typed text now enters markup.
+     What is still worth asserting here is that render.js as a whole has no HTML
+     sink — it is the file that renders every other piece of owner-typed
+     content, and that rule predates photographs. */
+  /* Comments first. render.js opens by stating this very rule — "Never
+     innerHTML, never insertAdjacentHTML" — so a scan of the raw text finds the
+     prohibition and reports it as a violation. The old scan was scoped to the
+     photographs section and never met that paragraph; widened to the file, it
+     does. A control that fails on the sentence describing it is a control that
+     gets deleted for being noisy. */
+  const code = RENDER.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
   const found = ["innerHTML", "insertAdjacentHTML", "outerHTML", "document.write"]
-    .filter((sink) => photoHalf.includes(sink));
-  check("no HTML sink anywhere in it", found, []);
+    .filter((sink) => code.includes(sink));
+  check("no HTML sink anywhere in render.js", found, []);
 
   /* …and the scan notices when one is put in. An assertion that never fails is
-     not evidence of anything.
-
-     Anchored on the function signature rather than on a line inside the body.
-     The previous anchor was `if (!photo) return;`, which stopped existing the
-     day that line grew a slot release — and the failure was this control going
-     quiet, which is the one failure a control like this cannot afford. A
-     signature is the most stable thing in the region and the sink lands inside
-     the scanned window wherever the body goes next. */
-  const sabotaged = photoHalf.replace("function renderPhotos(photos) {",
-                                      "function renderPhotos(photos) { img.innerHTML = \"\";");
+     not evidence of anything — and this one has to be sabotaged *after* the
+     comments come off, or it would only be proving that the stripper works. */
+  const sabotaged = code.replace("function paint(content) {",
+                                 "function paint(content) { document.body.innerHTML = \"\";");
   check("and the scan would notice one",
         ["innerHTML", "insertAdjacentHTML"].filter((s) => sabotaged.includes(s)),
         ["innerHTML"]);
 }
+
 
 console.log(failures
   ? `\n${failures} problem(s) — the photographs are not wired the way they are described`

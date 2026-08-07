@@ -71,7 +71,7 @@ function classicScripts(root) {
    It fails the same silent way as the other two: without it everything works,
    costs more, and says nothing. tools/test-worker.mjs asserts it lists exactly
    the pages that exist. */
-const ROOT_FILES = ["_headers", "robots.txt", "_routes.json"];
+const ROOT_FILES = ["_headers", "robots.txt"];
 
 /* 3. The built-in photographs, at the path the *editor* asks for them by.
 

@@ -16,10 +16,15 @@ without that the second looks like a step backwards.
 
 ## 0. Where this stands — 7 Aug 2026
 
-**Decided, proven, not yet shipped.** Production still runs the four-layer
-design described in §2. The replacement in §3 has been tested end to end on a
-preview deployment and works; nothing has been deleted from `main` yet, on
-purpose. §6 has the order.
+**Done.** All four steps of §6 are shipped. `photo-boot.js`,
+`functions/_middleware.js`, `_routes.json`, the runtime swap in `render.js` and
+the two harnesses that guarded them are deleted. A photograph reaches the site
+one way: `tools/bake-photos.mjs`, at build time, triggered by the owner pressing
+Publish.
+
+`tools/test-photos.mjs` now asserts the rule rather than the old machinery —
+that nothing in `render.js` assigns a `src`, in the DOM and in the source.
+Sabotage-verified: putting a swap back fails both halves.
 
 What was proven, on `photo-rebuild-test` at
 `photo-rebuild-test.aromati-cafe.pages.dev`, with the middleware, `photo-boot.js`
@@ -39,13 +44,12 @@ until a build replaced the markup.
 
 ### Open
 
-- [ ] **Alt text is not baked.** `renderPhotos()` sets `alt` from the database as
-      well as `src`. `bake-photos.mjs` does not — it preserves the markup's alt
-      and rewrites only the `src`. Removing the runtime swap without teaching the
-      bake to write alt would silently strip the owner's alt edits from the site.
-      This must land *before* §6 step 4. See §5.
-- [ ] **The Publish button and its Edge Function.** §4.
-- [ ] **The CMS wording.** §7.
+- [ ] **The CMS wording.** §7 — the note still describes what a visitor sees
+      under the old design. It is now wrong and should be rewritten.
+- [ ] **data.js still fetches the photos table** and nothing on a public page
+      reads the result. Harmless, and dead weight. Left alone on purpose so the
+      deletion stayed one reviewable change; the editor and the bake stamp are
+      the things to check before removing it.
 
 ---
 
@@ -192,30 +196,21 @@ Short, because there is little left to break.
 
 ---
 
-## 6. Migration order
+## 6. How it was migrated — done 7 Aug 2026
 
-Each step is safe on its own, and the site is correct after every one of them.
-**Do not reorder — steps 1–3 leave the current design fully working.**
+Kept here because the order was the safe part, and a future change of this
+shape wants the same shape. Each step left the site correct, and the first
+three were redundant with the four layers still running:
 
-1. **Create the Pages deploy hook** for `main`, and the Edge Function that holds
-   it. Nothing changes for a visitor.
-2. **Add the Publish button** to the editor. Now a rebuild can be triggered on
-   demand. The four layers are still doing their job; this is redundant with
-   them, deliberately.
-3. **Teach `bake-photos.mjs` to bake alt text**, and prove it on a preview.
-   Still redundant.
-4. **Only now, remove the layers** — `photo-boot.js` and its `<script>` on all
-   five public pages, `functions/_middleware.js`, `_routes.json` and its entry in
-   `vite.config.js`'s `ROOT_FILES`, the photos step in `renderPhotos()`, and the
-   two test tools that exist solely to guard them (`test-worker.mjs`,
-   `test-photo-boot.mjs`) along with their `npm` scripts.
+1. **Deploy hook + `supabase/functions/publish-site`.** Nothing changed for a
+   visitor.
+2. **Publish in the editor.** A rebuild could now be asked for. Watched working
+   before anything was removed — that was the whole point of doing it second.
+3. **The bake learned to write descriptions.** Still redundant.
+4. **The layers deleted.** The only step that changed what a visitor gets, and
+   it happened after every part of its replacement had been seen working.
 
-Step 4 is the only one that can regress anything, and by then every part of its
-replacement has been watched working.
-
-`photo-rebuild-test` holds the proof for step 4 and is not for merging — it
-disables the runtime swap with `if (false && …)` rather than removing it, and it
-predates the alt-text finding.
+The branch `photo-rebuild-test` held the proof for step 4 and has been deleted.
 
 ---
 

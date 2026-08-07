@@ -81,11 +81,9 @@ See *Backing up* below.
 | `vendor/` | The Supabase SDK, vendored with its digest written down |
 | `assets/` | Photography, self-hosted Lenis, the studio mark |
 | `_headers` | The Content-Security-Policy and friends. Cloudflare Pages reads it |
-| `_routes.json` | Confines the Function to the public pages. Without it every asset invokes it |
-| `functions/_middleware.js` | Rewrites photograph `src` at the edge for anything changed since the build |
-| `photo-boot.js` | Runs in `<head>`; holds back a slot that is about to be replaced |
-| `tools/bake-photos.mjs` | Writes the owner's current photographs into `dist/` after `vite build` |
-| `PHOTOGRAPHS.md` | **Read before touching any of the five files above.** Why a picture never changes in front of a visitor, the three bugs that made it, and how to verify |
+| `tools/bake-photos.mjs` | Writes the owner's current photographs and their descriptions into `dist/` after `vite build`. The only thing that puts a photograph on the site |
+| `supabase/functions/publish-site/` | What the editor's Publish button asks for a rebuild. Holds the deploy hook URL, which may never reach a browser |
+| `PHOTOGRAPHS.md` | **Read before touching either of the two above.** Why a picture never changes in front of a visitor, and why the four layers that used to guarantee it were deleted |
 
 The menu pages are flat in the root on purpose — every relative path is then
 identical to `index.html`, which is what keeps `file://` working with no
@@ -233,7 +231,7 @@ enough.
 npm test
 ```
 
-31 harnesses, no network, no Docker. They run the real files — the real pages
+29 harnesses, no network, no Docker. They run the real files — the real pages
 in jsdom, the real renderer, and the migrations against Postgres
 compiled to WebAssembly. `memory.md` records the current verification workflow;
 the individual commands live in `package.json`.
@@ -245,20 +243,19 @@ live page and checks nothing is left behind. **Both skip cleanly where there is
 no Chrome**, which is exactly when a regression would go out unnoticed — so they
 are the second guard on what they cover, never the only one.
 
-**The middleware is not exercised by `npm test`.** `functions/_middleware.js` runs
-only on Cloudflare — not over `file://`, not under `vite dev`, and HTMLRewriter
-does not exist in Node, so a stub of it would be a test of the stub.
-`npm run test:worker` guards what can be checked honestly: that its copies of
-the project, the policy and the storage URL still match `config.js`, `_headers`
-and `data.js`. To exercise the rewrite for real:
+**`npm run check:headers` is not in `npm test`, and reads the deployment.**
+Everything else here reads the source tree, which is why `_headers` could spend
+months naming `/admin.html` — a path Cloudflare 308s to `/admin` — while
+`check:csp` passed and the editor ran with none of the protections written for
+it. This one follows the redirect and asserts the response, and it writes its
+expectations out by hand rather than parsing `_headers`: two copies that must
+agree is the point. Run it after a deploy, and whenever `_headers` changes.
 
 ```
 npm run build
-npx wrangler pages dev dist
+npm run check:headers                      # against production
+npm run check:headers -- https://…         # against a preview deployment
 ```
-
-Then check a photograph changed since the build is served pointing at Supabase,
-and one that has not is served from `assets/baked-…`.
 
 The standard every harness is held to: **it has been sabotaged and required to
 fail, naming the right check.** A harness nobody has broken on purpose is a
