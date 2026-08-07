@@ -180,6 +180,33 @@ console.log("\nit never hands back a validator it cannot honour\n");
         dropAt > 0 && bailAt > 0 && dropAt < bailAt, true);
 }
 
+console.log("\nand it tells photo-boot.js which slots it has already made current\n");
+{
+  /* The third copy of a constant in this project, and the one with the nastiest
+     failure. photo-boot.js hides a slot in <head> whenever its cache says a
+     replacement is coming. Once this middleware has rewritten the src there is
+     nothing to replace, and hiding blanks a correct photograph until render.js
+     has run — a blank hero instead of the right one, on repeat visits only.
+
+     If these two names ever stop matching, photo-boot.js finds no meta, assumes
+     the markup is stale, and does exactly that. Nothing else fails: the page is
+     valid, the rewrite still happens, the tests all pass. */
+  const boot = readFileSync("photo-boot.js", "utf8");
+  const fromWorker = pick(/const MARKUP_CURRENT = "([^"]+)"/, mw, "MARKUP_CURRENT in the middleware");
+  const fromBoot = pick(/meta\[name="([^"]+)"\]/, boot, "the meta selector in photo-boot.js");
+  check("the meta photo-boot.js looks for is the one the middleware writes",
+        fromWorker, fromBoot);
+
+  const flat = mw.replace(/\s+/g, " ");
+  /* After <meta charset>, not prepended to <head>: the character set has to stay
+     inside the first 1024 bytes or the browser guesses it. */
+  check("it is written in after the charset, not at the top of <head>",
+        /\.on\("meta\[charset\]", \{ element\(el\) \{/.test(flat) &&
+        /el\.after\(/.test(flat), true);
+  check("and photo-boot.js skips hiding for what it names",
+        /if \(current\[slot\]\) return;/.test(boot.replace(/\s+/g, " ")), true);
+}
+
 console.log("\nand the build tells it what it already put in the pages\n");
 {
   const bake = readFileSync("tools/bake-photos.mjs", "utf8");

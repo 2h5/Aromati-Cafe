@@ -216,10 +216,43 @@ var AROMATI_PHOTO_BOOT = (function () {
     }
   }
 
+  /* Slots the server has already made current in the markup that just arrived.
+     functions/_middleware.js writes this immediately after <meta charset>, so
+     it is parsed before this script runs; the name MUST match MARKUP_CURRENT
+     there, and tools/test-worker.mjs fails the build if the two ever drift.
+
+     Hiding one of these is the thing to avoid. The picture in the markup is
+     the current one, so there is nothing to replace and nothing to wait for —
+     hiding it only blanks a correct photograph until render.js has parsed,
+     run, and heard back from the database. On a repeat visit that was a blank
+     hero for as long as the round trip took, which is the artefact this whole
+     mechanism exists to prevent, caused by the mechanism itself.
+
+     Absent for every good reason and one bad one: opened from file://, served
+     by a static host with no Function in front, an older deployment, or a
+     database that answered with nothing. All of them mean "the server makes no
+     promise about the markup", which is exactly what was assumed before this
+     existed — so the fallback is the old behaviour, unchanged. */
+  function serverSaysCurrent() {
+    var out = {};
+    try {
+      var meta = document.querySelector('meta[name="aromati-photos-current"]');
+      if (!meta) return out;
+      var content = meta.getAttribute("content") || "";
+      content.split(/\s+/).forEach(function (slot) { if (slot) out[slot] = true; });
+    } catch (err) {
+      /* querySelector is not going to throw, but this file's rule is that
+         nothing in it may be the reason a photograph stays hidden. */
+    }
+    return out;
+  }
+
   var known = {};
+  var current = {};
 
   try {
     known = overrides();
+    current = serverSaysCurrent();
 
     /* Armed before anything is hidden, not after. If the code between here and
        the end of this block throws, the timeout is already scheduled and the
@@ -228,6 +261,12 @@ var AROMATI_PHOTO_BOOT = (function () {
     window.addEventListener("pageshow", function (e) { if (e.persisted) revealAll(); });
 
     Object.keys(known).forEach(function (slot) {
+      /* Already right in the markup. Not hidden, and not preloaded either: the
+         <img> carrying it is in the document the browser is parsing right now,
+         so its own preload scanner reaches it within a few kilobytes. A preload
+         here would either duplicate that or — if this cache entry is older than
+         the markup — fetch a photograph nobody is going to be shown. */
+      if (current[slot]) return;
       preload(known[slot]);
       hide(slot);
     });
@@ -238,6 +277,10 @@ var AROMATI_PHOTO_BOOT = (function () {
   return {
     cacheKey: CACHE_KEY,
     urls: known,
+    /* Slots the server vouched for. Nothing reads this at runtime; it is here
+       so tools/test-photo-boot.mjs can tell "the meta was honoured" apart from
+       "the meta was never seen", which otherwise look identical from outside. */
+    markupCurrent: current,
     /* render.js calls these. They are the only reason this returns anything. */
     reveal: reveal,
     revealAll: revealAll,

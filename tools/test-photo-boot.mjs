@@ -37,7 +37,13 @@ function check(what, got, want) {
 }
 
 const BOOT = readFileSync("photo-boot.js", "utf8");
-const PAGE = `<!doctype html><html><head></head><body>
+/* `declared` is what functions/_middleware.js writes in after <meta charset>
+   when it has made the markup current — the page as a visitor to the deployed
+   site receives it. Empty is the page as every other way of serving it
+   produces one: file://, a static host, an older deployment. */
+const PAGE = (declared) => `<!doctype html><html><head><meta charset="UTF-8">${
+  declared ? `<meta name="aromati-photos-current" content="${declared}">` : ""
+}</head><body>
   <img data-photo="hero.main" src="assets/web/hero-dining.jpg">
   <img data-photo="story.one" src="assets/web/story.jpg">
   <img data-photo="strip.a" src="assets/web/strip.jpg" data-photo-decorative>
@@ -49,7 +55,7 @@ function boot(cache, opts = {}) {
   /* runScripts so the file can be evaluated inside the window rather than in a
      bare sandbox: it reaches for document, localStorage and window.setTimeout,
      and the point of this harness is to run it against the real ones. */
-  const dom = new JSDOM(PAGE, {
+  const dom = new JSDOM(PAGE(opts.declared || ""), {
     url: "https://aromati.test/",
     pretendToBeVisual: true,
     runScripts: "dangerously"
@@ -111,6 +117,51 @@ console.log("\nwhat is held back, and what is left alone\n");
   check("a slot with no replacement is never touched",
         b.hiddenSlots().includes("story.one"), false);
   check("and nothing is preloaded for it", b.preloads().length, 1);
+}
+
+console.log("\nwhen the server has already put the right picture in the markup\n");
+{
+  /* The case this was losing, and it was invisible because it only happens to
+     someone who has been here before: the middleware rewrites the src, so the
+     page arrives correct — and then this file hid it anyway, because its cache
+     said a replacement existed. A correct hero, blanked, until render.js had
+     parsed, run and heard back from the database. */
+  const b = boot(REPLACED, { declared: "hero.main" });
+  check("the slot the server vouched for is not hidden", b.hiddenSlots(), []);
+  check("and nothing is preloaded for it — the <img> is already in the page",
+        b.preloads(), []);
+  check("the meta was actually read, not merely missing",
+        b.api.markupCurrent, { "hero.main": true });
+}
+
+{
+  /* Declaring one slot must not quietly excuse the others. */
+  const cache = {
+    photos: {
+      "hero.main": { alt: "a", url: "https://yofoiqgknsqzsuwtlqvh.supabase.co/a.webp" },
+      "strip.a":   { alt: "c", url: "https://yofoiqgknsqzsuwtlqvh.supabase.co/c.webp" }
+    }
+  };
+  const b = boot(cache, { declared: "hero.main" });
+  check("a slot the server did not name is still held", b.hiddenSlots(), ["strip.a"]);
+  check("and only that one is fetched early", b.preloads(),
+        ["https://yofoiqgknsqzsuwtlqvh.supabase.co/c.webp"]);
+}
+
+{
+  /* Every way of serving this site that is not the deployed one. The promise
+     is absent, so the old behaviour has to be exactly what happens. */
+  const b = boot(REPLACED, { declared: "" });
+  check("no meta means hide, as before", b.hiddenSlots(), ["hero.main"]);
+  check("and preload, as before", b.preloads().length, 1);
+  check("and nothing is claimed to be current", b.api.markupCurrent, {});
+}
+
+{
+  /* A meta naming slots this page has never heard of changes nothing. */
+  const b = boot(REPLACED, { declared: "menuDrinks.masthead gallery.g9" });
+  check("slots that are not in the cache are simply irrelevant",
+        b.hiddenSlots(), ["hero.main"]);
 }
 
 console.log("\na first visit pays nothing\n");

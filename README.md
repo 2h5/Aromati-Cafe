@@ -81,6 +81,11 @@ See *Backing up* below.
 | `vendor/` | The Supabase SDK, vendored with its digest written down |
 | `assets/` | Photography, self-hosted Lenis, the studio mark |
 | `_headers` | The Content-Security-Policy and friends. Cloudflare Pages reads it |
+| `_routes.json` | Confines the Function to the public pages. Without it every asset invokes it |
+| `functions/_middleware.js` | Rewrites photograph `src` at the edge for anything changed since the build |
+| `photo-boot.js` | Runs in `<head>`; holds back a slot that is about to be replaced |
+| `tools/bake-photos.mjs` | Writes the owner's current photographs into `dist/` after `vite build` |
+| `PHOTOGRAPHS.md` | **Read before touching any of the five files above.** Why a picture never changes in front of a visitor, the three bugs that made it, and how to verify |
 
 The menu pages are flat in the root on purpose — every relative path is then
 identical to `index.html`, which is what keeps `file://` working with no

@@ -1,6 +1,10 @@
 node_modules/
 dist/
 
+# `npx wrangler pages dev dist` — the local Workers runtime's own cache and
+# state. Written whenever the middleware is exercised locally; see PHOTOGRAPHS.md.
+.wrangler/
+
 .DS_Store
 Thumbs.db
 *.log

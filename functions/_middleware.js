@@ -47,6 +47,13 @@
 const SUPABASE_URL = "https://yofoiqgknsqzsuwtlqvh.supabase.co";
 const SUPABASE_KEY = "sb_publishable_pd33KkoVYvTcEpXcemAZnA_dhEI-qdf";
 
+/* The name of the <meta> this emits and photo-boot.js reads. Spelled once here
+   and once there, and asserted identical by tools/test-worker.mjs — a drift
+   would be silent in the worst way, because photo-boot.js would simply find no
+   meta, fall back to hiding, and put a blank hero back on every repeat visit
+   while every page still looked correct. */
+const MARKUP_CURRENT = "aromati-photos-current";
+
 /* Mirrors the `/*` rule in _headers, asserted equal by tools/test-worker.mjs. */
 const CSP = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https://yofoiqgknsqzsuwtlqvh.supabase.co; font-src 'self' data: ; connect-src 'self' https://yofoiqgknsqzsuwtlqvh.supabase.co; frame-ancestors 'self' https://aragvelipalazzolo.com https://www.aragvelipalazzolo.com; base-uri 'self'; form-action 'self'; object-src 'none'";
 
@@ -228,7 +235,37 @@ export async function onRequest(context) {
     const [map, already] = await Promise.all([currentPhotos(context), baked(context)]);
     if (!map || !map.size) return response;
 
+    /* ── telling photo-boot.js to leave these alone ────────────────────────────
+       photo-boot.js hides a slot in <head> when its cache says a replacement is
+       coming, so the visitor never sees the old picture swapped for the new one.
+       That is right when the markup is stale. It is actively harmful once this
+       middleware has made the markup current: the slot is hidden, nothing needs
+       replacing, and it stays blank until render.js has been parsed, run, and
+       answered — a blank hero in place of a correct one.
+
+       It cannot work this out for itself. It runs in <head>, before a single
+       <img> has been parsed and before seed-photos.js has loaded, so it has
+       nothing to compare against. Only the server knows, and this is the server
+       saying so.
+
+       Every slot in the map is listed, because for all of them the markup that
+       just went out names the current photograph — either the build baked it in
+       or the rewrite below is about to. Slot names only, no URLs: it stays a
+       couple of hundred bytes, and it is emitted immediately after <meta
+       charset> so the character set is still the first thing in the document.
+
+       A slot that is named here and somehow not actually current costs exactly
+       what this site did before any of it existed — render.js decodes the
+       replacement off-DOM and swaps it in. Never a blank. */
+    const declared = [...map.keys()].filter((s) => /^[A-Za-z0-9._-]+$/.test(s)).join(" ");
+
     return new HTMLRewriter()
+      .on("meta[charset]", {
+        element(el) {
+          if (!declared) return;
+          el.after(`<meta name="${MARKUP_CURRENT}" content="${declared}">`, { html: true });
+        }
+      })
       .on("img[data-photo]", {
         element(el) {
           const slot = el.getAttribute("data-photo");
