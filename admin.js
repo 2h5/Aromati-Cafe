@@ -1420,24 +1420,27 @@ var AROMATI_ADMIN = (function () {
      rebuild is what removes it, by putting the new photograph into the file
      itself. See tools/bake-photos.mjs.
 
-     Rebuilds are metered by the host, which is why nothing here starts one
-     automatically and why this says so plainly. An owner who knows a rebuild
-     is a real, countable thing will batch their uploads; one who does not will
-     upload nine photographs one at a time and wonder why the allowance went. */
+     Republishing is a step outside this editor — the site is built from the
+     repository and uploaded — so what this must not do is imply a button
+     exists here that does it. It says the change is already live, says what
+     republishing buys, and says to batch. Nothing about quotas: the site is
+     deployed by direct upload, which the host does not meter, and a number
+     that turns out not to apply is worse than no number. */
   function photoNote() {
     return makeNote(function (node) {
-      node.appendChild(el("strong", null, "Photographs need the site rebuilt. "));
+      node.appendChild(el("strong", null, "Your photograph is live straight away. "));
       node.appendChild(document.createTextNode(
-        "A new photograph goes live straight away, but until the site is " +
-        "rebuilt visitors may see the old one for a moment first. Rebuilding " +
-        "puts the picture into the page itself and the flicker stops."));
+        "Save it and visitors see it on their next visit — there is nothing " +
+        "else you need to do for the picture to be on the site."));
       node.appendChild(el("br"));
       node.appendChild(el("br"));
-      node.appendChild(el("strong", null, "Rebuilds are limited. "));
+      node.appendChild(el("strong", null, "One thing to know. "));
       node.appendChild(document.createTextNode(
-        "The host allows 500 a month and every one counts, so finish all the " +
-        "photographs you want to change first, then rebuild once — not once " +
-        "per picture. Nothing here starts a rebuild on its own."));
+        "Until the site is republished, a visitor may glimpse the previous " +
+        "picture for a moment before the new one appears. Republishing puts " +
+        "the photograph into the page itself and that flicker stops. It is a " +
+        "separate step, done by whoever looks after the site — so change all " +
+        "the photographs you want to change, then ask for it once."));
     });
   }
 
