@@ -44,12 +44,11 @@ until a build replaced the markup.
 
 ### Open
 
-- [ ] **The CMS wording.** §7 — the note still describes what a visitor sees
-      under the old design. It is now wrong and should be rewritten.
-- [ ] **data.js still fetches the photos table** and nothing on a public page
-      reads the result. Harmless, and dead weight. Left alone on purpose so the
-      deletion stayed one reviewable change; the editor and the bake stamp are
-      the things to check before removing it.
+Nothing. Both items that stood here are closed:
+
+- **The CMS wording** was rewritten — see §7.
+- **data.js fetching the photos table** turned out not to be dead, and is
+  staying. See §8.
 
 ---
 
@@ -214,15 +213,49 @@ The branch `photo-rebuild-test` held the proof for step 4 and has been deleted.
 
 ---
 
-## 7. What the owner is told — ⚠️ needs rewriting
+## 7. What the owner is told — done
 
-The editor's wording still describes the old design: the photograph live on
-save, a flicker until someone republishes, republishing a thing done outside the
-editor by whoever looks after the site.
+`photoNote()` in `admin.js`. The old wording opened with **"Your photograph is
+live straight away"** and warned about a flicker. Both were true of the old
+design and neither is true now, and the first one was the dangerous one: an
+owner who believes it uploads a photograph and walks away, and the site never
+changes. Out-of-date wording that invites the wrong action is worse than no
+wording.
 
-Under §3 and §4 all three sentences are wrong. The photograph is live when they
-press Publish, about a minute later, and republishing is the button in front of
-them. There is no flicker to warn anyone about.
+It now says the opposite, in the same place: saving shows the photograph *here*
+and leaves the site alone until Publish. Then it says the delay is about a
+minute, ends by itself, and does not want Publish pressed twice — because the
+owner's instinct on seeing an unchanged site is to press it again.
 
-Rewrite it when step 2 lands, not before — wording that describes a button that
-does not exist yet is worse than wording that is out of date.
+Two things it deliberately leaves out. **Quotas**, because a build allowance
+this owner will not approach is a number that only makes them hesitate. And
+**the flicker**, because there is no longer one to warn about; describing a
+failure mode that has been removed teaches somebody to fear a thing that cannot
+happen.
+
+If the note changes again, the sentence that must survive is that the site
+waits for Publish.
+
+---
+
+## 8. Why `data.js` still fetches the photos table
+
+It looks like dead weight — nothing on a public page reads `content.photos` any
+more, because the runtime swap that used to read it is gone. It was listed for
+deletion. **Do not delete it.**
+
+`tools/check-live-project.mjs` is the reader. It compares the descriptions in
+the live database against `data/seed-photos.js` and reports drift — the owner
+reworded an alt text, the seed file did not hear about it, and a visitor on the
+offline fallback gets the old wording read out to them. It reaches that
+comparison through `data.js`, deliberately, so that it is comparing *what the
+site would render* and not its own second opinion about the table's shape.
+
+The diagnostic is worth more than the saving. The fetch is one request inside a
+`Promise.all` that already makes six others, so removing it saves no round
+trip — only a column list.
+
+What that does leave is a genuine oddity worth knowing before you touch this:
+`shapePhotos` and `publicUrl` in `data.js` are now maintained for a tool rather
+than for the site. §5.3 — `publicUrl` spelled the same way in `bake-photos.mjs`
+and `data.js` — still holds, and this is why it is not obvious that it does.

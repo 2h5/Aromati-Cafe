@@ -531,6 +531,14 @@ var AROMATI_DATA = (function () {
       get("menu_courses?select=id,page,course_key,tab_label,heading,sizes,is_static,static_id,sort_order&order=sort_order"),
       get("menu_items?select=id,course_id,name,tag,description,price,prices,price_all_sizes,no_price,is_hidden,options_dom_id,sort_order," +
           "menu_item_pours(id,label,price,sort_order),menu_item_options(id,name,price,sort_order)&order=sort_order"),
+      /* Nothing on a public page reads the result of this one any more — the
+         runtime photograph swap it fed was deleted on 2026-08-07 and a
+         photograph now reaches the site only through tools/bake-photos.mjs at
+         build time. It stays because tools/check-live-project.mjs reads the
+         descriptions back through this file, on purpose, so that it compares
+         what the site would render rather than its own opinion of the table's
+         shape. Deleting it costs no round trip and loses that check.
+         PHOTOGRAPHS.md §8. */
       get("photos?select=slot,storage_path,alt"),
       get("hours_exceptions?select=on_date,is_closed,opens_at,closes_at,note&order=on_date")
     ];

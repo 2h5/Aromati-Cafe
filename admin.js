@@ -1409,38 +1409,38 @@ var AROMATI_ADMIN = (function () {
 
      Words, hours, prices and menu items are live the moment they are saved —
      the site reads them on the next page load and nothing else has to happen.
-     A photograph is different, and the difference is worth spelling out here
-     rather than leaving it to be discovered.
+     A photograph is not, and the difference is worth spelling out here rather
+     than leaving it to be discovered.
 
-     A replaced photograph *is* live immediately. What it is not, until the
-     site is rebuilt, is baked into the page — so on that first load a visitor
-     can see the previous picture for a moment before it changes. Four attempts
-     were made to remove that flicker in the browser and it cannot be removed
-     there: the page has to be painted before the database can be asked. The
-     rebuild is what removes it, by putting the new photograph into the file
-     itself. See tools/bake-photos.mjs.
+     A saved photograph reaches this editor immediately and the site not at
+     all. Photographs are written into the pages when the site is built, so
+     until a build has run every visitor keeps seeing the previous picture —
+     sitting still, not flickering. Publish is what runs the build. See
+     PHOTOGRAPHS.md for why it works that way; the short version is that a
+     photograph swapped in after the page has painted is a photograph the
+     visitor watches change.
 
-     Republishing is a step outside this editor — the site is built from the
-     repository and uploaded — so what this must not do is imply a button
-     exists here that does it. It says the change is already live, says what
-     republishing buys, and says to batch. Nothing about quotas: the site is
-     deployed by direct upload, which the host does not meter, and a number
-     that turns out not to apply is worse than no number. */
+     Two things this must get right. It must not say "live straight away",
+     which was true under the old design and is the one sentence an owner would
+     act on wrongly — they would upload and walk away. And it must give the
+     delay a shape: about a minute, ending by itself, not something to press
+     Publish twice for. Nothing about quotas — a build allowance this owner
+     will not approach is a number that only makes them hesitate. */
   function photoNote() {
     return makeNote(function (node) {
-      node.appendChild(el("strong", null, "Your photograph is live straight away. "));
+      node.appendChild(el("strong", null, "Saving is not enough on this page. "));
       node.appendChild(document.createTextNode(
-        "Save it and visitors see it on their next visit — there is nothing " +
-        "else you need to do for the picture to be on the site."));
+        "A photograph you save shows here right away, but the site keeps the " +
+        "old one until you press Publish at the top of this page. Nothing " +
+        "looks broken in the meantime — visitors simply see the previous " +
+        "picture."));
       node.appendChild(el("br"));
       node.appendChild(el("br"));
-      node.appendChild(el("strong", null, "One thing to know. "));
+      node.appendChild(el("strong", null, "Change as many as you like first. "));
       node.appendChild(document.createTextNode(
-        "Until the site is republished, a visitor may glimpse the previous " +
-        "picture for a moment before the new one appears. Publishing puts the " +
-        "photograph into the page itself and that flicker stops. Press " +
-        "Publish at the top of this page when you are done — once is enough, " +
-        "however many photographs you changed."));
+        "One Publish covers every photograph you changed, so upload them all, " +
+        "look them over, and publish once at the end. The site takes about a " +
+        "minute to catch up, and you do not have to wait or press it again."));
     });
   }
 
