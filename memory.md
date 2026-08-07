@@ -369,16 +369,33 @@ map above it. Three things there are load-bearing:
   dropping a new one on top is the blink. `data.js` has already cached the
   fresh content, so the next load opens on it with no wait. One visit shows
   one-edit-old photographs; nobody watches a photograph change.
-- **The first visit is now covered too, and it costs a round trip.** With a CMS
-  configured, `photo-boot.js` hides `[data-photo-critical]` — one image per
-  page, above the fold — even with no cache to say it will change. That image
-  arrives one request late on a first visit and sits on the oxblood panel
-  `.hero__media` / `.mhead__bg` provide until it does. Only that one image
-  pays; everything below the fold keeps the shipped picture and swaps if it
-  must, because holding the whole page is the SPA loading screen this site
-  exists not to be. The entrance choreography is *not* held and plays on time
-  over the panel — `test:photosettle` asserts the boot stylesheet never names
-  anything but a photograph.
+- **The cold visit is covered too, and only the cold visit.** With a CMS
+  configured *and no readable cache*, `photo-boot.js` hides
+  `[data-photo-critical]` — one image per page, above the fold — even with
+  nothing to say it will change. That image arrives one request late on a first
+  visit and sits on the oxblood panel `.hero__media` / `.mhead__bg` provide
+  until it does. Only that one image pays; everything below the fold keeps the
+  shipped picture and swaps if it must, because holding the whole page is the
+  SPA loading screen this site exists not to be. The entrance choreography is
+  *not* held and plays on time over the panel — `test:photosettle` asserts the
+  boot stylesheet never names anything but a photograph.
+
+  **`!cacheKnown` is the load-bearing half of that condition** and it was
+  missing for a day. Gated on "is a CMS configured" alone, the rule fired on
+  returning visitors too — and `hero.main` on this site has no upload, so the
+  hero sat behind the dark panel on every single load, waiting out a request
+  that came back saying nothing had changed, then appeared with a jolt.
+  Measured in Chrome at 177ms held with `complete=true` — the picture had been
+  decoded and ready the whole time — revealed at 225ms. A new blink, paid by
+  every visitor on every load, in exchange for nothing.
+
+  A cache carrying an empty photos map is **not** an absence of information. It
+  is the CMS's own answer: these slots show what they ship with. So a returning
+  visitor is held to what the cache actually says, and only an unreadable or
+  absent cache counts as silence. What that gives up is narrow and
+  self-correcting: when a slot goes from empty to filled, one visitor with an
+  older cache sees one swap, and their cache is written before they leave.
+  `test:photobrowser` holds the line in both directions.
 
 This is why `config.js` moved into `<head>`, above `photo-boot.js`: without it
 the boot script cannot tell whether an answer is coming, and holding the hero

@@ -259,10 +259,44 @@ console.log("\nthe above-the-fold hold, and what gates it\n");
 }
 {
   const live = boot(REPLACED, { config: true });
-  check("a known replacement is held by name as well as by the group",
-        live.hiddenSlots(), ["[data-photo-critical]", "hero.main"]);
+  check("a returning visitor is held to exactly what the cache says",
+        live.hiddenSlots(), ["hero.main"]);
   live.fireTimers();
-  check("and the deadline lifts both", live.hiddenSlots(), []);
+  check("and the deadline lifts it", live.hiddenSlots(), []);
+}
+{
+  /* The regression. Reported from a real site on 7 August 2026: the hero sat
+     behind the dark panel on every load, the masthead animated over it, and
+     the photograph appeared with a jolt afterwards.
+
+     The cause was this rule firing on a visitor whose cache already said the
+     hero has no replacement. The picture was decoded and ready — measured at
+     `complete=true` while still hidden — and was held anyway, waiting out a
+     request whose answer was "nothing changed". Every load, for nothing.
+
+     A cache carrying an empty photos map is not an absence of information. It
+     is the CMS's own answer, and the answer is that these slots show what they
+     ship with. */
+  const settled = boot({ photos: {} }, { config: true });
+  check("a cache that says 'no replacements' holds nothing at all",
+        settled.hiddenSlots(), []);
+}
+{
+  const partial = boot({ photos: { "story.one": { alt: "b", url: null } } }, { config: true });
+  check("and a cache that answers for a slot with null holds nothing either",
+        partial.hiddenSlots(), []);
+}
+{
+  /* But a cache that cannot be read is not an answer, it is silence — and
+     silence about the one image above the fold is the cold visit, which is
+     still held. This is the line the fix must not cross: it narrows the hold
+     to visitors who know something, not away entirely. */
+  const broken = boot("{ not json", { config: true });
+  check("an unreadable cache is silence, and silence still holds the hero",
+        broken.hiddenSlots(), ["[data-photo-critical]"]);
+  const noPhotos = boot({ menu: {} }, { config: true });
+  check("so is a cache with no photos key at all",
+        noPhotos.hiddenSlots(), ["[data-photo-critical]"]);
 }
 
 console.log("\nthe deadline records why it fired\n");

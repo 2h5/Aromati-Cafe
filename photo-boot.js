@@ -170,21 +170,33 @@ var AROMATI_PHOTO_BOOT = (function () {
     return key === CRITICAL ? "[data-photo-critical]" : '[data-photo="' + key + '"]';
   }
 
-  function overrides() {
-    var out = {};
+  /* Two answers, and the second one is easy to overlook and load-bearing.
+
+     `urls` is what it has always been: the slots with a usable replacement.
+
+     `known` is whether this browser has a record of what the CMS said at all —
+     a cache that parsed and carried a photos object. That is a different
+     question from "are there any replacements", and conflating them is what
+     made the hero sit behind a dark panel on every load of a site whose hero
+     has no replacement and never had one. An empty photos map is not silence;
+     it is the site saying, in as many words, that these slots are showing what
+     they ship with. */
+  function readCache() {
+    var out = { urls: {}, known: false };
     try {
       var raw = window.localStorage.getItem(CACHE_KEY);
       if (!raw) return out;
       var parsed = JSON.parse(raw);
       var photos = parsed && parsed.photos;
       if (!photos || typeof photos !== "object") return out;
+      out.known = true;
       Object.keys(photos).forEach(function (slot) {
         var url = photos[slot] && photos[slot].url;
-        if (typeof url === "string" && SAFE_URL.test(url)) out[slot] = url;
+        if (typeof url === "string" && SAFE_URL.test(url)) out.urls[slot] = url;
       });
     } catch (err) {
       /* Storage disabled, private browsing, an opaque origin, malformed JSON.
-         All of them mean "no replacements known", none of them mean "stop". */
+         All of them mean "nothing is known", none of them mean "stop". */
     }
     return out;
   }
@@ -325,9 +337,12 @@ var AROMATI_PHOTO_BOOT = (function () {
 
   var known = {};
   var live = false;
+  var cacheKnown = false;
 
   try {
-    known = overrides();
+    var cache = readCache();
+    known = cache.urls;
+    cacheKnown = cache.known;
     live = liveContent();
 
     /* Armed before anything is hidden, not after. If the code between here and
@@ -341,12 +356,35 @@ var AROMATI_PHOTO_BOOT = (function () {
       hide(slot);
     });
 
-    /* The cold-visit hold. Unconditional on the cache: a slot the cache knows
-       nothing about is exactly the slot most likely to change under this
-       visitor, and the hero is the one place a change is unmissable. When the
-       cache *does* have the hero it is already hidden by name above, and this
-       rule is a harmless duplicate that lifts at the same moment. */
-    if (live) hide(CRITICAL);
+    /* The cold-visit hold — and note what it is gated on, because the first
+       version of this was gated on `live` alone and that was wrong in a way
+       that took a browser to see.
+
+       This rule holds the above-the-fold image without knowing whether it is
+       going to change. That is the right call when nothing is known. It is a
+       bad call the moment something *is* known, and on a returning visit
+       something always is: the cache carries the CMS's own answer for every
+       slot, including "this one has no replacement".
+
+       Held on anyway, the hero on a site whose hero has no upload sat behind
+       the dark panel on every single load, waiting out a request that came
+       back saying nothing had changed, and then appeared with a jolt — an
+       image that had been decoded and ready the whole time. Measured at 177ms
+       held with `complete=true`, revealed at 225ms. That is not the blink this
+       file exists to remove; it is a new one, paid by every visitor on every
+       load, in exchange for nothing.
+
+       So a returning visitor is held to what the cache actually says: the
+       slots with a replacement are hidden by name above, and everything else
+       paints immediately, exactly as it did before any of this existed.
+
+       What that gives up is narrow and self-correcting. If the owner uploads a
+       photograph for a slot that had none, the next visitor to arrive with an
+       older cache sees the shipped picture swap once — and their cache is
+       written before they leave, so every load after that is clean. One swap,
+       once, per visitor, per slot that goes from empty to filled. Against a
+       dark hero on every load forever, it is not a close call. */
+    if (live && !cacheKnown) hide(CRITICAL);
   } catch (err) {
     revealAll();
   }

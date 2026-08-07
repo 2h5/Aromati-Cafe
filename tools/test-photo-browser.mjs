@@ -73,7 +73,22 @@ function probeFor({ cached, delayMs, cmsPhoto }) {
       localStorage.setItem("aromati:content:v3", JSON.stringify({
         menu: {}, hours: [], hoursNote: null, exceptions: {},
         settings: {}, copy: {},
-        photos: { "hero.main": { alt: "cached", url: CACHED } }
+        /* The URL has to be an https one on the storage origin, because that
+           is the only kind photo-boot.js will act on — it applies render.js's
+           https-only rule at its own door. Seeding a relative path here made
+           this case quietly stop testing anything: the boot script ignored it,
+           held nothing, and the run passed for the wrong reason.
+
+           "none" is the other real state, and a different one: a cache that
+           answers for the hero and says it has no replacement. That is what
+           this site's cache actually holds, and it must not be confused with
+           having no cache at all. */
+        photos: {
+          "hero.main": {
+            alt: "cached",
+            url: CACHED === "none" ? null : "https://example.invalid/cached.webp"
+          }
+        }
       }));
     } catch (e) {}
   } else {
@@ -127,8 +142,14 @@ function probeFor({ cached, delayMs, cmsPhoto }) {
      that gets missed. The file is deliberately not the shipped hero, so a swap
      cannot hide inside an identical picture. */
   function rewrite(v) {
-    return (typeof v === "string" && v.indexOf("https://example.invalid") === 0)
-      ? ${JSON.stringify(cmsPhoto || "")} : v;
+    if (typeof v !== "string" || v.indexOf("https://example.invalid") !== 0) return v;
+    /* Two fictional URLs, two real files. The cached photograph and the one
+       the CMS hands back have to be visibly different pictures or a swap
+       between them proves nothing — a run in which both resolved to the same
+       file would report "one photograph, shown once" no matter how badly the
+       ordering was broken. */
+    if (v.indexOf("/cached.webp") >= 0) return ${JSON.stringify(cached === "none" ? "" : (cached || ""))};
+    return ${JSON.stringify(cmsPhoto || "")};
   }
   var elSet = Element.prototype.setAttribute;
   Element.prototype.setAttribute = function (name, value) {
@@ -238,13 +259,35 @@ console.log("\na reload after the owner changed the photograph\n");
      exact sequence the owner reported: reload, watch the old picture, watch it
      be replaced. */
   const r = run(probeFor({
-    cached: "assets/web/hero-wine-frame.webp", delayMs: 600, cmsPhoto: CMS_FILE
+    cached: "assets/web/dining-corner.jpg", delayMs: 600, cmsPhoto: CMS_FILE
   }));
   if (!r) fail("the page did not report", "no probe result in <title>");
   else {
     check("the cached photograph is never painted, only the new one",
           r.seen, ["(held)", CMS]);
     check("no reload shows two photographs", r.seen.filter((s) => s !== "(held)").length, 1);
+  }
+}
+
+console.log("\na reload of a page whose hero has no photograph in the CMS\n");
+{
+  /* The regression, and the reason this check exists in the browser file
+     rather than only in jsdom: jsdom said the hero was "revealed" and was
+     right, and the site still looked wrong. What a visitor experienced was the
+     dark panel, the masthead animating over it, and the photograph landing
+     afterwards with a jolt — a picture that had been decoded and ready the
+     whole time, held back waiting for a request whose answer was "nothing
+     changed".
+
+     `cached: "none"` seeds the cache the way this site's actually is: a
+     complete record, in which the hero has no replacement. A returning
+     visitor holding that must not wait for anything. The hero is expected to
+     be visible on the very first sample — no "(held)" in the list at all. */
+  const r = run(probeFor({ cached: "none", delayMs: 600, cmsPhoto: null }));
+  if (!r) fail("the page did not report", "no probe result in <title>");
+  else {
+    check("the hero is never held, not even for a frame", r.seen, [SHIPPED]);
+    check("the database was still asked", r.answered, true);
   }
 }
 
