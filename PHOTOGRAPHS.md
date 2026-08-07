@@ -18,7 +18,7 @@ page and the first thing anyone looks at.
 
 All four layers are live at `aromati-cafe.pages.dev`, served by a Git-connected
 Cloudflare Pages project building from `main`. Last verified against production
-after commit `3203841`:
+after commit `4dc27e1`:
 
 | Check | Expected | Observed |
 | --- | --- | --- |
@@ -78,7 +78,7 @@ There is no third option. Several attempts were made to find one — decoding
 off-DOM before assigning, holding the paint, masking the reload on `pagehide` —
 and all of them failed, because they were all trying to win a race that starts
 before the starting gun. Two of those attempts are still in the git history
-(`05fc9d7`, `430ef48`) with their reasoning intact, and were reverted.
+(`e53a792`, `0c8ea22`) with their reasoning intact, and were reverted.
 
 **The fix is to remove the disagreement, not to hide it.** That means resolving
 the photograph *before the HTML reaches the browser*. Everything below is that
