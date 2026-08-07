@@ -44,12 +44,26 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
    Authorization header is the entire point of the request. */
 const ALLOWED = /^https:\/\/([a-z0-9-]+\.)?aromati-cafe\.pages\.dev$/;
 
-function cors(origin: string | null) {
+/* The requested headers are echoed rather than listed.
+
+   Listing them is how the first version of this failed, and it failed silently
+   in the only way CORS can: the preflight was answered 204, the browser then
+   compared the list to what supabase-js actually sends, found x-client-info
+   missing, and never sent the POST at all. Nothing reached this function, so
+   the logs showed an OPTIONS with no POST after it and the editor showed the
+   generic "try again in a minute" — a failure with no failed request in it.
+
+   A hardcoded list has to be kept in step with a client library that is free to
+   add a header in any release. Echoing cannot drift. It is not a weakening
+   either: the origin is still checked against ALLOWED, and every header named
+   here arrives on a request that has already been proved to come from the
+   editor's own origin. */
+function cors(origin: string | null, requested?: string | null) {
   const headers: Record<string, string> = {
     "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "authorization, content-type, apikey",
+    "Access-Control-Allow-Headers": requested || "authorization, content-type, apikey, x-client-info",
     "Access-Control-Max-Age": "86400",
-    Vary: "Origin",
+    Vary: "Origin, Access-Control-Request-Headers",
   };
   if (origin && ALLOWED.test(origin)) headers["Access-Control-Allow-Origin"] = origin;
   return headers;
@@ -65,7 +79,12 @@ function reply(body: unknown, status: number, origin: string | null) {
 Deno.serve(async (req) => {
   const origin = req.headers.get("Origin");
 
-  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors(origin) });
+  if (req.method === "OPTIONS") {
+    return new Response(null, {
+      status: 204,
+      headers: cors(origin, req.headers.get("Access-Control-Request-Headers")),
+    });
+  }
   if (req.method !== "POST") return reply({ error: "Use POST." }, 405, origin);
 
   /* Read before anything else is done, so a project that was deployed without

@@ -550,7 +550,8 @@ These names are kept here so the project checks can detect missing or renamed
 support files without requiring a long explanation for each one.
 
 Tools: `tools/add-content-hooks.mjs`, `tools/check-csp.mjs`,
-`tools/check-fonts.mjs`, `tools/check-live-project.mjs`,
+`tools/check-deployed-headers.mjs`, `tools/check-fonts.mjs`,
+`tools/check-live-project.mjs`,
 `tools/check-memory.mjs`, `tools/check-policies.mjs`, `tools/check-vendor.mjs`,
 `tools/copy-labels.mjs`, `tools/extract-copy.mjs`, `tools/extract-menus.mjs`,
 `tools/extract-photos.mjs`, `tools/fetch-fonts.mjs`, `tools/gen-photo-sql.mjs`,
