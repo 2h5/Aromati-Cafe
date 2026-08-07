@@ -39,6 +39,7 @@
     "fetch:fonts": "node tools/fetch-fonts.mjs",
     "check:fonts": "node tools/check-fonts.mjs",
     "test:fonts": "node tools/test-fonts.mjs",
+    "check:headers": "node tools/check-deployed-headers.mjs",
     "check:csp": "node tools/check-csp.mjs",
     "test:replay": "node tools/test-replay.mjs",
     "build:files": "vite build",

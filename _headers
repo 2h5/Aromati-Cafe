@@ -88,7 +88,20 @@
 # The editor page. It holds the owner's session token in localStorage, so an
 # injected script there is worth more to an attacker than one on a menu page.
 # Same policy, minus data: everywhere it is not needed, and no framing at all.
+#
+# BOTH PATHS, and this is not belt and braces. Cloudflare Pages serves the file
+# at /admin and 308s /admin.html to it, so a rule written only against the name
+# on disk matches the redirect and never the page. Found in production on
+# 2026-08-07, after months of the editor quietly running under the /* rule
+# instead of this one: framable by the portfolio, indexable, referrer leaking,
+# and no blob: for the upload preview. Every line below was written on purpose
+# and none of them had been in force. Add a page here and add both spellings.
 /admin.html
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob: https://yofoiqgknsqzsuwtlqvh.supabase.co; font-src 'self' data:; connect-src 'self' https://yofoiqgknsqzsuwtlqvh.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'
+  X-Robots-Tag: noindex, nofollow
+  Referrer-Policy: no-referrer
+
+/admin
   Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob: https://yofoiqgknsqzsuwtlqvh.supabase.co; font-src 'self' data:; connect-src 'self' https://yofoiqgknsqzsuwtlqvh.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'
   X-Robots-Tag: noindex, nofollow
   Referrer-Policy: no-referrer
