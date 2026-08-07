@@ -765,13 +765,91 @@
      is applied in two places: the storage bucket decides what may be stored,
      and this decides what may be rendered. */
 
+  /* photo-boot.js has been in <head> since before the body was parsed, and on
+     any repeat visit it has already hidden the slots it knows are about to
+     change and started fetching their replacements. This function is the other
+     half of that: it puts the picture in and tells the boot script the slot may
+     be shown again.
+
+     It has to be safe when the boot script is absent — opened from file://
+     with only some of the scripts, or an older cached copy of a page. Every
+     call into it goes through this, which degrades to the old behaviour of
+     setting src and moving on. */
+  var boot = typeof AROMATI_PHOTO_BOOT === "object" && AROMATI_PHOTO_BOOT
+    ? AROMATI_PHOTO_BOOT : null;
+
+  function releaseSlot(slot) {
+    if (boot) { try { boot.reveal(slot); } catch (err) { /* stays visible */ } }
+  }
+
+  /* Put a picture in without ever showing it half-arrived.
+
+     Two cases, and they want opposite things:
+
+     A slot the boot script is holding is blank right now. Nothing is on screen
+     to protect, so the src goes straight in and the slot is revealed as soon
+     as the picture is ready — the visitor's first sight of that box is the
+     finished photograph.
+
+     A slot that is *not* held is showing the shipped photograph: a first-ever
+     visit, or a replacement uploaded since this visitor last had a cache.
+     Setting src there would leave the old picture up and swap when the new one
+     decodes, which is the blink. So the image is decoded off-DOM first and
+     only then assigned, making the change a single frame rather than a wait
+     with an old photograph in it.
+
+     decode() is not universal and can reject on a perfectly good image if the
+     element is detached mid-flight. Both paths fall back to a plain assignment,
+     which is what the site did before any of this existed. */
+  function setPhoto(img, slot, url) {
+    if (boot && boot.isHeld(slot)) {
+      img.setAttribute("src", url);
+      if (img.decode) {
+        img.decode().then(function () { releaseSlot(slot); },
+                          function () { releaseSlot(slot); });
+      } else {
+        img.addEventListener("load", function () { releaseSlot(slot); });
+        img.addEventListener("error", function () { releaseSlot(slot); });
+      }
+      return;
+    }
+
+    if (img.getAttribute("src") === url) { releaseSlot(slot); return; }
+
+    var pre = new Image();
+    if (!pre.decode) {
+      img.setAttribute("src", url);
+      releaseSlot(slot);
+      return;
+    }
+    pre.src = url;
+    pre.decode().then(function () {
+      img.setAttribute("src", url);
+      releaseSlot(slot);
+    }, function () {
+      /* The replacement is unreachable — storage down, object deleted, the CSP
+         origin out of step with config.js. Leaving the shipped photograph up is
+         the right answer and needs no action; the slot is not held, so there is
+         nothing to reveal either. */
+      releaseSlot(slot);
+    });
+  }
+
   function renderPhotos(photos) {
     Array.prototype.forEach.call(document.querySelectorAll("[data-photo]"), function (img) {
-      var photo = photos[img.getAttribute("data-photo")];
-      if (!photo) return;
+      var slot = img.getAttribute("data-photo");
+      var photo = photos[slot];
+
+      /* A slot with no entry at all still has to be released. It cannot
+         normally be held — the boot script only hides what it found a URL for —
+         but "cannot normally" is not a reason to leave the one path that would
+         strand a photograph off the page. */
+      if (!photo) { releaseSlot(slot); return; }
 
       if (typeof photo.url === "string" && SAFE_URL.test(photo.url)) {
-        img.setAttribute("src", photo.url);
+        setPhoto(img, slot, photo.url);
+      } else {
+        releaseSlot(slot);
       }
 
       /* data-photo-decorative is this *drawing* of the slot, not the slot: the

@@ -301,6 +301,46 @@ does not use them; the only casualty was the editor's warning that a replacement
 photograph is a very different shape from the one it replaces. A reader that
 fails by going quiet deserves more suspicion than one that throws.
 
+### The shipped photograph must never be painted and then replaced
+
+Noticed on 6 August 2026, on the hero: the photograph the site ships with
+appeared for a beat on every load and was then swapped for the owner's. The
+data was never wrong. The replacement was already in `localStorage` before the
+page began parsing — it was simply not *asked for* until far too late.
+
+The shipped file is a real `src` in the markup, which is what makes the site
+correct from `file://`, with no database and with JavaScript off. That is not
+going away. But `render.js` is at the bottom of the body, so the browser
+fetched the shipped file from line 129, painted it, parsed four hundred more
+lines, and only then set the replacement.
+
+`photo-boot.js` is the answer and is the **only** script in `<head>`. It reads
+the same cache key `data.js` writes, preloads the replacements, and hides
+exactly the slots that are about to change until `render.js` has the real
+picture decoded. A repeat visitor never sees the shipped photograph at all.
+
+Three things about it are load-bearing and easy to undo by accident:
+
+- **It must stay external and stay above the body.** `script-src` is `'self'`
+  with no `'unsafe-inline'`; an inline version fails `check:csp`. Moved below
+  the body it silently does nothing.
+- **The cache key is written twice**, here and in `data.js`. They are compared
+  at runtime and asserted by `test:photoboot`. Bumping the version in one file
+  only puts the blink back on a site where everything still passes.
+- **Nothing may stay hidden.** The reveal timeout is armed before anything is
+  hidden, and every error path reveals everything. If that timer is ever doing
+  the work on a normal load, the photograph is arriving 700ms late and nothing
+  reports it — `test:photoboot` asserts `render.js` releases each slot on every
+  path through it, which is what keeps the timer a net rather than the
+  mechanism.
+
+**A first-ever visitor is not covered and cannot be**, at runtime: the URL
+exists only in a database the browser has not queried. For that visitor the fix
+is the one already written above — run `node tools/extract-photos.mjs` after an
+upload and commit, so the shipped file *is* the current photograph and there is
+nothing to swap. The friend's hero replacement on 6 August 2026 is exactly the
+case: uploaded, never extracted.
+
 Do not treat a general CMS-to-files sync tool as current work. The CMS is the
 editing surface, and text edits reach the seed files through the existing
 extract tools. The photographs are the one place this has actually been done by
@@ -383,11 +423,12 @@ also run `node tools/check-live-project.mjs`. For headline or responsive layout
 changes, run `node tools/measure-headlines.mjs` and inspect the result in a real
 browser. Automated checks cannot replace the browser pass for visual behavior.
 
-### The twenty-eight harnesses
+### The twenty-nine harnesses
 
 `npm test` currently covers: `check:fonts`, `test:fonts`, `check:csp`,
 `check:vendor`, `test:pages`, `test:hours`, `test:copy`, `test:ordering`,
-`test:guards`, `test:admin`, `test:photos`, `test:sql`, `test:rls`,
+`test:guards`, `test:admin`, `test:photos`, `test:photoboot`, `test:sql`,
+`test:rls`,
 `test:dbguards`, `test:live`, `test:policies`, `check:policies`, `check:seed`,
 `check:photosql`, `check:memory`, `check:layout`, `test:replay`,
 `test:resilience`, `test:hourslive`, `test:hoursexceptions`, `test:menushapes`,
@@ -414,7 +455,8 @@ Tools: `tools/add-content-hooks.mjs`, `tools/check-csp.mjs`,
 `tools/test-hours-exceptions.mjs`, `tools/test-hours-live.mjs`,
 `tools/test-hours.mjs`, `tools/test-live.mjs`,
 `tools/test-menu-hidden.mjs`, `tools/test-menu-shapes.mjs`,
-`tools/test-ordering.mjs`, `tools/test-photos.mjs`,
+`tools/test-ordering.mjs`, `tools/test-photo-boot.mjs`,
+`tools/test-photos.mjs`,
 `tools/test-policies.mjs`, `tools/test-replay.mjs`, `tools/test-resilience.mjs`,
 `tools/test-rls.mjs`, `tools/test-sql.mjs`, `tools/verify-phase1.mjs` and
 `tools/wire-scripts.mjs`.

@@ -228,7 +228,7 @@ enough.
 npm test
 ```
 
-28 harnesses, no network, no Docker. They run the real files — the real pages
+29 harnesses, no network, no Docker. They run the real files — the real pages
 in jsdom, the real renderer, and the migrations against Postgres
 compiled to WebAssembly. `memory.md` records the current verification workflow;
 the individual commands live in `package.json`.

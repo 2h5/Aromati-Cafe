@@ -193,16 +193,29 @@ console.log("\nthe one security rule, in the code that writes photographs\n");
   /* render.js is scanned whole elsewhere; this is the photograph half of it,
      read on its own so that adding an innerHTML here is caught by the harness
      that owns this code rather than only by a general one. */
-  const photoHalf = RENDER.slice(RENDER.indexOf("function renderPhotos"),
+  /* From the section marker, not from `function renderPhotos`. The code that
+     assigns a src is no longer all inside that one function — setPhoto() and
+     releaseSlot() sit above it and setPhoto is the thing that actually writes
+     the attribute now. Anchored at the function, this scan would have gone on
+     reporting "no HTML sink anywhere in it" while not reading the lines where
+     one would matter most. */
+  const photoHalf = RENDER.slice(RENDER.indexOf("/* ── photographs ──"),
                                  RENDER.indexOf("/* ── go ──"));
   const found = ["innerHTML", "insertAdjacentHTML", "outerHTML", "document.write"]
     .filter((sink) => photoHalf.includes(sink));
   check("no HTML sink anywhere in it", found, []);
 
   /* …and the scan notices when one is put in. An assertion that never fails is
-     not evidence of anything. */
-  const sabotaged = photoHalf.replace("if (!photo) return;",
-                                      "if (!photo) { img.innerHTML = \"\"; return; }");
+     not evidence of anything.
+
+     Anchored on the function signature rather than on a line inside the body.
+     The previous anchor was `if (!photo) return;`, which stopped existing the
+     day that line grew a slot release — and the failure was this control going
+     quiet, which is the one failure a control like this cannot afford. A
+     signature is the most stable thing in the region and the sink lands inside
+     the scanned window wherever the body goes next. */
+  const sabotaged = photoHalf.replace("function renderPhotos(photos) {",
+                                      "function renderPhotos(photos) { img.innerHTML = \"\";");
   check("and the scan would notice one",
         ["innerHTML", "insertAdjacentHTML"].filter((s) => sabotaged.includes(s)),
         ["innerHTML"]);
