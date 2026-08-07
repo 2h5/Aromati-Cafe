@@ -2,8 +2,9 @@
    AROMATI — the replaced photograph, before the first paint
    ═══════════════════════════════════════════════
 
-   This is the only script the pages load from <head>, and the only one that
-   runs before the body is parsed. That position is the entire point of it.
+   This is the only script the pages load from <head> apart from config.js, and
+   the only one that runs before the body is parsed. That position is the entire
+   point of it.
 
    ── the bug this exists to end ──
    Every photograph on the site ships in the markup as a real src:
@@ -21,12 +22,31 @@
    as the new one takes to arrive. On the hero — above the fold, the largest
    element on the page — it reads as the site being broken.
 
-   Nothing was wrong with the data. The replacement was already in localStorage
-   before the page started parsing. It was simply not *asked for* until far too
-   late.
+   ── the second blink, which is the one that never went away ──
+   The paragraphs above were written against *one* of the two swaps on this
+   page, and for a long time the file only closed that one.
+
+   There are two. The cache is one edit behind the database by construction —
+   data.js writes it at the *end* of a visit, so what it holds is whatever the
+   database said last time. That gives a returning visitor:
+
+       shipped photograph  →  cached photograph  →  the photograph in the CMS
+       └──── closed by hiding the slot ────┘   └──── still a visible swap ────┘
+
+   The first arrow is what the original version of this file removed. The
+   second one fires on *every* reload for as long as the owner keeps editing,
+   because every edit puts the cache one behind again. From the owner's chair
+   it looks like the site never stops flashing the old picture — which is
+   exactly the report that produced this rewrite.
+
+   So the hold now runs one step further: a slot stays hidden not until its
+   *cached* picture is decoded, but until the refresh that might replace it has
+   come back and the *final* picture is decoded. render.js drives that; see
+   `settlePhotos` there. What a visitor sees is one photograph, once, and it is
+   the right one.
 
    ── what this does about it ──
-   Three things, in the order they matter:
+   Four things, in the order they matter:
 
      1. Reads the same cache data.js reads, synchronously, in <head>. On any
         reload or repeat visit the replacement URL is known here — before the
@@ -37,23 +57,39 @@
         hundred milliseconds behind it.
 
      3. Hides *exactly* the slots that are going to change, and nothing else,
-        until render.js has the real picture decoded and in place. A slot with
-        no replacement is never touched, so the overwhelming majority of the
+        until render.js has the final picture decoded and in place. A slot with
+        no replacement and no chance of one is never touched, so most of the
         page paints exactly as it does today.
 
-   The result on a repeat visit is that the shipped photograph is never shown.
-   Not shown-and-replaced: never painted at all.
+     4. When the site is wired to a CMS at all, also hides the one image on
+        each page that sits above the fold — `data-photo-critical` — even with
+        no cache to say it is going to change. This is the first-visit case the
+        old version of this file gave up on, and the paragraph below explains
+        what it costs.
 
-   ── what it deliberately does not do ──
+   ── the cold visit, and what it now costs ──
    A visitor arriving for the very first time has no cache, so nothing here
-   knows a replacement is coming and nothing is hidden. That visit still shows
-   the shipped photograph and still swaps. That is not an oversight — it is not
-   solvable at runtime, because the URL only exists in a database the browser
-   has not queried yet. The fix for that case is to bake the current
-   photographs into the markup at build time; see README.md. What this file
-   guarantees for the cold visit is narrower but still worth having: the swap,
-   when it comes, is atomic and fully decoded, never a picture painting in
-   over the top of another one.
+   knows whether a replacement is coming. The old behaviour was to show the
+   shipped photograph and swap if one turned up. The new behaviour is to hold
+   the one above-the-fold image until the database has answered.
+
+   That is a real trade and it is worth stating plainly. It buys: no visitor,
+   ever, on any visit, sees a photograph replaced under them. It costs: on a
+   first visit the hero photograph appears one network round trip late — call
+   it 100–400ms on a working connection — and the visitor looks at a dark
+   brand-coloured panel until it does. The hero's own entrance choreography
+   (the eyebrow, the title lifting its words, the rule, the buttons) is not
+   held and plays over that panel exactly on time, so the page is never
+   *still*; it is the photograph behind the words that arrives a beat later.
+
+   Only `data-photo-critical` pays this. Everything below the fold keeps the
+   shipped picture and swaps if it has to, because a swap nobody is looking at
+   is not worth a hold — and holding the whole page would be the SPA loading
+   screen this site exists not to be.
+
+   And it is only paid when a CMS is actually configured. Over file://, or with
+   config.js emptied, no request is ever going to arrive, so nothing is held
+   and the page behaves precisely as it did in Phase 1.
 
    ── why an external file and not four lines inline ──
    Inline would be simpler and is not available. script-src is 'self' with no
@@ -85,21 +121,54 @@ var AROMATI_PHOTO_BOOT = (function () {
      that the value came from somewhere already checked. */
   var SAFE_URL = /^https:\/\/[^\s]+$/i;
 
-  /* How long a slot may stay hidden waiting for its replacement.
+  /* The ceiling on how long any photograph may be hidden. One number, covering
+     everything: the database round trip, the decode, and any bug between here
+     and render.js.
 
-     This is the only number in the file and it is a safety net, not a tuning
-     knob. On the path this was written for — a repeat visit, the photograph
-     immutable in the HTTP cache from `cacheControl: 31536000` — the reveal
-     happens in single-digit milliseconds and this never fires. It exists for
-     the visitor whose network dies between the cache being written and the
-     page being opened. For them the shipped photograph appears a beat late,
-     which is the correct outcome and the one the whole site is built around:
-     when the live layer is unavailable, fall back to what is in git. */
-  var HOLD_MS = 700;
+     It was 700ms when the only thing being waited for was a decode out of the
+     HTTP cache. It is longer now because the wait includes one request to
+     Supabase, which on the path this was written for lands in 100–400ms and
+     never comes near this. What is on the other side of the number is a
+     visitor on a dying connection: at 1200ms they get the picture the site
+     already had — cached, or the one in git — and the page stops waiting.
 
-  var hidden = {};      // slot → true, while it is waiting
+     Raising it further would buy correctness on slower connections at the cost
+     of a longer dark hero for everyone whose network fails outright. Lowering
+     it puts the blink back for anyone slower than the number. This is the
+     knob; it is deliberately the only one.
+
+     `sealed` below is the other half of the same decision — see it. */
+  var HOLD_MS = 1200;
+
+  /* A reserved key, not a slot. It stands for the one above-the-fold image on
+     the page, which is held as a group rather than by name: nothing in <head>
+     can query the DOM, so this cannot be a list of slot names without that
+     list drifting from the markup silently. A single attribute selector costs
+     one rule and cannot go stale — an image that gains or loses the attribute
+     changes what is held with no edit here. */
+  var CRITICAL = ":critical";
+
+  var hidden = {};      // key → true, while it is waiting
   var sheet = null;
   var revealed = false;
+
+  /* Set when HOLD_MS fires with things still hidden — i.e. the page gave up
+     waiting and revealed whatever it had.
+
+     render.js reads this and, if it is set, declines to apply photographs from
+     a refresh that arrives afterwards. That looks like throwing away a correct
+     answer, and it is. The alternative is worse: the visitor is by then
+     *looking* at the cached photograph, and dropping the new one in on top is
+     precisely the blink this whole file exists to remove — reintroduced by the
+     safety net meant to prevent a different failure. The fresh content is
+     still written to the cache by data.js, so the next load opens on the right
+     picture with no wait at all. One late visit shows one-edit-old
+     photographs; nobody watches a photograph change. */
+  var sealed = false;
+
+  function selectorFor(key) {
+    return key === CRITICAL ? "[data-photo-critical]" : '[data-photo="' + key + '"]';
+  }
 
   function overrides() {
     var out = {};
@@ -120,6 +189,30 @@ var AROMATI_PHOTO_BOOT = (function () {
     return out;
   }
 
+  /* Is there a database to wait for at all?
+
+     The same test data.js makes before it fetches, made here because this file
+     now has to decide something before data.js exists: whether to hold the
+     above-the-fold image on a visitor with no cache. Holding it when nothing
+     is ever going to arrive would be a dark hero until HOLD_MS on every
+     file:// open and on every deploy with config.js emptied — the two states
+     this site treats as fully supported.
+
+     Two copies of a rule is a thing worth being uncomfortable about, and this
+     one is safe to duplicate in a way CACHE_KEY is not: if the two ever
+     disagree, render.js releases the hold the moment its first paint is done,
+     because it asks data.js — not this file — whether a refresh is coming. A
+     drift here costs a few milliseconds, not a hidden photograph. */
+  function liveContent() {
+    try {
+      return typeof AROMATI_CONFIG === "object" && AROMATI_CONFIG &&
+        typeof AROMATI_CONFIG.url === "string" && /^https:\/\//.test(AROMATI_CONFIG.url) &&
+        typeof AROMATI_CONFIG.anonKey === "string" && AROMATI_CONFIG.anonKey.length > 20;
+    } catch (err) {
+      return false;
+    }
+  }
+
   /* An empty <style> satisfies style-src 'self'; everything after this is
      CSSOM, which CSP does not gate. Building it here rather than shipping the
      rules in styles.css is deliberate — the rules have to name specific slots,
@@ -137,7 +230,7 @@ var AROMATI_PHOTO_BOOT = (function () {
     return sheet;
   }
 
-  function hide(slot) {
+  function hide(key) {
     var s = styleSheet();
     if (!s) return false;
     try {
@@ -145,15 +238,21 @@ var AROMATI_PHOTO_BOOT = (function () {
          every framed figure hold their exact layout and nothing reflows when
          the picture arrives. A display:none here would collapse the hero to
          nothing and animate it back, which trades a wrong photograph for a
-         jumping page.
+         jumping page. It would also break script.js, which measures the
+         masthead and the hero to place the scroll cue and the parallax.
+
+         What is behind the hidden image is not the page's cream — styles.css
+         gives .hero__media and .mhead__bg a dark brand panel precisely so this
+         hold reads as intentional and the cream hero type stays legible over
+         it. The two changes belong together.
 
          CSS.escape is not used because slot keys are already constrained to
          [a-z0-9.] by the editor and the seed, and it is absent in older
          browsers this site still renders in. The value is quoted, and a slot
          containing a quote could at worst break its own rule — which fails
          open, to visible. */
-      s.insertRule('[data-photo="' + slot + '"]{visibility:hidden}', s.cssRules.length);
-      hidden[slot] = true;
+      s.insertRule(selectorFor(key) + "{visibility:hidden}", s.cssRules.length);
+      hidden[key] = true;
       return true;
     } catch (err) {
       return false;
@@ -182,16 +281,15 @@ var AROMATI_PHOTO_BOOT = (function () {
   /* Reveal is idempotent and total. Called per-slot as each picture lands, and
      called for everything by the timeout, by any error, and by pagehide — a
      bfcache restore must never come back to a hidden hero. */
-  function reveal(slot) {
-    if (!hidden[slot]) return;
-    delete hidden[slot];
+  function reveal(key) {
+    if (!hidden[key]) return;
+    delete hidden[key];
     var s = styleSheet();
     if (!s) return;
     try {
+      var want = selectorFor(key);
       for (var i = s.cssRules.length - 1; i >= 0; i--) {
-        if (s.cssRules[i].selectorText === '[data-photo="' + slot + '"]') {
-          s.deleteRule(i);
-        }
+        if (s.cssRules[i].selectorText === want) s.deleteRule(i);
       }
     } catch (err) {
       revealAll();
@@ -216,21 +314,39 @@ var AROMATI_PHOTO_BOOT = (function () {
     }
   }
 
+  /* The deadline. Distinct from revealAll() only in that it records *why*
+     everything became visible, which is the fact render.js needs in order not
+     to undo it. */
+  function expire() {
+    if (revealed) return;
+    sealed = true;
+    revealAll();
+  }
+
   var known = {};
+  var live = false;
 
   try {
     known = overrides();
+    live = liveContent();
 
     /* Armed before anything is hidden, not after. If the code between here and
        the end of this block throws, the timeout is already scheduled and the
        page still reveals itself. */
-    window.setTimeout(revealAll, HOLD_MS);
+    window.setTimeout(expire, HOLD_MS);
     window.addEventListener("pageshow", function (e) { if (e.persisted) revealAll(); });
 
     Object.keys(known).forEach(function (slot) {
       preload(known[slot]);
       hide(slot);
     });
+
+    /* The cold-visit hold. Unconditional on the cache: a slot the cache knows
+       nothing about is exactly the slot most likely to change under this
+       visitor, and the hero is the one place a change is unmissable. When the
+       cache *does* have the hero it is already hidden by name above, and this
+       rule is a harmless duplicate that lifts at the same moment. */
+    if (live) hide(CRITICAL);
   } catch (err) {
     revealAll();
   }
@@ -238,6 +354,9 @@ var AROMATI_PHOTO_BOOT = (function () {
   return {
     cacheKey: CACHE_KEY,
     urls: known,
+    /* The reserved key, exported so render.js names it from here rather than
+       writing the string out a second time. */
+    CRITICAL: CRITICAL,
     /* render.js calls these. They are the only reason this returns anything. */
     reveal: reveal,
     revealAll: revealAll,
@@ -245,6 +364,14 @@ var AROMATI_PHOTO_BOOT = (function () {
        replacing something a visitor can currently see — in which case the new
        picture is decoded before it goes in — or filling a box that has been
        deliberately blank for a few milliseconds, where it can go straight in. */
-    isHeld: function (slot) { return !!hidden[slot]; }
+    isHeld: function (key) { return !!hidden[key]; },
+    /* Did the page give up waiting? If so, refreshed photographs are dropped
+       rather than swapped in. See `sealed` above. */
+    isSealed: function () { return sealed; },
+    /* Is a refresh worth waiting for? Read by nothing on the happy path —
+       render.js asks data.js, which is the file that actually decides — and
+       exported so tools/test-photo-boot.mjs can assert the cold-visit hold is
+       gated on it. */
+    isLive: function () { return live; }
   };
 }());

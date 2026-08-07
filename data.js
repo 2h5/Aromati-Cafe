@@ -558,9 +558,17 @@ var AROMATI_DATA = (function () {
 
      `nowNY` is exported because it is the site's only clock. script.js reads
      it for the open/closed pill and render.js for the search listing; a second
-     implementation in either would be a second answer. */
+     implementation in either would be a second answer.
+
+     `configured` is exported for one question with one right answer: is a
+     second paint coming? render.js has to know, because photo-boot.js holds
+     the above-the-fold photograph until it arrives and would otherwise hold it
+     until the deadline on every file:// open. This is the function that
+     actually decides whether refresh() reaches for the network, so asking it
+     cannot disagree with what happens. */
   return {
     current: current, refresh: refresh, stable: stable,
-    nowNY: nowNY, CACHE_KEY: CACHE_KEY
+    nowNY: nowNY, CACHE_KEY: CACHE_KEY,
+    configured: function () { return configured() && typeof fetch === "function"; }
   };
 })();

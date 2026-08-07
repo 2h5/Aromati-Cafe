@@ -331,17 +331,68 @@ Three things about it are load-bearing and easy to undo by accident:
   only puts the blink back on a site where everything still passes.
 - **Nothing may stay hidden.** The reveal timeout is armed before anything is
   hidden, and every error path reveals everything. If that timer is ever doing
-  the work on a normal load, the photograph is arriving 700ms late and nothing
-  reports it — `test:photoboot` asserts `render.js` releases each slot on every
+  the work on a normal load, the photograph is arriving 1200ms late and nothing
+  reports it — `test:photoboot` asserts `render.js` reports each slot on every
   path through it, which is what keeps the timer a net rather than the
   mechanism.
 
-**A first-ever visitor is not covered and cannot be**, at runtime: the URL
-exists only in a database the browser has not queried. For that visitor the fix
-is the one already written above — run `node tools/extract-photos.mjs` after an
-upload and commit, so the shipped file *is* the current photograph and there is
-nothing to swap. The hero replacement uploaded on 6 August 2026 exposed this
-gap and has now been extracted as `assets/web/hero-wine-frame.webp`.
+### The *second* blink: cached, then replaced again
+
+Reported 6 August 2026, after the fix above had shipped. The hero still changed
+on every reload, and the owner's description was exact: it blinks whenever the
+photograph on screen is not the one the site shipped with.
+
+There were always two swaps and the section above only closed one:
+
+    shipped → cached → whatever the CMS says now
+
+`data.js` writes the cache at the *end* of a visit, so what it holds is what the
+database said **last** time. Every edit puts it one behind again — which is why
+the blink came back on every single reload for as long as the owner kept
+working, and why a fix that only helps the second load is not a fix.
+
+So the hold now runs one step further. A slot is released not when its *cached*
+picture decodes but when the refresh has come back and the **final** picture
+decodes. `render.js` owns that ordering — `settlePhotos`, and the `readyButHeld`
+map above it. Three things there are load-bearing:
+
+- **`settlePhotos(repainting)` must be told which answer arrived.** On "nothing
+  changed" the decoded pictures go up. On "here is a different photograph" the
+  same slots must *stay* hidden and be handed to the new picture's own decode.
+  Releasing first and repainting after is the original bug, rebuilt out of the
+  code written to prevent it. Sabotage this and `test:photosettle` fails seven
+  checks.
+- **A refresh that lands after the deadline does not apply its photographs.**
+  `photo-boot.js` records *why* everything became visible (`isSealed`), and
+  `render.js` drops the photographs from a late answer while applying
+  everything else. The visitor is by then looking at the cached picture and
+  dropping a new one on top is the blink. `data.js` has already cached the
+  fresh content, so the next load opens on it with no wait. One visit shows
+  one-edit-old photographs; nobody watches a photograph change.
+- **The first visit is now covered too, and it costs a round trip.** With a CMS
+  configured, `photo-boot.js` hides `[data-photo-critical]` — one image per
+  page, above the fold — even with no cache to say it will change. That image
+  arrives one request late on a first visit and sits on the oxblood panel
+  `.hero__media` / `.mhead__bg` provide until it does. Only that one image
+  pays; everything below the fold keeps the shipped picture and swaps if it
+  must, because holding the whole page is the SPA loading screen this site
+  exists not to be. The entrance choreography is *not* held and plays on time
+  over the panel — `test:photosettle` asserts the boot stylesheet never names
+  anything but a photograph.
+
+This is why `config.js` moved into `<head>`, above `photo-boot.js`: without it
+the boot script cannot tell whether an answer is coming, and holding the hero
+over `file://` would be a dark panel until the deadline on every open.
+`wire-scripts.mjs` refuses to run if the two tags drift apart, because the
+failure is otherwise silent — the hold quietly stops happening and every test
+stays green.
+
+**Baking the photographs into the markup is still the better fix** and is still
+worth doing: run `node tools/extract-photos.mjs` after an upload and commit, so
+the shipped file *is* the current photograph and no visitor waits for anything.
+The runtime hold is what covers the window between an edit and the next deploy.
+The hero uploaded on 6 August 2026 has been extracted as
+`assets/web/hero-wine-frame.webp`.
 
 Do not treat a general CMS-to-files sync tool as current work. The CMS is the
 editing surface, and text edits reach the seed files through the existing
@@ -425,11 +476,13 @@ also run `node tools/check-live-project.mjs`. For headline or responsive layout
 changes, run `node tools/measure-headlines.mjs` and inspect the result in a real
 browser. Automated checks cannot replace the browser pass for visual behavior.
 
-### The twenty-nine harnesses
+### The thirty-one harnesses
 
 `npm test` currently covers: `check:fonts`, `test:fonts`, `check:csp`,
 `check:vendor`, `test:pages`, `test:hours`, `test:copy`, `test:ordering`,
-`test:guards`, `test:admin`, `test:photos`, `test:photoboot`, `test:sql`,
+`test:guards`, `test:admin`, `test:photos`, `test:photoboot`, `test:photosettle`,
+`test:photobrowser`,
+`test:sql`,
 `test:rls`,
 `test:dbguards`, `test:live`, `test:policies`, `check:policies`, `check:seed`,
 `check:photosql`, `check:memory`, `check:layout`, `test:replay`,
@@ -458,6 +511,7 @@ Tools: `tools/add-content-hooks.mjs`, `tools/check-csp.mjs`,
 `tools/test-hours.mjs`, `tools/test-live.mjs`,
 `tools/test-menu-hidden.mjs`, `tools/test-menu-shapes.mjs`,
 `tools/test-ordering.mjs`, `tools/test-photo-boot.mjs`,
+`tools/test-photo-browser.mjs`, `tools/test-photo-settle.mjs`,
 `tools/test-photos.mjs`,
 `tools/test-policies.mjs`, `tools/test-replay.mjs`, `tools/test-resilience.mjs`,
 `tools/test-rls.mjs`, `tools/test-sql.mjs`, `tools/verify-phase1.mjs` and
