@@ -2052,8 +2052,15 @@ var AROMATI_ADMIN = (function () {
     var sizeWrap = el("div", "field");
     sizeWrap.appendChild(el("span", "field__label", "Size columns"));
     sizeWrap.appendChild(makeCheck(
-      "This section prices items by size (Small / Large)", hasSizes,
+      /* The label does not name the columns. It used to say "(Small / Large)",
+         which stopped being true when the coffee list went to three, and a
+         checkbox that describes the data wrongly is worse than one that does
+         not describe it at all — the boxes below say what they actually are. */
+      "This section prices items by size", hasSizes,
       function (checked) {
+        /* Two is the starting shape for a section that has never had sizes, not
+           a cap. Ticking this on a section that already has three does not
+           happen — the box is already ticked. */
         course.sizes = checked ? ["Small", "Large"] : null;
         if (!checked) {
           /* Items priced per size cannot stay that way without columns to
@@ -2074,20 +2081,70 @@ var AROMATI_ADMIN = (function () {
 
     if (hasSizes) {
       var sizeRow = el("div", "row");
-      [0, 1].forEach(function (n) {
+      /* Driven off the array, not off [0, 1]. The hardcoded pair is why the
+         coffee list's Medium column was invisible here for a day: it was in the
+         database and on the printed sheet and rendering on the site, and this
+         screen — the only place anyone can change it — drew two boxes and never
+         mentioned the third. */
+      course.sizes.forEach(function (size, n) {
         var f = makeField({
           table: "menu_courses", row: course, col: "sizes",
           cardId: cardId, tab: "menu",
-          label: "Column " + (n + 1), value: course.sizes[n] || "", extra: "field--narrow",
+          label: "Column " + (n + 1), value: size || "", extra: "field--narrow",
           onInput: function (v) {
             var next = (course.sizes || []).slice();
             next[n] = v;
-            course.sizes = next.filter(function (s) { return t(s).length > 0; });
+            /* Blanks are kept, not filtered out. Dropping them here shortened
+               the array under the editor's hands — clearing "Large" silently
+               took the section to one column and put every item in it one price
+               out of step, reported as a mismatch against a column count nobody
+               had touched. An empty box is now held in place and named by the
+               validator instead. */
+            course.sizes = next;
           }
         });
         sizeRow.appendChild(f.wrap);
       });
       card.body.appendChild(sizeRow);
+
+      /* Three is the layout's ceiling and menu_courses_sizes_max_3 is the
+         database's. Both are real, so the button that would cross them is not
+         drawn rather than drawn and then refused. */
+      var sizeTools = el("div", "tools");
+
+      if (course.sizes.length < 3) {
+        var addCol = el("button", "btn btn--small", "Add a size column");
+        addCol.type = "button";
+        on(addCol, "click", function () {
+          course.sizes = course.sizes.concat("");
+          /* Every per-size item is priced one-to-one against these columns, so
+             the new column arrives in the items too. Leaving them short would
+             turn one click into a validation error on every line in the
+             section. */
+          itemsIn(course.id).forEach(function (item) {
+            if (priceShape(item) === "sizes") item.prices = (item.prices || []).concat("");
+          });
+          renderAll(false, true);
+        });
+        sizeTools.appendChild(addCol);
+      }
+
+      if (course.sizes.length > 1) {
+        var dropCol = el("button", "btn btn--small", "Remove the last column");
+        dropCol.type = "button";
+        on(dropCol, "click", function () {
+          course.sizes = course.sizes.slice(0, -1);
+          itemsIn(course.id).forEach(function (item) {
+            if (priceShape(item) === "sizes") {
+              item.prices = (item.prices || []).slice(0, course.sizes.length);
+            }
+          });
+          renderAll(false, true);
+        });
+        sizeTools.appendChild(dropCol);
+      }
+
+      card.body.appendChild(sizeTools);
     }
 
     /* The lines on the menu are their own card. A section's own settings are
@@ -3869,9 +3926,22 @@ var AROMATI_ADMIN = (function () {
             "with a lowercase letter and use only lowercase letters, numbers and dashes.",
             "menu_courses", course.id, "course_key");
       }
-      if (course.sizes && course.sizes.length > 2) {
-        add("“" + course.heading + "” has more than two size columns, which the menu " +
+      /* Three, not two, since 2026-08-06: the price cells are
+         repeat(var(--cols), var(--cell)) and --cell narrows once at
+         data-cols="3". This mirrors menu_courses_sizes_max_3 — if the two ever
+         disagree again, the database wins and the save fails at the round trip
+         instead of here, which is the worse place to find out. */
+      if (course.sizes && course.sizes.length > 3) {
+        add("“" + course.heading + "” has more than three size columns, which the menu " +
             "layout has no room for.", "menu_courses", course.id, "sizes");
+      }
+      /* The editor keeps an emptied column in place rather than filtering it
+         out, so this is the thing that names it. Without it a blank saves
+         cleanly — cardinality is still 3, the database is satisfied — and the
+         menu renders a column header that is not there. */
+      if (course.sizes && course.sizes.some(function (s) { return isBlank(s); })) {
+        add("A size column in “" + (course.heading || "a section") + "” has no name. " +
+            "Name it, or remove the column.", "menu_courses", course.id, "sizes");
       }
     });
 
