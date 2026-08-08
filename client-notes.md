@@ -35,6 +35,14 @@ counts what you have changed. Then:
   immediately; refresh the site in another tab and it is there.
 - **Discard changes** — everything goes back to how it was. Nothing is sent.
 
+**Photographs are the one exception, and it is worth knowing.** A photograph
+you save shows up in the editor straight away, but the website keeps showing
+the old one until you press **Publish** at the top of the page. Nothing is
+broken in between — visitors just see the previous picture. Change as many
+photographs as you like first; one Publish covers all of them, and the site
+catches up about a minute later on its own. You do not need to wait on the page
+or press it twice.
+
 If you close the tab without saving, nothing is saved. That is deliberate: it
 means you can open the editor and click around without any risk of changing the
 site by accident.
@@ -145,6 +153,12 @@ what is in it needs a developer.
 Every photograph on the site, in the place it appears, with a **Choose a
 photograph** button under each one.
 
+- **Saving is not the last step here.** A saved photograph shows in the editor
+  right away and on the website only after you press **Publish** at the top of
+  the page. Until then visitors keep seeing the old picture, which looks
+  perfectly normal — that is why it is easy to forget. Change as many as you
+  like and press Publish once at the end; the site catches up about a minute
+  later by itself.
 - Pick a file and you get a preview. **Nothing is uploaded until you press
   Save** — pick one, change your mind, discard, and nothing was ever sent.
 - **Put the original back** is always available. The photographs the site was

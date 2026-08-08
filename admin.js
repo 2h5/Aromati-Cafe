@@ -4788,7 +4788,20 @@ var AROMATI_ADMIN = (function () {
       } else {
         showProblems([]);
         sweep(superseded);
-        flash("Saved. The site is showing it now.");
+        /* Everything in this editor is live the moment it is saved except a
+           photograph, which reaches the site only when a build bakes it in —
+           so this said the wrong thing for exactly one table, immediately
+           below the save that made it wrong. The Photos panel warns that
+           saving is not enough; a success message underneath it saying the
+           site is showing it now is the one the owner believes, because it
+           arrived second and in response to what they just did.
+
+           Said for a mixed save too. If a batch touched photographs at all,
+           Publish is the outstanding action, and the words that survive have
+           to be the ones with something left to do in them. */
+        flash(steps.some(function (s) { return s.table === "photos"; })
+          ? "Saved. Press Publish to put the photographs on the site."
+          : "Saved. The site is showing it now.");
       }
     }
 

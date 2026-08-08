@@ -298,12 +298,23 @@ A broken build that nobody notices is how the last one stayed broken — and sin
 ## Deploying
 
 ```
-npm run build        # then drag dist/ to Cloudflare Pages
+git push origin main     # Cloudflare Pages builds and deploys it
 ```
 
-**A direct upload of `dist/` to Cloudflare Pages.** There is no git integration
-and no build command configured on Cloudflare's side — the build runs here, and
-the folder it produces is what gets dragged.
+**Cloudflare Pages is connected to this repository and runs `npm run build`
+itself.** A push to `main` deploys; a push to any other branch gets a preview
+URL. Nothing is dragged anywhere.
+
+The owner can also deploy without touching git, which is the point of the whole
+photographs design: **Publish** in the editor calls
+`supabase/functions/publish-site`, which checks `is_owner()` and then fires a
+Cloudflare deploy hook. Same build, same result — see `PHOTOGRAPHS.md`.
+
+*This section used to describe a manual drag of `dist/`, which was true before
+the repository was connected. Left corrected rather than deleted because
+following the old instructions would upload a `dist/` built on somebody's
+laptop — plausibly stale, and baked against whatever was in the database that
+afternoon.*
 
 So `dist/` is not a convenience, and `vite.config.js` is not optional
 scaffolding: it is the deploy. Read its header before changing it. It exists
@@ -320,13 +331,15 @@ Two things follow:
   The build asserts they landed rather than trusting the copy. Note that
   `npm run check:csp` reads the *source tree*, so it passes whether or not they
   ever reached the build — it cannot catch this, and once did not.
-- **Upload `dist/`, not the repo.** That is what makes this safe: `dist/` holds
-  built output only, so `node_modules/`, `tools/`, `memory.md`, `client-notes.md`
-  and `.git/` cannot reach a public host by being in the drag.
+- **`dist/` is what gets served, not the repository.** Cloudflare is pointed at
+  the build output, which holds built files only — so `node_modules/`, `tools/`,
+  `memory.md`, `client-notes.md` and `.git/` are not published, even though the
+  repository is connected. Changing the output directory in the Pages settings
+  is therefore a security change, not a preference.
 
 The source tree is still a complete working site — that is what keeps `file://`
 working and what makes local development a double-click. It just is not the
-thing that gets uploaded.
+thing that gets served.
 
 `admin.html` ships with the rest of the site and is therefore reachable on every
 preview URL. Supabase auth is the real gate and RLS is the real defence, so this
