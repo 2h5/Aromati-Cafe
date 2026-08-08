@@ -59,18 +59,16 @@ function classicScripts(root) {
    identical and has none of them. robots.txt is the other half of keeping the
    editor out of search results; the meta tag alone is the weaker half.
    tools/check-csp.mjs reads these from the source tree, so it passes whether or
-   not they ever reached the build — it cannot catch this, and did not. */
-/* _routes.json joined them in Phase 7. Once a project has any Function at all,
-   Cloudflare invokes it for *every* request by default — every stylesheet,
-   every photograph, every seed script — and each one is billed as a Worker
-   request. The middleware has nothing to say about any of those; it rewrites
-   photograph src attributes in HTML. This file confines it to the five public
-   pages, which is the difference between a handful of invocations per visit
-   and forty.
+   not they ever reached the build — it cannot catch this, and did not.
 
-   It fails the same silent way as the other two: without it everything works,
-   costs more, and says nothing. tools/test-worker.mjs asserts it lists exactly
-   the pages that exist. */
+   _routes.json was a third entry here for as long as the project had an edge
+   Function. It confined functions/_middleware.js to the five public pages,
+   because Cloudflare otherwise invokes a Function for *every* request — every
+   stylesheet, every photograph, every seed script — and bills each one. Both
+   files were deleted on 2026-08-07 when photographs moved to build-time baking
+   (see PHOTOGRAPHS.md), so there is no Function to confine and no invocation
+   to pay for. The build log line to expect now is "No functions dir at
+   /functions found. Skipping." */
 const ROOT_FILES = ["_headers", "robots.txt"];
 
 /* 3. The built-in photographs, at the path the *editor* asks for them by.

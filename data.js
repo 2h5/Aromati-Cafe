@@ -46,24 +46,12 @@ var AROMATI_DATA = (function () {
      content a moment later, which is the ordinary path. */
   var CACHE_KEY = "aromati:content:v3";
 
-  /* photo-boot.js reads this same key from <head>, before the body exists, to
-     find the photographs it should be preloading. Two copies of a constant is
-     a thing worth being uncomfortable about, and it cannot be one copy: this
-     file is at the bottom of the body and by the time it has defined anything
-     the paint that mattered has already happened.
-
-     So they are checked against each other instead. A drift here is otherwise
-     completely silent — the boot script finds nothing under a key nobody
-     writes, hides nothing, preloads nothing, and the old photograph starts
-     blinking again on a site where every test still passes. Bumping the
-     version above without bumping it there is exactly the change that would
-     do it. */
-  if (typeof AROMATI_PHOTO_BOOT === "object" && AROMATI_PHOTO_BOOT &&
-      AROMATI_PHOTO_BOOT.cacheKey !== CACHE_KEY && window.console) {
-    console.warn("aromati: photo-boot.js is reading '" + AROMATI_PHOTO_BOOT.cacheKey +
-                 "' but data.js writes '" + CACHE_KEY + "'. Replaced photographs " +
-                 "will flash the shipped one on every visit until these match.");
-  }
+  /* CACHE_KEY was once spelled twice — photo-boot.js read it from <head> to
+     find the photographs it should preload, and a guard here warned when the
+     two drifted. photo-boot.js was deleted on 2026-08-07 with the rest of the
+     runtime photograph machinery, so the constant has one home again and the
+     guard could never fire. Both are gone. Bumping the version above is now
+     the whole of the change it used to be half of. */
 
   /* ── the seed floor ──────────────────────────
      Read through functions rather than captured at load, so a seed file that

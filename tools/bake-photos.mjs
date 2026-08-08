@@ -15,14 +15,16 @@
    Everything that was tried in the browser to hide that moment failed in the
    same way, because the browser cannot win it: it has to paint before it can
    ask, so the only choices are "show the old one" and "show nothing". There is
-   no third one. photo-boot.js narrows the window and cannot close it.
+   no third one. photo-boot.js narrowed the window and could not close it, and
+   was deleted for it.
 
    This closes it, by removing the disagreement instead of hiding it. At build
    time — where there is no visitor waiting and a network request costs nothing
    — the current photograph is downloaded and written into the built page as
    the src. The HTML the browser receives already names the right picture. It
-   paints once. There is nothing for JavaScript to replace, and on a baked slot
-   render.js is told to leave it alone entirely.
+   paints once, and there is nothing left in the browser capable of replacing
+   it: the runtime swap in render.js went with photo-boot.js. The blink is not
+   suppressed here, it is unreachable.
 
    ── it writes to dist/, never to the source tree ──
    Deliberate, and the reason the whole thing is safe.
@@ -47,10 +49,15 @@
    ── what it costs to keep current ──
    A photograph changed in the CMS reaches the site on the next build, not
    immediately. Cloudflare Pages counts builds against a monthly quota, so
-   nothing here triggers one — a person does, or a deploy hook does. The
-   editor says so in as many words; see photoNote() in admin.js. Until that
-   build happens the old runtime path still covers the slot, so the change is
-   live either way — it just blinks until the files catch up. */
+   nothing here triggers one — a person does, by pressing Publish in the
+   editor, which calls supabase/functions/publish-site. The editor says so in
+   as many words; see photoNote() in admin.js.
+
+   Until that build finishes the site serves the *previous* photograph, and
+   that is now the whole of what a visitor sees — there is no runtime path left
+   to cover the slot in the meantime, because covering it was the blink. Not a
+   flicker: the old picture, sitting still. That is the trade this file exists
+   to make. */
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { createHash } from "node:crypto";
@@ -285,21 +292,19 @@ for (const [slot, info] of baked) {
 
 writeFileSync(seedFile, seed);
 
-/* ── what the edge middleware needs to know ──────────────────────────────────
-   functions/_middleware.js rewrites the src of any slot whose photograph has
-   changed since this build. To know which those are it has to know what this
-   build put in — otherwise every baked photograph gets rewritten from a
-   same-origin file to a Supabase URL on every request: correct, and slower
-   than doing nothing, on the common path where nothing has changed at all.
+/* This used to also write dist/_baked.json — a manifest of every baked slot
+   and its storage path, for functions/_middleware.js to diff against. The
+   middleware was deleted on 2026-08-07 and nothing else ever read the file, so
+   it was a public artifact with no reader: Cloudflare Pages gives no special
+   treatment to a leading underscore beyond _headers, _redirects, _routes.json
+   and _worker.js, which means it was being served. Not a secret — every path in
+   it points at a photograph already on the page, through a bucket that is
+   public by URL by design — but it handed out the list rather than making
+   anyone assemble it, and the bucket's whole posture is that the URL is the
+   permission (see memory.md, "Storage abuse"). Dead output is worth deleting;
+   dead output on a public origin is worth deleting sooner. */
 
-   Written as data rather than compiled into the middleware so that a deploy of
-   the same code against a different set of photographs cannot go stale. */
-writeFileSync(
-  resolve(OUT, "_baked.json"),
-  JSON.stringify(Object.fromEntries([...baked].map(([s, b]) => [s, b.path])), null, 1)
-);
-
-/* Then read it back and ask the only question that matters, the same way
+/* Read the stamps back and ask the only question that matters, the same way
    vite.config.js does: does every baked slot actually name a file that is
    there? A rewrite that silently matched nothing leaves a page that loads and
    404s, which is worse than not baking at all. */
