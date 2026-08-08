@@ -929,7 +929,7 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
 .fact span{ display:block; font-size:11.5px; letter-spacing:.08em; text-transform:uppercase; line-height:1.75; color:var(--ink-soft); opacity:.8; }
 
 /* image reveal (clip) */
-[data-reveal-img]{ clip-path:inset(8% 6% 8% 6% round 6px); opacity:.001; transition:clip-path 1.1s var(--ease-exp), opacity .8s ease, box-shadow .7s ease var(--lift-delay,1.15s); }
+[data-reveal-img]{ clip-path:inset(8% 6% 8% 6% round 6px); opacity:.001; transition:clip-path .55s var(--ease-exp), opacity .8s ease, box-shadow .25s ease var(--lift-delay,.6s); }
 [data-reveal-img].in{ clip-path:inset(0 0 0 0 round 6px); opacity:1; }
 
 /* ── photo lift ──────────────────────────────────────────────────────────
@@ -966,7 +966,7 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
 .wine__board.in,
 .gallery__item.in{
   box-shadow:var(--lift);
-  animation:lift-unclip 0s linear var(--lift-delay,1.15s) forwards;
+  animation:lift-unclip 0s linear var(--lift-delay,.6s) forwards;
 }
 @keyframes lift-unclip{ to{ clip-path:none; } }
 
@@ -2883,7 +2883,7 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
      still trickle in over most of a second */
   .mmenu, .mmenu *, .mmenu *::before, .mmenu *::after{ transition-delay:0s !important; }
   /* The blanket rule above collapses durations but not delays, so the photo
-     lift would still wait out its 1.15s hold before appearing — a shadow
+     lift would still wait out its .6s hold before appearing — a shadow
      fading in on its own, over a page that has already finished arriving.
      Both the clip release and the shadow land immediately instead. */
   .story__img.in, .cafe__card.in, .wine__board.in, .gallery__item.in{
