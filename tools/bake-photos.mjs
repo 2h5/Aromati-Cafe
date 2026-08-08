@@ -316,7 +316,7 @@ if (failed.length) {
 
 const kb = [...baked.values()].reduce((n, b) => n + b.bytes, 0) / 1024;
 console.log(`\n  ${baked.size} photograph${baked.size === 1 ? "" : "s"} baked in ` +
-            `(${kb.toFixed(0)} kB), ${stamped} stamped so the runtime leaves them alone`);
+            `(${kb.toFixed(0)} kB), ${stamped} stamped into the built seed file`);
 console.log("  the built pages now name the owner's photographs directly\n");
 notes = 0;
 process.exit(0);
