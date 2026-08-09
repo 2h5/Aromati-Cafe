@@ -90,6 +90,19 @@
     <span class="topbar__spacer"></span>
     <span class="topbar__msg" id="publishMsg" role="status" hidden></span>
     <a class="topbar__link" id="viewSite" href="index.html" target="_blank" rel="noopener"><span>View the site</span><span class="topbar__link-go" aria-hidden="true">↗</span></a>
+    <div class="topbar__help" id="publishHelp">
+      <button class="topbar__help-btn" type="button" id="publishHelpBtn"
+              aria-label="How photo publishing works" aria-expanded="false"
+              aria-controls="publishHelpTip" aria-describedby="publishHelpTip">
+        <span aria-hidden="true">i</span>
+      </button>
+      <div class="topbar__help-tip" id="publishHelpTip" role="tooltip">
+        <p class="topbar__help-title">How Publish works</p>
+        <p>Photo changes are staged in the editor. Save a photo and it appears here right away, but visitors keep seeing the previous photo until a rebuild has run.</p>
+        <p>In short: this Publish button has a quota of 500 uses per month. You probably will not reach it. Each Publish starts a Cloudflare Pages rebuild, so stage and save all your photo changes, review them, then publish once. The rebuild usually takes about a minute and runs on its own.</p>
+        <p><strong>Only photo changes require Publish. Text changes do not.</strong> Text, menu, hours, and other non-photo content can be changed and saved independently. They do not use a photo rebuild. For text changes, just press Save changes at the bottom right.</p>
+      </div>
+    </div>
     <button class="btn btn--quiet" type="button" id="publishBtn"><span>Publish</span></button>
     <button class="btn btn--quiet" type="button" id="signOut"><span>Sign out</span></button>
   </header>

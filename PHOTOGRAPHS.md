@@ -227,11 +227,15 @@ and leaves the site alone until Publish. Then it says the delay is about a
 minute, ends by itself, and does not want Publish pressed twice — because the
 owner's instinct on seeing an unchanged site is to press it again.
 
-Two things it deliberately leaves out. **Quotas**, because a build allowance
-this owner will not approach is a number that only makes them hesitate. And
-**the flicker**, because there is no longer one to warn about; describing a
-failure mode that has been removed teaches somebody to fear a thing that cannot
-happen.
+Two things the short panel note deliberately leaves out. **Quota detail** is
+available from the small information control beside Publish, where it is
+useful at the moment the owner is deciding whether to spend a build. The
+project has 500 builds per month, and ordinary staged photo updates are
+unlikely to use them all. The rule is simple: **only photo changes require
+Publish; text changes do not.** The panel note itself stays focused on the
+action. And **the flicker**, because there is no longer one to warn about;
+describing a failure mode that has been removed teaches somebody to fear a
+thing that cannot happen.
 
 If the note changes again, the sentence that must survive is that the site
 waits for Publish.

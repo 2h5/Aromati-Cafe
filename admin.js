@@ -1424,8 +1424,8 @@ var AROMATI_ADMIN = (function () {
      which was true under the old design and is the one sentence an owner would
      act on wrongly — they would upload and walk away. And it must give the
      delay a shape: about a minute, ending by itself, not something to press
-     Publish twice for. Nothing about quotas — a build allowance this owner
-     will not approach is a number that only makes them hesitate. */
+     Publish twice for. The quota detail lives in the information control beside
+     Publish, so this panel note can stay focused on the action. */
   function photoNote() {
     return makeNote(function (node) {
       node.appendChild(el("strong", null, "Saving is not enough on this page. "));
@@ -4916,6 +4916,35 @@ var AROMATI_ADMIN = (function () {
     node.hidden = !text;
   }
 
+  /* The explanation beside Publish is a hover tooltip on a pointer and a
+     small disclosure on touch. Keep the click state explicit for keyboard and
+     screen-reader users, and close it when attention moves elsewhere. */
+  function wirePublishHelp() {
+    var root = byId("publishHelp");
+    var button = byId("publishHelpBtn");
+    if (!root || !button) return;
+
+    function setOpen(open) {
+      root.classList.toggle("is-open", open);
+      button.setAttribute("aria-expanded", open ? "true" : "false");
+    }
+
+    on(button, "click", function () {
+      setOpen(!root.classList.contains("is-open"));
+    });
+    on(document, "mousedown", function (e) {
+      if (!root.contains(e.target)) setOpen(false);
+    });
+    on(document, "focusin", function (e) {
+      if (!root.contains(e.target)) setOpen(false);
+    });
+    on(document, "keydown", function (e) {
+      if (e.key !== "Escape" || !root.classList.contains("is-open")) return;
+      setOpen(false);
+      button.focus();
+    });
+  }
+
   function publish() {
     var btn = byId("publishBtn");
     if (!btn || btn.disabled) return;
@@ -5171,6 +5200,7 @@ var AROMATI_ADMIN = (function () {
     restoreTab();
     restoreSections();
     wireGate();
+    wirePublishHelp();
     on(byId("publishBtn"), "click", publish);
     on(byId("signOut"), "click", signOut);
     on(byId("saveBtn"), "click", save);

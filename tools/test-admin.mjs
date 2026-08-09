@@ -728,6 +728,27 @@ console.log("\nthe gate");
 }
 
 
+console.log("\nthe publishing explanation");
+{
+  const r = await boot();
+  await r.signIn();
+  const button = r.q("#publishHelpBtn");
+  check("the information control is present beside Publish",
+        [!!button, button && button.getAttribute("aria-controls")],
+        [true, "publishHelpTip"]);
+  check("and explains the 500-use quota without making it a rebuild button",
+        [r.q("#publishHelpTip").textContent.includes("quota of 500 uses per month"),
+         button.getAttribute("aria-expanded")], [true, "false"]);
+
+  button.click();
+  check("a tap opens the explanation", [button.getAttribute("aria-expanded"),
+        r.q("#publishHelp").classList.contains("is-open")], ["true", true]);
+
+  r.doc.dispatchEvent(new r.window.MouseEvent("mousedown", { bubbles: true }));
+  check("clicking elsewhere closes it", button.getAttribute("aria-expanded"), "false");
+}
+
+
 /* ═══ 4. editing, and what a save actually sends ════════════════════════════ */
 
 console.log("\nediting a paragraph");

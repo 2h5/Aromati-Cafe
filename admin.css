@@ -185,19 +185,74 @@ button{ font-family: inherit; }
   opacity: .75; transform: none;
 }
 
+/* The small explanation beside Publish is a disclosure on touch and a
+   tooltip on pointer/keyboard hover. Its copy stays in the page so it can be
+   read by assistive technology without depending on JavaScript. */
+.topbar__help{
+  position: relative; z-index: 10;
+  display: inline-flex; flex: 0 0 auto;
+}
+.topbar__help-btn{
+  appearance: none; cursor: pointer;
+  display: grid; place-items: center;
+  width: 30px; height: 30px; padding: 0;
+  border: 1px solid rgba(247,242,234,.48); border-radius: 50%;
+  background: transparent; color: var(--gold-soft);
+  font: 600 15px/1 var(--serif);
+  transition: background-color 180ms ease, color 180ms ease,
+    border-color 180ms ease;
+}
+.topbar__help-btn:hover,
+.topbar__help-btn[aria-expanded="true"]{
+  background: rgba(247,242,234,.10);
+  border-color: var(--cream); color: var(--cream);
+}
+.topbar__help-tip{
+  position: absolute; z-index: 40;
+  top: calc(100% + 10px); right: 0;
+  width: min(380px, calc(100vw - 28px)); max-height: calc(100vh - 86px);
+  overflow: auto; padding: 16px 18px;
+  border: 1px solid var(--line-input); border-radius: 10px;
+  background: var(--card); color: var(--ink);
+  box-shadow: 0 14px 34px rgba(42,26,21,.18);
+  font-size: 12px; line-height: 1.55;
+  opacity: 0; visibility: hidden; transform: translateY(-5px);
+  pointer-events: none;
+  transition: opacity 160ms ease, transform 160ms ease,
+    visibility 0s linear 160ms;
+}
+.topbar__help:hover .topbar__help-tip,
+.topbar__help:focus-within .topbar__help-tip,
+.topbar__help.is-open .topbar__help-tip{
+  opacity: 1; visibility: visible; transform: none; pointer-events: auto;
+  transition-delay: 0s;
+}
+.topbar__help-title{
+  margin: 0 0 8px;
+  color: var(--maroon-800); font-size: 14px; font-weight: 600;
+}
+.topbar__help-tip strong{ color: var(--maroon-800); font-weight: 600; }
+.topbar__help-tip p{ margin: 0; }
+.topbar__help-tip p + p{ margin-top: 10px; }
+
+#publishBtn,
 #signOut{
   position: relative; isolation: isolate; overflow: hidden;
   border-color: rgba(247,242,234,.4); color: var(--cream);
   transition: color 450ms var(--ease), border-color 450ms var(--ease);
 }
+#publishBtn::before,
 #signOut::before{
   content: ""; position: absolute; inset: 0; z-index: 0;
   border-radius: inherit; background: var(--cream);
   transform: scaleX(0); transform-origin: right;
   transition: transform 550ms var(--ease);
 }
+#publishBtn span,
 #signOut span{ position: relative; z-index: 1; }
+#publishBtn:hover:not(:disabled),
 #signOut:hover:not(:disabled){ color: var(--ink); border-color: var(--cream); }
+#publishBtn:hover:not(:disabled)::before,
 #signOut:hover:not(:disabled)::before{ transform: scaleX(1); transform-origin: left; }
 
 @keyframes admin-topbar-in{
@@ -1391,6 +1446,10 @@ body.is-framing{ overflow: hidden; }
   .topbar{ gap: 10px; padding: 0 14px; }
   .topbar__who{ display: none; }
   .topbar__link span:first-child{ font-size: 12px; }
+  .topbar__help-tip{
+    position: fixed; top: calc(var(--topbar) + 8px); right: 14px; left: 14px;
+    width: auto; max-width: none; max-height: calc(100vh - 86px);
+  }
 }
 
 @media (prefers-reduced-motion: reduce){
@@ -1403,7 +1462,8 @@ body.is-framing{ overflow: hidden; }
      to undo here — this is only in case a class outlives its journey. */
   .is-settling{ transition: none; }
   .app--enter .topbar__link, .app--enter #signOut{ animation: none; }
-  .topbar__link-go, #signOut, #signOut::before{ transition: none; }
+  .topbar__link-go, #signOut, #signOut::before,
+  .topbar__help-btn, .topbar__help-tip{ transition: none; }
   .tab__dot, .tab__dot--leaving,
   .field--edited > .field__label::after, .field--edited-leaving > .field__label::after{
     animation: none;
