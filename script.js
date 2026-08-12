@@ -907,7 +907,7 @@
     function selected(group) {
       return chipsIn(group).filter(function (c) { return c.classList.contains("is-on"); });
     }
-    function money(n) { return "$" + n.toFixed(2); }
+    function money(n) { return n.toFixed(2); }
 
     function render(bump) {
       var base = selected("base")[0];

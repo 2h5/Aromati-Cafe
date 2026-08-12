@@ -1,5 +1,5 @@
 /* The menu, transcribed from the printed carte in assets/menus/.
-   Prices are bare; styles.css renders "$".
+   Prices are bare and the public menu displays them without a currency symbol.
 
    ── this file used to say "do not hand-edit" ──
    It was first written by tools/extract-menus.mjs, which read the item markup
@@ -81,7 +81,7 @@ var SEED_MENU = {
         },
         {
           "name": "Eggplant Rolls",
-          "desc": "Roasted eggplant filled with garlic-walnut sauce, topped with pomegranate. Georgian bread +$3.",
+          "desc": "Roasted eggplant filled with garlic-walnut sauce, topped with pomegranate. Georgian bread +3.",
           "price": "19"
         },
         {

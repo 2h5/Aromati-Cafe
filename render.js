@@ -18,9 +18,9 @@
    <script>… a menu item named <script>… rather than a script that runs in
    every visitor's browser. There is no case where the convenience is worth it.
 
-   Prices are stored bare — no "$". styles.css renders the symbol for
-   .mi__price, .mi__cell, .mi__pours b and .mi__opts li b, so the character
-   appears in exactly one place in the whole project. */
+   Prices are stored bare and rendered as bare numbers throughout the public
+   menu. Keeping the values unadorned also keeps the CMS and static builders
+   consistent. */
 
 (function () {
   "use strict";
@@ -74,7 +74,7 @@
 
     } else if (item.prices) {
       /* Index-aligned with the course's sizes. A blank means the item is not
-         offered in that size — an empty cell, never a "$" on its own. */
+         offered in that size — an empty cell, never a price on its own. */
       var cells = el("span", "mi__cells");
       for (var i = 0; i < course.sizes.length; i++) {
         var p = item.prices[i];

@@ -9,18 +9,16 @@
 
    This is the other half: given rows in the shape PostgREST hands back, does
    `data.js` reshape them and does `render.js` draw them the way the hand-written
-   markup did. A shape that stores perfectly and renders as a bare "$" is still
-   a broken menu, and nothing between the constraint and the page was looking.
+   markup did. Prices must remain bare on the public menu, and nothing between
+   the constraint and the page should add a currency symbol.
 
    The awkward one is shape 2 with a gap — an item offered in one size and not
    the other. The blank is not a missing price, it is a statement that the item
-   is not sold that way, and it has to render as an empty cell. The "$" lives in
-   the stylesheet (`.mi__cell::before`), so an empty cell with the ordinary class
-   would show a currency symbol attached to nothing. That is checked here in
-   both places it can go wrong: the class the renderer chooses, and the rule in
-   styles.css that acts on it — because jsdom will not compute a ::before, and a
-   check that only looked at the class would keep passing after someone deleted
-   the rule.
+   is not sold that way, and it has to render as an empty cell. That is checked
+   here in both places it can go wrong: the class the renderer chooses and the
+   stylesheet that controls the presentation — because jsdom will not compute a
+   ::before, and a check that only looked at the class would not catch a stray
+   currency symbol added by CSS.
 
    Then the two behaviours that only exist once the board has been *replaced*:
    the tab filter, and the two hand-written blocks that are out of scope to
@@ -206,16 +204,11 @@ console.log("\nthe six price shapes, drawn from database rows\n");
           [false, false]);
   }
 
-  /* The class alone proves nothing. The currency symbol is drawn by the
-     stylesheet, so what actually keeps a lone "$" off the page is one rule —
-     and jsdom will not compute a ::before to tell us it is still there. Read
-     the stylesheet and require it, so deleting the rule fails here rather than
-     on the site. */
+  /* jsdom will not compute a ::before, so read the stylesheet directly and
+     require that no currency symbol is injected by CSS. */
   const css = readFileSync("styles.css", "utf8").replace(/\s+/g, "");
-  check("styles.css still suppresses the currency symbol on an empty cell",
-        css.includes(".mi__cell--none::before{content:none;}"), true);
-  check("and the symbol is drawn by the stylesheet in the first place, not the markup",
-        css.includes('.mi__cell::before{content:"$"'), true);
+  check("styles.css does not inject a currency symbol",
+        css.includes('content:"$"'), false);
 }
 
 /* ══ 3. the tab filter, after the board has been replaced ════════════════
@@ -316,7 +309,7 @@ console.log("\nthe six price shapes, drawn from database rows\n");
     check("clicking a chip threw nothing", p.thrown, []);
     check("and the chip took the selection",
           chip.classList.contains("is-on") && chip.getAttribute("aria-pressed") === "true", true);
-    if (total) check("and the total is a price", /^\$\d/.test(total.textContent.trim()), true);
+    if (total) check("and the total is a bare price", /^\d/.test(total.textContent.trim()), true);
     else fail("Build Your Own has no total element to check");
   }
 

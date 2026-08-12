@@ -143,12 +143,13 @@ Plus `.mi__tag`, an inline qualifier in the heading — a vintage, `750 ml`,
 
 Two details that are easy to break:
 
-- **Prices are stored bare, with no `$`.** `styles.css` adds the symbol through
-  `::before`, so the character exists in one place in the whole project.
+- **Prices are stored bare and displayed as-is.** The public menu keeps the
+  number separate from any currency symbol so the CMS and static builder use
+  the same presentation.
 - **A blank size is a statement, not a missing price.** An item sold small and
-  not large renders as `.mi__cell--none`, and one line of CSS
-  (`.mi__cell--none::before { content: none }`) keeps a lone `$` out of the
-  empty cell. Both halves are checked by `tools/test-menu-shapes.mjs`.
+  not large renders as `.mi__cell--none`, which keeps the size grid aligned
+  while leaving that cell empty. Both halves are checked by
+  `tools/test-menu-shapes.mjs`.
 
 **Sizes are declared per course, not per item** — `.course__sizes` is a column
 header. Two columns maximum: the grid has two, and the database refuses a third.
