@@ -582,6 +582,8 @@
   boot("reel", function () {
     var reel = document.querySelector("[data-reel]");
     if (!reel) return;
+    var viewport = reel.querySelector(".reel__viewport");
+    var track = reel.querySelector("[data-reel-track]");
     var plates = Array.prototype.slice.call(reel.querySelectorAll(".plate"));
     var reelIO = new IntersectionObserver(function (entries) {
       entries.forEach(function (en) {
@@ -596,6 +598,154 @@
       });
     }, { threshold: 0.12 });
     reelIO.observe(reel);
+
+    /* Desktop-only grab-to-pan. The reel's normal motion remains a CSS animation
+       until the pointer has actually moved. Once that happens, capture the
+       animation's current matrix, turn the animation off, and move the track with
+       one inline transform. CSS animation and pointer-written transforms must
+       never compete: that race is especially unreliable in WebKit, and the
+       duplicate group gives us a finite, blank-free range to clamp to. Touch and
+       reduced-motion paths deliberately do not enter this handler. */
+    var finePointer = window.matchMedia &&
+      window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+    if (!finePointer || prefersReduced || !viewport || !track) return;
+
+    reel.classList.add("reel--drag-ready");
+
+    function readTrackX() {
+      var value = window.getComputedStyle(track).transform;
+      var parts;
+      if (!value || value === "none") return 0;
+      if (value.indexOf("matrix3d(") === 0) {
+        parts = value.slice(9, -1).split(",");
+        return parseFloat(parts[12]) || 0;
+      }
+      if (value.indexOf("matrix(") === 0) {
+        parts = value.slice(7, -1).split(",");
+        return parseFloat(parts[4]) || 0;
+      }
+      return 0;
+    }
+
+    function clampTrackX(x) {
+      var min = Math.min(0, viewport.clientWidth - track.scrollWidth);
+      return Math.max(min, Math.min(0, x));
+    }
+
+    var armed = false, dragging = false;
+    var startX = 0, lastX = 0, manualX = 0;
+    var velocity = 0, lastMoveAt = 0, inertiaFrame = 0;
+
+    function writeManual() {
+      track.style.transform = "translate3d(" + manualX.toFixed(3) + "px,0,0)";
+    }
+
+    function stopInertia() {
+      if (inertiaFrame) cancelAnimationFrame(inertiaFrame);
+      inertiaFrame = 0;
+      velocity = 0;
+    }
+
+    function startInertia() {
+      /* Velocity is pixels per millisecond. A time-based decay keeps the feel
+         stable if the display is 60Hz, 120Hz, or briefly misses a frame. */
+      if (Math.abs(velocity) < 0.02) { velocity = 0; return; }
+      var previous = performance.now();
+      function step(now) {
+        var dt = Math.min(40, Math.max(0, now - previous));
+        previous = now;
+        manualX = clampTrackX(manualX + velocity * dt);
+        writeManual();
+
+        var min = Math.min(0, viewport.clientWidth - track.scrollWidth);
+        var atEdge = manualX <= min || manualX >= 0;
+        if (atEdge || Math.abs(velocity) < 0.02) {
+          velocity = 0;
+          inertiaFrame = 0;
+          return;
+        }
+
+        /* About 8% slower per 60th of a second: a short, visible glide rather
+           than a long autonomous scroll. */
+        velocity *= Math.pow(0.92, dt / 16.667);
+        inertiaFrame = requestAnimationFrame(step);
+      }
+      inertiaFrame = requestAnimationFrame(step);
+    }
+
+    function beginManual(dx) {
+      /* Read before adding .is-manual: after that class lands, the animation no
+         longer contributes a transform and there would be nothing to capture. */
+      manualX = clampTrackX(readTrackX() + dx);
+      reel.classList.add("is-manual", "is-dragging");
+      writeManual();
+      dragging = true;
+    }
+
+    function endPointer(e) {
+      if (!armed) return;
+      var wasDragging = dragging;
+      var shouldFling = e.type === "pointerup" && wasDragging;
+      armed = false;
+      if (viewport.releasePointerCapture && viewport.hasPointerCapture &&
+          viewport.hasPointerCapture(e.pointerId)) {
+        viewport.releasePointerCapture(e.pointerId);
+      }
+      if (dragging) {
+        dragging = false;
+        reel.classList.remove("is-dragging");
+      }
+      if (shouldFling) {
+        /* Releasing after a pause should not reuse an old fast movement. */
+        var idle = Math.max(0, performance.now() - lastMoveAt);
+        velocity *= Math.pow(0.92, idle / 16.667);
+        startInertia();
+      } else {
+        velocity = 0;
+      }
+    }
+
+    viewport.addEventListener("pointerdown", function (e) {
+      /* A touch or pen must retain the browser's native gesture path. */
+      if (e.pointerType !== "mouse") return;
+      stopInertia();
+      armed = true;
+      startX = lastX = e.clientX;
+      lastMoveAt = performance.now();
+      viewport.setPointerCapture && viewport.setPointerCapture(e.pointerId);
+      /* Prevent the image's native drag ghost while we decide whether this is a
+         grab. There are no interactive controls inside the reel. */
+      e.preventDefault();
+    });
+
+    viewport.addEventListener("pointermove", function (e) {
+      if (!armed || e.pointerType !== "mouse") return;
+      var now = performance.now();
+      var dx = e.clientX - startX;
+      if (!dragging) {
+        if (Math.abs(dx) < 4) return;
+        beginManual(dx);
+        lastX = e.clientX;
+        lastMoveAt = now;
+        velocity = 0;
+      } else {
+        var delta = e.clientX - lastX;
+        var elapsed = Math.max(8, Math.min(80, now - lastMoveAt));
+        manualX = clampTrackX(manualX + delta);
+        lastX = e.clientX;
+        lastMoveAt = now;
+        /* Smooth the samples so one unusually large/coalesced event cannot
+           launch the track at an absurd speed. Cap at 2px/ms (2000px/s). */
+        velocity = velocity * 0.65 + Math.max(-2, Math.min(2, delta / elapsed)) * 0.35;
+        writeManual();
+      }
+      e.preventDefault();
+    });
+
+    viewport.addEventListener("pointerup", endPointer);
+    viewport.addEventListener("pointercancel", endPointer);
+    viewport.addEventListener("lostpointercapture", endPointer);
+    viewport.addEventListener("dragstart", function (e) { e.preventDefault(); });
   });
 
   /* ── menus: courses cascade in, tabs re-cascade what's left ──
@@ -744,7 +894,31 @@
     }, { threshold: 0.12, rootMargin: "0px 0px -5% 0px" });
 
     balance();
-    courses.forEach(function (c) { courseIO.observe(c); });
+
+    /* On a narrow menu page the board can begin just high enough that the first
+       course is already peeking into the viewport below the tabs. Intersection
+       Observer waits for its threshold, so the heading looks stuck until the
+       first scroll even though the visitor can see it. Treat only that first,
+       actually visible course as if the scroll had already reached it. The same
+       cascade and lead delay are retained; every later course remains genuinely
+       scroll-triggered. */
+    var mobileWidth = window.matchMedia &&
+      window.matchMedia("(max-width: 760px)").matches;
+    var firstCourse = courses[0];
+    var firstVisible = false;
+    if (mobileWidth && firstCourse) {
+      var firstRect = firstCourse.getBoundingClientRect();
+      firstVisible = firstRect.top < window.innerHeight && firstRect.bottom > 0;
+    }
+    courses.forEach(function (c, i) {
+      if (i === 0 && firstVisible) {
+        cascade(c, lead);
+        c.classList.add("in");
+        lead = 0;
+      } else {
+        courseIO.observe(c);
+      }
+    });
 
     var onTabClick = null;
 

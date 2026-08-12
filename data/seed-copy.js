@@ -31,7 +31,7 @@ var SEED_COPY = {
 
   "kitchen.label": "The Kitchen",
   "kitchen.headline": "Bread, cheese, and broth: a few staples of the Georgian table.",
-  "kitchen.lede": "Everything comes out of the open kitchen on the ground floor. Khachapuri is blistered to order and khinkali is pleated by hand.",
+  "kitchen.lede": "Everything comes out of the open kitchen on the ground floor. Khachapuri is blistered to order, with Georgian favorites served all day.",
   "kitchen.reelLabel": "A few plates",
   "kitchen.reelNote": "photographed in the room",
 
@@ -69,7 +69,7 @@ var SEED_COPY = {
 
   "food.label": "The Kitchen",
   "food.headline": "The Food Menu",
-  "food.lede": "Everything comes out of the open kitchen on the ground floor. Khachapuri is blistered to order and khinkali is pleated by hand. Served all day.",
+  "food.lede": "Everything comes out of the open kitchen on the ground floor. Khachapuri is blistered to order, with Georgian favorites served all day.",
   "food.footNote": "…and salads, stews, toast & sweets in between.",
   "food.footButton": "Come Hungry",
 

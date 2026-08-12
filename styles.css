@@ -1035,6 +1035,15 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
   display:flex; width:max-content;
   animation:reel-drift 68s linear infinite;
 }
+/* A mouse can take over on desktop without changing the touch path. The class
+   is added only after a drag threshold, so a click leaves the drift untouched. */
+@media (hover:hover) and (pointer:fine){
+  .reel--drag-ready .reel__viewport{ cursor:grab; }
+  .reel--drag-ready.is-dragging,
+  .reel--drag-ready.is-dragging *{ user-select:none; -webkit-user-select:none; }
+  .reel--drag-ready.is-dragging .reel__viewport{ cursor:grabbing; }
+  .reel--drag-ready.is-manual .reel__track{ animation:none; }
+}
 /* Pause-on-hover is desktop-only. iOS synthesises :hover on tap and leaves it
    stuck until you tap elsewhere, so one accidental touch stops the reel for
    good — hover:hover is false on touch, which is the split we want. The
