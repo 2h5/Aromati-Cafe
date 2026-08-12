@@ -1851,11 +1851,9 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
    Both are inline SVG data: URIs, which img-src 'self' data: already allows
    (see _headers) and which cost no request and no dependency.
 
-   The frame is a nine-slice border-image: the four corner cells carry the
-   sweeping arc that cuts the corner off a squared inner rule, and the four
-   edge cells are two straight parallel lines that stretch to any length. A
-   background-image could not do this — background-size:100% 100% on a tall
-   card would flatten the corner arcs into ellipses.
+   The frame is one authored nine-slice vector. It is painted by a static child
+   and revealed by the parent shell below, so the artwork remains one coherent
+   piece while the animation moves only a clip window.
 
    The divider is a fixed-size ornament sitting on a full-width rule drawn as
    a second background layer, so the rule runs the width of the course and the
@@ -1870,8 +1868,7 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
   --m-ink-soft:  #8a4550;   /* descriptions — 5.9:1 on the paper */
   --m-rule:      rgba(115,35,52,.30);
   --m-rule-soft: rgba(115,35,52,.15);
-  /* The band the frame is drawn into. border-image ties the corner art to the
-     border width, so this number *is* the size of the corner scoop — at 34px
+  /* The size of each corner tile and the band reserved for the frame. At 34px
      the geometry was too small to read and the card looked merely rounded. */
   --m-frame:     clamp(26px,5.2vw,62px);
 }
@@ -1897,104 +1894,40 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
      this: --pad is a clamp on vw, so the masthead's edge moves with the
      viewport between 400px and 1680px wide. */
   max-width:calc(var(--maxw) - var(--pad) * 2);
-  /* The frame is drawn by ::before rather than by this element's own border,
-     so that it can be clipped and drawn on (see the animation below). The
-     border width therefore has to be paid for here instead — the card's own
-     padding only adds breathing room past the inner rule. */
+  /* The absolutely positioned frame does not take up layout space, so its
+     band is paid for here. The remaining padding is breathing room past the
+     inner rule. */
   padding:calc(var(--m-frame) + clamp(10px,1.4vw,22px));
   background:var(--m-paper);
   box-shadow:0 1px 2px rgba(115,35,52,.06), 0 14px 38px rgba(115,35,52,.10);
 }
-/* inset:0 lands on the card's padding box, and with no border of its own that
-   is the full card — so the band sits exactly where the border used to */
-.page-menu .carte::before{
-  content:""; position:absolute; inset:0; pointer-events:none;
-  border:var(--m-frame) solid transparent;
-  /* width/height are load-bearing, not decoration: border-image-slice counts
-     in the image's own pixels, and an SVG with only a viewBox has no intrinsic
-     size for it to count against — the corners then resolve against the
-     browser's 300x150 default and the arcs stretch right across the card.
+/* ── segmented menu frame ────────────────────
+   The vector remains static inside the frame shell below. Narrow WebKit is
+   only asked to animate the shell's clip window, leaving the SVG paint and
+   its authored corner geometry untouched.
 
-     The corner is the printed menu's, measured off the A5 sheet: the outer
-     rule does not turn a corner at all, it is *scooped* away by a quarter-arc
-     centred on the corner point itself, radius roughly three times the gap
-     between the two rules (25 / 38 / r40 here, against 22 / 34 / r35 in
-     points on the original). The inner rule keeps its square corner and is
-     left standing proud inside the scoop, with the arc crossing it — the two
-     small breaks at 60.8 and 64.8 are that crossing, drawn as a weave.
-     Curving the arc the other way is what makes it read as a rounded card. */
-  border-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 200 200'%3E%3Cg fill='none' stroke='%23732334' stroke-width='2.8'%3E%3Cpath d='M25 70V65A40 40 0 0 0 65 25H70'/%3E%3Cpath d='M38 70V64.8M38 60.8V38h22.8M64.8 38H70'/%3E%3Cpath d='M175 70V65A40 40 0 0 1 135 25H130'/%3E%3Cpath d='M162 70V64.8M162 60.8V38h-22.8M135.2 38H130'/%3E%3Cpath d='M25 130v5a40 40 0 0 1 40 40h5'/%3E%3Cpath d='M38 130v5.2M38 139.2V162h22.8M64.8 162H70'/%3E%3Cpath d='M175 130v5a40 40 0 0 0-40 40h-5'/%3E%3Cpath d='M162 130v5.2M162 139.2V162h-22.8M135.2 162H130'/%3E%3Cpath d='M70 25h60M70 38h60M70 175h60M70 162h60'/%3E%3Cpath d='M25 70v60M38 70v60M175 70v60M162 70v60'/%3E%3C/g%3E%3C/svg%3E") 70 / var(--m-frame) stretch;
-  /* linear on purpose — the shape of this motion is in the keyframe values,
-     not in the timing function. See the note over @keyframes carte-frame. */
-  animation:carte-frame 1.8s linear .25s both;
+   The final clip equals the resting clip, so the line width cannot change when
+   wide; the SVG paint is confined to four 26–62px corner tiles. `backwards`
+   hides each piece only while it is waiting to draw, then releases transform
+   and clip-path when it finishes so no permanent animation layer remains. */
+/* ── static vector frame + reveal shell ──────
+   The border-image is static inside this element. Only the parent shell
+   animates its clip window, preserving the authored corner as one coherent
+   piece and keeping the line width at its final value from the first visible
+   frame. The final clip is also the resting clip, so the animation has no
+   repaint or thickness change to perform at the end. */
+.page-menu .carte-frame{
+  position:absolute; inset:0; z-index:2;
+  pointer-events:none;
+  clip-path:inset(0);
+  animation:carte-frame-reveal 1.8s linear .25s both;
 }
-/* The frame draws itself on once, on load — the card's top edge is on screen
-   at load on every size checked, so it is seen without being tied to the
-   scroll. Deliberately NOT a reveal: the observer choreography in script.js
-   drives the courses, and hanging the frame off it would redraw the border
-   every time a filter re-runs the cascade, and would animate it under the
-   reader's thumb on the way down the page.
-
-   One clip rectangle does the whole thing. It starts as a zero-width sliver at
-   the top centre, opens left and right so the top rule draws outward from the
-   middle, then travels down to the bottom. Clipping a pseudo-element rather
-   than .carte itself keeps the menu text unclipped and leaves the card's
-   shadow alone.
-
-   ── why the values are baked and the timing is linear ──
-   This was three keyframes with var(--ease) on the animation, and the sides
-   did not travel down the card, they snapped. CSS applies the timing function
-   to *every* keyframe segment, not to the animation as a whole, so a curve
-   like cubic-bezier(.22,1,.36,1) — nearly all of its distance in the first
-   third of its time — restarts at full speed at each stop. Measured on the
-   food card (4170px tall): the descent covered 1751px and then sat still for
-   the last 200ms of the first segment, and the second segment left that dead
-   stop at 11,600px/s, 443px in a single frame. That standing start is the
-   snap, and no choice of easing fixes it, because the discontinuity is at the
-   join rather than in the curve.
-
-   So the curve lives in the values instead, sampled every 5% of the timeline,
-   and the animation runs linear over them. With the shape in the values a
-   segment boundary carries no meaning at all.
-
-   ── why the band comes out of the percentage ──
-   The first attempt at that sampled one ease-in-out across the whole descent,
-   which fixed the sides and broke both ends. The frame is drawn in a band
-   --m-frame tall, a fixed 26–62px, and on a 4170px card that band is 1.5% of
-   the height: an easing that leaves and arrives gently spends its slowest
-   moments exactly there. The top rules stayed clipped for 160ms while the
-   opening was already three-quarters done, so there was nothing to watch being
-   drawn; and the bottom band was crossed at ~220px/s, so the bottom rule crept
-   in rather than arriving.
-
-   So the band is held out of the percentage. The clip starts one band short of
-   the top — the top rules are complete in the very first frame and the whole of
-   the opening is spent drawing them outward — and the descent is that distance,
-   written calc(P% - var(--m-frame) * K) with K = P/100 so the band unwinds in
-   step with the percentage and the last stop is a true zero.
-
-   ── why the two moves overlap ──
-   Handing straight from one to the other left a hole at the corners. An
-   ease-out that ends at rest spends its last tenth of distance on a third of
-   its time, so the opening had looked finished for a while before it actually
-   was, and the descent then left from a standstill: measured, nothing moved at
-   all between 405ms and 495ms. A pause that short still reads, because it is
-   exactly where the eye is — on the corner it is waiting to see turned.
-
-   So both moves are speed profiles, and they overlap. The opening runs 0–20%:
-   up to speed over its first fifth, cruise, then decelerate into the corner but
-   only to a quarter of cruise, not to nothing. The descent starts at 15% —
-   inside the opening — ramps up from rest, cruises, and eases to 40% of cruise
-   at the bottom, a pen arriving rather than one fading out. Through the 15–20%
-   overlap the sides are still opening while the descent is already building, so
-   there is no instant in the whole 1.8s when nothing is moving.
-
-   Measured on the food card afterwards: the top band is complete in the first
-   painted frame; the opening covers 618px→0 in 360ms; the descent is already
-   running at ~770px/s when the corners close, cruises at 3,100px/s — a quarter
-   of the 11,600px/s snap this started as — and closes the last 140px at
-   1,550px/s, so the bottom band crosses in about 40ms. */
-@keyframes carte-frame{
+.page-menu .carte-frame::before{
+  content:""; position:absolute; inset:0;
+  border:var(--m-frame) solid transparent;
+  border-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 200 200'%3E%3Cg fill='none' stroke='%23732334' stroke-width='2.8'%3E%3Cpath d='M25 70V65A40 40 0 0 0 65 25H70'/%3E%3Cpath d='M38 70V64.8M38 60.8V38h22.8M64.8 38H70'/%3E%3Cpath d='M175 70V65A40 40 0 0 1 135 25H130'/%3E%3Cpath d='M162 70V64.8M162 60.8V38h-22.8M135.2 38H130'/%3E%3Cpath d='M25 130v5a40 40 0 0 1 40 40h5'/%3E%3Cpath d='M38 130v5.2M38 139.2V162h22.8M64.8 162H70'/%3E%3Cpath d='M175 130v5a40 40 0 0 0-40 40h-5'/%3E%3Cpath d='M162 130v5.2M162 139.2V162h-22.8M135.2 162H130'/%3E%3Cpath d='M70 25h60M70 38h60M70 175h60M70 162h60'/%3E%3Cpath d='M25 70v60M38 70v60M175 70v60M162 70v60'/%3E%3C/g%3E%3C/svg%3E") 70 / var(--m-frame) stretch;
+}
+@keyframes carte-frame-reveal{
   from{ clip-path:inset(0 50% calc(100% - var(--m-frame)) 50%); }
    5%{ clip-path:inset(0 40.69% calc(100% - var(--m-frame)) 40.69%); }
   10%{ clip-path:inset(0 25.19% calc(100% - var(--m-frame)) 25.19%); }
@@ -2015,7 +1948,7 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
   85%{ clip-path:inset(0 0 calc(13.82% - var(--m-frame) * .14) 0); }
   90%{ clip-path:inset(0 0 calc(7.92% - var(--m-frame) * .08) 0); }
   95%{ clip-path:inset(0 0 calc(3.3% - var(--m-frame) * .03) 0); }
-  to{ clip-path:inset(0 0 0 0); }
+  to{ clip-path:inset(0); }
 }
 
 /* ── course tabs ──────────────────────────── */
@@ -2885,9 +2818,8 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
     --lift-delay:0s;
   }
   /* The blanket rule at the top of this block collapses the duration but not
-     the delay, so without this the menu card would sit with no border at all
-     for a quarter of a second and then snap one on. */
-  .page-menu .carte::before{ animation-delay:0s !important; }
+     the delay, so every frame segment also has to start immediately. */
+  .page-menu .carte-frame{ animation-delay:0s !important; }
   /* the reel stops drifting and becomes an ordinary swipeable strip */
   .reel__track{ animation:none !important; }
   .reel__viewport{ overflow-x:auto; scrollbar-width:none; }
@@ -2898,27 +2830,3 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
 /* ═══════════ STUDIO CREDIT STRIP ═══════════
    Signature line under the footer, not part of it: near-black regardless of
    the site's palette so it reads as a mark on the frame rather than page content. */
-.studio-credit{
-  background:#0c0c0c; border-top:1px solid var(--hairline-lt);
-}
-.studio-credit__link{
-  max-width:1200px; margin-inline:auto; padding:.95rem var(--pad);
-  display:flex; align-items:center; flex-wrap:wrap; gap:.4rem .7rem;
-  color:rgba(215,226,234,.62); text-decoration:none;
-}
-.studio-credit__mark{ width:1.5rem; height:auto; opacity:.92; transition:opacity .26s var(--ease); }
-.studio-credit__text{ display:flex; align-items:baseline; flex-wrap:wrap; gap:.15rem .45rem; min-width:0; }
-.studio-credit__by{ font-size:.62rem; font-weight:600; letter-spacing:.16em; text-transform:uppercase; }
-.studio-credit__name{ color:#d7e2ea; font-size:.8rem; font-weight:700; letter-spacing:.01em; }
-.studio-credit__cta{
-  margin-left:auto; color:var(--gold); font-size:.72rem; font-weight:700; white-space:nowrap;
-  border-bottom:1px solid transparent; transition:border-color .26s var(--ease);
-}
-.studio-credit__link:hover .studio-credit__cta{ border-bottom-color:rgba(201,163,92,.7); }
-.studio-credit__link:hover .studio-credit__mark{ opacity:1; }
-.studio-credit__link:focus-visible{ outline:3px solid var(--gold); outline-offset:-3px; }
-
-@media (max-width: 608px){
-  .studio-credit__cta{ margin-left:0; flex-basis:100%; }
-  .studio-credit__text{ flex:1 1 0; }
-}

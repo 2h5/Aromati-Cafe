@@ -209,6 +209,35 @@ console.log("\nthe six price shapes, drawn from database rows\n");
   const css = readFileSync("styles.css", "utf8").replace(/\s+/g, "");
   check("styles.css does not inject a currency symbol",
         css.includes('content:"$"'), false);
+  check("the border-image lives in a static frame child",
+        [css.includes(".page-menu.carte::before"),
+         css.includes(".page-menu.carte-frame::before"),
+         css.includes("border-image:url(")],
+        [false, true, true]);
+  check("each menu carries one single frame shell",
+        ["menu-food.html", "menu-drinks.html", "menu-wine.html"].map((file) => {
+          const html = readFileSync(file, "utf8");
+          return [
+            (html.match(/class="carte-frame"/g) || []).length,
+            (html.match(/carte-frame__edge carte-frame__edge--/g) || []).length,
+            (html.match(/carte-frame__corner carte-frame__corner--/g) || []).length,
+            /class="carte-frame" aria-hidden="true"/.test(html)
+          ];
+        }),
+        [[1, 0, 0, true], [1, 0, 0, true], [1, 0, 0, true]]);
+  check("the frame is independent of database board rebuilds",
+        !!p.doc.querySelector(".carte > .carte-frame") &&
+        !p.doc.querySelector("#carteBody .carte-frame"), true);
+  check("the static vector is revealed by a clip shell",
+        [css.includes("animation:carte-frame-reveal1.8slinear.25sboth"),
+         css.includes("@keyframescarte-frame-reveal"),
+         css.includes("border:var(--m-frame)solidtransparent"),
+         css.includes("clip-path:inset(0)")],
+        [true, true, true, true]);
+  check("the frame has no browser-detection path",
+        ["menu-food.html", "menu-drinks.html", "menu-wine.html"].some((file) =>
+          /userAgent|needs-webkit|is-ios|platform\.js/.test(readFileSync(file, "utf8"))),
+        false);
 }
 
 /* ══ 3. the tab filter, after the board has been replaced ════════════════

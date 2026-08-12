@@ -390,8 +390,28 @@
     if (el.closest(".hero") || el.closest(".mhead")) return true;
     return isInnerPage && !!(el.closest(".carte__masthead") || el.closest(".notice"));
   }
+  /* The menu tail sits after a dynamically sized board. If it is observed in
+     the initial layout pass, a short/empty first pass can put it inside the
+     viewport and consume its reveal before the board has finished settling.
+     Hold only that tail until the visitor actually starts scrolling; once
+     armed it uses the same observer and the same threshold as every other
+     scroll reveal. */
+  var scrollHeld = [];
   document.querySelectorAll("[data-split], [data-reveal-img], .reveal, .footer")
-    .forEach(function (el) { if (!inOpeningStage(el)) io.observe(el); });
+    .forEach(function (el) {
+      if (inOpeningStage(el)) return;
+      if (el.closest(".carte__foot")) scrollHeld.push(el);
+      else io.observe(el);
+    });
+
+  if (scrollHeld.length) {
+    var armScrollReveals = function () {
+      scrollHeld.forEach(function (el) { io.observe(el); });
+      scrollHeld = [];
+      window.removeEventListener("scroll", armScrollReveals);
+    };
+    window.addEventListener("scroll", armScrollReveals, { passive: true });
+  }
 
   /* ── staggered reveals (story copy, fact row) ─ */
   var staggerGroups = [
