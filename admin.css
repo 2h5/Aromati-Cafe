@@ -1153,10 +1153,78 @@ button{ font-family: inherit; }
 .pour{ display: flex; gap: 8px; align-items: flex-end; margin-top: 8px; }
 .pour .field{ margin-top: 0; }
 
+/* The breakfast builder is a fixed public layout, but its editor rows are
+   ordinary form controls. Keep each choice on one readable line at desktop
+   widths instead of letting flexbox size fields from their label text. */
+.builder-course__intro{
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 18px;
+}
+.builder-course__intro .static{ flex: 1 1 auto; margin-top: 12px; }
+.builder-course__intro > .check{ flex: 0 0 auto; margin: 28px 0 0; }
+.builder-group{ margin-top: 22px; }
+.builder-group + .builder-group{ margin-top: 28px; }
+.builder-option{
+  display: grid;
+  grid-template-columns:
+    minmax(0, 1.05fr) minmax(0, .65fr) minmax(0, 1.45fr)
+    minmax(0, 1fr) max-content;
+  column-gap: 16px; row-gap: 8px; align-items: start;
+  margin-top: 20px; padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+.builder-option--add{
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, .8fr) minmax(120px, auto) max-content;
+}
+.builder-option--bagel{
+  grid-template-columns: minmax(0, 1fr) minmax(120px, auto) max-content;
+}
+.builder-option .field{ min-width: 0; margin: 0; }
+.builder-option .field__input,
+.builder-option .field__area,
+.builder-option .field__select{ min-width: 0; }
+.builder-option > .check{
+  align-self: end; min-width: 0; margin: 0 0 8px;
+}
+.builder-option > .tools{
+  align-self: end; min-width: 0; margin: 0 0 5px;
+}
+.builder-option > .tools .btn--danger{ margin-left: 2px; }
+
+/* Price fields no longer carry a currency note. The remaining base fields
+   still need room for their descriptions, so keep the row's controls aligned
+   to the bottom without reserving an empty helper-text line in the price cell. */
+.builder-option > .field--narrow{ align-self: start; }
+
+@media (max-width: 899px){
+  .builder-course__intro{ display: block; }
+  .builder-course__intro > .check{ margin: 14px 0 0; }
+  .builder-option,
+  .builder-option--add,
+  .builder-option--bagel{
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .builder-option > .field:first-child{ grid-column: 1 / -1; }
+  .builder-option > .check{ align-self: end; }
+  .builder-option > .tools{ justify-content: flex-start; }
+}
+
 /* ── the photographs ──────────────────────────
    The picture and everything about it side by side, because the whole job is
    looking at one while reading the other. Below 640 they stack, and the
    picture stays first — it is the thing being identified. */
+
+@media (max-width: 620px){
+  .builder-option,
+  .builder-option--add,
+  .builder-option--bagel{
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 14px;
+  }
+  .builder-option > .field:first-child{ grid-column: auto; }
+  .builder-option > .check,
+  .builder-option > .tools{ align-self: start; margin: 0; }
+}
 
 .photo{
   display: grid; grid-template-columns: 190px 1fr; gap: 16px;

@@ -242,6 +242,7 @@
 
   function renderCourse(course) {
     var section = el("section", "course" + (course.sizes ? " course--sized" : ""));
+    section.hidden = !!course.isHidden;
     section.setAttribute("data-course", course.key);
     section.setAttribute("data-label", course.tabLabel);
     /* How many size columns this course draws. styles.css lays out both the
@@ -310,6 +311,7 @@
             var count = staticHead.querySelector(".course__count");
             staticHead.insertBefore(ornament(), count);
           }
+          kept.hidden = !!course.isHidden;
           frag.appendChild(kept);
         } else missing.push(course.staticId);
         return;
@@ -748,6 +750,48 @@
     });
   }
 
+  /* The breakfast block keeps its layout and event target in the page, while
+     the choices inside it come from the same content object as every other
+     menu value. Rebuilding only the chips means the iOS-sensitive height
+     transition and the ticket logic stay untouched. All owner text enters via
+     textContent, never as HTML. */
+  function renderBuilder(builder) {
+    if (!builder || !Array.isArray(builder.base) || !builder.base.length) return;
+    var block = document.querySelector('[data-static="build"]');
+    if (!block) return;
+
+    function group(groupName) {
+      return block.querySelector('[data-group="' + groupName + '"]');
+    }
+
+    function chip(option, isOn) {
+      var button = el("button", "chip" + (isOn ? " is-on" : ""));
+      button.type = "button";
+      button.setAttribute("aria-pressed", isOn ? "true" : "false");
+      button.setAttribute("data-name", option.label);
+      if (option.price !== null && option.price !== undefined && option.price !== "") {
+        button.setAttribute("data-price", option.price);
+      }
+      if (option.hint) button.setAttribute("data-hint", option.hint);
+      if (option.sub) button.setAttribute("data-sub", option.sub);
+      button.appendChild(document.createTextNode(option.label));
+      if (option.price !== null && option.price !== undefined && option.price !== "") {
+        button.appendChild(el("em", null, option.price));
+      }
+      return button;
+    }
+
+    ["base", "bagel", "add"].forEach(function (name) {
+      var host = group(name);
+      var options = Array.isArray(builder[name]) ? builder[name] : [];
+      if (!host) return;
+      while (host.firstChild) host.removeChild(host.firstChild);
+      options.forEach(function (option, i) {
+        host.appendChild(chip(option, name !== "add" && i === 0));
+      });
+    });
+  }
+
   /* ── photographs ──────────────────────────────
      There is no photograph code here any more, and that is the design rather
      than an omission.
@@ -804,6 +848,10 @@
       });
     }
 
+    if (content.builder) step("breakfast builder", function () {
+      renderBuilder(content.builder);
+    });
+
     if (host && page) {
       /* No data is not a crash. The page keeps whatever markup it was served
          with rather than being emptied. */
@@ -836,7 +884,8 @@
     hoursNote: typeof SEED_HOURS_NOTE === "string" ? SEED_HOURS_NOTE : null,
     exceptions: typeof SEED_HOURS_EXCEPTIONS === "object" ? SEED_HOURS_EXCEPTIONS : {},
     settings:  typeof SEED_SETTINGS === "object" ? SEED_SETTINGS : null,
-    copy:      typeof SEED_COPY === "object" ? SEED_COPY : null
+    copy:      typeof SEED_COPY === "object" ? SEED_COPY : null,
+    builder:   typeof SEED_BREAKFAST_BUILDER === "object" ? SEED_BREAKFAST_BUILDER : null
     /* No photos here on purpose. This branch runs when data.js is absent, and
        the seed file records the built-in picture rather than an override —
        there is nothing to write that the markup does not already say. */

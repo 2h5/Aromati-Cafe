@@ -19,7 +19,7 @@
    stopped clock. Asserting on the shaping functions in isolation would have
    passed for the entire time the bug existed. */
 
-import { boot, settle, seedRows, serve, reporter } from "./page-boot.mjs";
+import { boot, settle, seedRows, seedEnv, serve, reporter } from "./page-boot.mjs";
 
 const { state, check, pass, fail } = reporter();
 
@@ -339,7 +339,8 @@ console.log("\na cache written before one-off dates existed is discarded, not ha
      it would put the site silently back to where it was before any of this. */
   const stale = {
     menu: { food: [] }, hours: new Array(7).fill({ closed: false, opens: 420, closes: 1320 }),
-    hoursNote: "", settings: {}, copy: {}, photos: {}
+    hoursNote: "", settings: {}, copy: {}, photos: {},
+    builder: seedEnv.SEED_BREAKFAST_BUILDER
   };
   const rig = boot("index.html", {
     fetcher: serve(seedRows({})), cache: stale, now: WED

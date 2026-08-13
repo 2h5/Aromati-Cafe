@@ -75,7 +75,7 @@ See *Backing up* below.
 | `data.js` | `network → localStorage → seed`, and nothing else — it never touches the DOM |
 | `config.js` | Which Supabase project, and the publishable key. Both are public by design |
 | `data/seed-*.js` | The site as it shipped: the offline floor and the disaster-recovery story |
-| `supabase/migrations/` | Six migrations — schema, seed content, the owner allowlist, advisor fixes, photographs, hiding an item |
+| `supabase/migrations/` | Ten migrations — schema, seed content, permissions, photographs, menu hiding, size guards, breakfast-builder choices and section hiding |
 | `supabase/POLICIES.md` | What the database allows, in plain words |
 | `tools/` | The extractors, the generators and the test suite. Never shipped |
 | `vendor/` | The Supabase SDK, vendored with its digest written down |
@@ -99,6 +99,7 @@ surprises. Pretty URLs are a hosting rewrite later, not a file move.
 | Opening hours, and one-off closures | `business_hours`, `hours_exceptions` | Hours | `seed-hours.js` |
 | Phone, email, Instagram, address, delivery links | `site_settings` | Contact | `seed-settings.js` |
 | Courses, items, prices, pours | `menu_courses`, `menu_items`, `menu_item_pours` | Menus | `seed-menu.js` |
+| Build Your Own Breakfast choices | `menu_builder_options` | Menus | `seed-breakfast-builder.js` |
 | Taking an item off the menu | `menu_items.is_hidden` | Menus, on the item | — never seeded |
 | The crêpe's topping list | `menu_item_options` | — modelled, not exposed | `seed-menu.js` |
 | Photographs and their descriptions | `photos` + the `site-photos` bucket | Photos | `seed-photos.js` |
@@ -160,6 +161,12 @@ coming from data. It does have to survive the board being replaced under it
 after a network refresh — that is what `aromati:board-replaced` is for, and what
 `tools/test-replay.mjs` drives a real browser to check.
 
+The **Build Your Own Breakfast** block is the one exception to the course/item
+renderer. Its hand-written layout and touch interaction stay in
+`menu-food.html`; `menu_builder_options` supplies only the Base, Which bagel?
+and Pile it on choices. That boundary keeps the iOS-sensitive disclosure and
+ticket behavior stable while letting the owner add, hide or remove choices.
+
 ---
 
 ## The editor
@@ -203,7 +210,7 @@ edits that copy. Nothing reaches the database until **Save changes**, and
 
 ## The database
 
-Six migrations in `supabase/migrations/`, applied in order. `POLICIES.md` says
+Ten migrations in `supabase/migrations/`, applied in order. `POLICIES.md` says
 what they allow in plain words and is the file to read first.
 
 The rules that are not negotiable, all of them checked:
@@ -435,8 +442,10 @@ failure. The same rule applies to every image source.
   banners. A CMS that looks bolted on is a CMS nobody trusts.
 - **Every init step is individually error-guarded**, so a failure in the menu
   render cannot take out the hours, the nav or the reveals.
-- **Out of scope — do not build, do not break**: Build Your Own Breakfast, the
-  crêpe options row, the Reserve a Table placeholder, the studio credit strip.
+- **Keep the Build Your Own Breakfast layout and interaction fixed.** Its base,
+  bagel varieties and add-ons are CMS-backed in `menu_builder_options`; the
+  crêpe options row, Reserve a Table placeholder and studio credit strip remain
+  out of scope.
 - **The nav differs by page.** On `index.html` the section links are hashes so
   Lenis smooth-scrolls them; on the inner pages they are `index.html#story`.
 - **An inner page's arrival is one timeline.** `MENU_T` in `script.js` holds the

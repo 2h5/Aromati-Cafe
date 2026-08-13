@@ -106,6 +106,7 @@ for (const f of files) {
     menu_items: 113,
     menu_item_pours: 31,
     menu_item_options: 0,
+    menu_builder_options: 12,
     /* 62 until 2026-08-06, when the hero's "Café ✦ Wine Bar" line stopped
        being copy: the brand lockup on the hero says it in the artwork, so the
        field had nothing left to edit and came out of data/seed-copy.js. */
@@ -128,6 +129,40 @@ for (const f of files) {
    rules a CHECK cannot express. None of it had ever run.
 
    The shape numbering matches memory.md, "Menu item shapes". */
+{
+  /* The breakfast builder has three deliberately small groups. These checks
+     keep bad rows from reaching the public fallback: a typo in the group would
+     disappear, a blank label would leave an empty chip, and an invalid special
+     link would make the bagel disclosure unreachable. */
+  const builderMustRefuse = [
+    ["an unknown builder group",
+     `insert into public.menu_builder_options (group_key, label, price, sort_order)
+      values ('sideways', 'Nope', '1', 90)`],
+    ["a builder choice without a label",
+     `insert into public.menu_builder_options (group_key, label, price, sort_order)
+      values ('add', '   ', '1', 91)`],
+    ["a base without a price",
+     `insert into public.menu_builder_options (group_key, label, sort_order)
+      values ('base', 'No price', 92)`],
+    ["an add-on without a price",
+     `insert into public.menu_builder_options (group_key, label, sort_order)
+      values ('add', 'No price', 93)`],
+    ["a bagel base link on an add-on",
+     `insert into public.menu_builder_options (group_key, label, price, sub_key, sort_order)
+      values ('add', 'Wrong link', '1', 'bagel', 94)`],
+    ["an unsupported base sub-choice",
+     `insert into public.menu_builder_options (group_key, label, price, sub_key, sort_order)
+      values ('base', 'Wrong link', '1', 'not-bagel', 95)`]
+  ];
+  const builderSlipped = [];
+  for (const [what, sql] of builderMustRefuse) {
+    try { await db.exec(sql); builderSlipped.push(what); } catch { /* refused, as intended */ }
+  }
+  if (builderSlipped.length) {
+    fail("the breakfast builder stored an invalid choice", builderSlipped.join("\n"));
+  } else pass("invalid breakfast builder choices are refused");
+}
+
 {
   const plain = await one(`
     insert into public.menu_courses (page, course_key, tab_label, heading, sort_order)

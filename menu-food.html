@@ -180,17 +180,16 @@
       <div class="carte__body" id="carteBody" data-menu="food">
 
         <!-- BUILD YOUR OWN -->
-        <!-- Build Your Own stays hardcoded — it is out of the CMS's scope. The
-             renderer finds it by data-static, lifts it out, and puts it back in
-             the position the seed data records, so the tab filter and the
-             course order behave as if it were generated like the rest. -->
+        <!-- The builder keeps this fixed, touch-safe layout in the page. Its
+             choices are rendered from the CMS when available and fall back to
+             these seeded values if the optional builder table is unavailable. -->
         <section class="course course--build" data-course="breakfast" data-label="Breakfast" data-full data-static="build">
           <header class="course__head"><h2>Build Your Own Breakfast</h2><span class="course__count">∞</span></header>
 
           <div class="build" id="build">
             <div class="build__form">
               <div class="build__field">
-                <span class="build__label">01 — Choose a base</span>
+                <span class="build__label">Choose a base</span>
                 <div class="chips" data-group="base">
                   <button class="chip is-on" type="button" aria-pressed="true" data-price="6" data-name="Avocado toast">Avocado toast <em>6</em></button>
                   <button class="chip" type="button" aria-pressed="false" data-price="7" data-name="Croissant sandwich">Croissant sandwich <em>7</em></button>
@@ -203,7 +202,7 @@
                    `inert` keeps it out of tab order and the a11y tree while shut -->
               <div class="build__field build__field--sub" id="bagelField" inert>
                 <div class="build__subinner">
-                  <span class="build__label">02 — Which bagel?</span>
+                  <span class="build__label">Which bagel?</span>
                   <!-- The printed sheet offers exactly two: "Bagel — plain,
                        plain everything". The four other varieties this list
                        used to carry are not on it. -->
@@ -215,7 +214,7 @@
               </div>
 
               <div class="build__field">
-                <span class="build__label">03 — Pile it on</span>
+                <span class="build__label">Pile it on</span>
                 <!-- The "Add ingredients" block on the printed sheet, item for
                      item. The long list this replaced (scallion, jalapeño,
                      green olive, shrimp, feta, bacon, Comté, crumbled egg…)
@@ -303,6 +302,7 @@
 <script src="data/seed-copy.js"></script>
 <script src="data/seed-photos.js"></script>
 <script src="data/seed-menu.js"></script>
+<script src="data/seed-breakfast-builder.js"></script>
 <script src="data.js"></script>
 <script src="render.js"></script>
 <script src="script.js"></script>

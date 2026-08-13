@@ -1,14 +1,14 @@
 # What the database allows, in plain words
 
-This describes `migrations/20260801000000_init_cms.sql` — 11 tables, 32
-policies. Phase 2's job is that
-this file gets read and agreed **before** the SQL is applied to anything. If a
-sentence here says something you did not intend, that is the finding — the SQL
-is wrong, not this summary.
+This describes the numbered migrations in this folder — 12 public content and
+system tables, 40 policies, including the isolated `menu_builder_options`
+table. If a sentence here says something you did not intend, that is the
+finding — the SQL is wrong, not this summary.
 
-Nothing here has been executed. There is no Supabase project yet and no
-Postgres on this machine, so **this SQL has never run**. See *What this has not
-been checked for* at the bottom.
+The migrations have been applied to the project identified by `config.js` and
+replayed locally by `npm run test:sql`. The live project was also checked with
+the Supabase MCP after the breakfast-builder migration; the local folder
+remains the source of truth for a rebuild.
 
 ---
 
@@ -84,7 +84,7 @@ offers that; the trigger makes it impossible rather than merely unavailable.
 ### Rows too — the owner adds and removes freely
 
 `hours_exceptions`, `menu_courses`, `menu_items`, `menu_item_pours`,
-`menu_item_options`, `faq_entries`.
+`menu_builder_options`, `menu_item_options`, `faq_entries`.
 
 These are the things a café actually gains and loses: a dish, a section, a
 holiday closure, a bottle that sold out.
@@ -264,19 +264,24 @@ just another edit.
 
 ## Why the live migration list is longer than this folder
 
-`list_migrations` on the live project returns nine entries. `supabase/migrations/`
-holds six. Nothing has drifted, and the next person to compare the two lists
-should read this before spending an hour on it.
+`list_migrations` on the live project returns fourteen entries.
+`supabase/migrations/` holds ten. The live history includes the entries that
+were applied through the dashboard/MCP and then folded into the numbered
+source migrations or content; the next person comparing the lists should read
+this before spending an hour on it.
 
-The three the folder does not have are:
+The live-only entries are:
 
 | Live-only version | What it did | Where it lives now |
 | --- | --- | --- |
 | `advisor_fixes_revoke_from_public` | Revoked a grant the linter flagged | `20260801000300_advisor_fixes.sql`, at the revoke near the end of the file |
 | `fix_hero_sub_nbsp` | Corrected a non-breaking space in one headline | The regenerated `site_copy` seed — `test:live` passing is the proof that live and the seed files agree on it |
 | `photos_allow_png_originals` | Added PNG to the bucket's allowed types | `20260801000400_photos.sql`, in the bucket's MIME list |
+| `resync_menu_to_printed_sheets` | Replaced menu rows with the current printed sheets | The current `menu` seed and `test:live` |
+| `breakfast_builder_options` | Added the CMS-backed Base, bagel and add-on choices | `20260812000100_breakfast_builder.sql` |
+| `menu_course_hidden` | Added the whole-section hide flag for menu courses | `20260812000200_menu_course_hidden.sql` |
 
-All three were folded back into the numbered files rather than kept as separate
+These changes were folded back into the numbered files rather than kept as separate
 steps, because the numbered files are what a rebuild from scratch runs and a
 rebuild has to produce the schema that is actually live. That is the trade this
 project made: **the folder is the source of truth for what the schema should be,

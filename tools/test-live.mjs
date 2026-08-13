@@ -62,7 +62,7 @@ async function rest(path) {
   }
   if (table === "menu_courses") {
     return (await db.query(
-      `select id, page, course_key, tab_label, heading, sizes, is_static, static_id, sort_order
+      `select id, page, course_key, tab_label, heading, sizes, is_static, static_id, is_hidden, sort_order
        from public.menu_courses order by sort_order`)).rows;
   }
   if (table === "menu_items") {
@@ -82,6 +82,11 @@ async function rest(path) {
       it.menu_item_options = options.filter((o) => o.item_id === it.id).reverse();
     }
     return items;
+  }
+  if (table === "menu_builder_options") {
+    return (await db.query(
+      `select id, group_key, label, price, hint, sub_key, is_hidden, sort_order
+       from public.menu_builder_options order by sort_order`)).rows;
   }
   if (table === "photos") {
     return (await db.query(
@@ -118,7 +123,7 @@ function sandbox({ key = "a".repeat(40), fetcher } = {}) {
 }
 
 const SEEDS = ["data/seed-settings.js", "data/seed-hours.js", "data/seed-menu.js",
-               "data/seed-copy.js", "data/seed-photos.js"];
+               "data/seed-copy.js", "data/seed-photos.js", "data/seed-breakfast-builder.js"];
 const dataSrc = readFileSync("data.js", "utf8");
 const seedSrc = SEEDS.map((f) => readFileSync(f, "utf8")).join("\n");
 
@@ -127,7 +132,7 @@ function load(env) {
      same way the browser loads them. Function-scoped eval reproduces that
      without a module wrapper changing the semantics under test. */
   const keys = Object.keys(env.g);
-  const fn = new Function(...keys, `${seedSrc}\n${dataSrc}\nreturn { AROMATI_DATA, SEED_MENU, SEED_HOURS, SEED_HOURS_NOTE, SEED_SETTINGS, SEED_COPY, SEED_PHOTOS };`);
+  const fn = new Function(...keys, `${seedSrc}\n${dataSrc}\nreturn { AROMATI_DATA, SEED_MENU, SEED_HOURS, SEED_HOURS_NOTE, SEED_SETTINGS, SEED_COPY, SEED_PHOTOS, SEED_BREAKFAST_BUILDER };`);
   return fn(...keys.map((k) => env.g[k]));
 }
 
@@ -140,7 +145,7 @@ console.log("\nthe live path against the seed path\n");
    about the site being the same site. */
 {
   const env = sandbox();
-  const { AROMATI_DATA, SEED_MENU, SEED_HOURS, SEED_SETTINGS, SEED_COPY, SEED_PHOTOS } = load(env);
+  const { AROMATI_DATA, SEED_MENU, SEED_HOURS, SEED_SETTINGS, SEED_COPY, SEED_PHOTOS, SEED_BREAKFAST_BUILDER } = load(env);
   await refresh(AROMATI_DATA);
 
   /* Read what was cached rather than what was handed to the callback. The
@@ -158,6 +163,7 @@ console.log("\nthe live path against the seed path\n");
       ["the hours", fresh.hours, SEED_HOURS],
       ["the settings", fresh.settings, SEED_SETTINGS],
       ["the copy", fresh.copy, SEED_COPY],
+      ["the breakfast builder", fresh.builder, SEED_BREAKFAST_BUILDER],
       /* The photographs are the one part where the live shape is a projection
          of the seed rather than the seed itself: the seed records the built-in
          file and its size, and the site uses neither — the picture is already

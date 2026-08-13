@@ -137,14 +137,16 @@ export const settle = () => new Promise((r) => setTimeout(r, 20));
 /* ── the seed files, as values ────────────────────────────────────────────── */
 export const seedEnv = {};
 for (const f of ["data/seed-settings.js", "data/seed-hours.js", "data/seed-menu.js",
-                 "data/seed-copy.js", "data/seed-photos.js"]) {
+                 "data/seed-copy.js", "data/seed-photos.js", "data/seed-breakfast-builder.js"]) {
   new Function("g", `with (g) { ${readFileSync(f, "utf8")} }
     g.SEED_MENU = typeof SEED_MENU !== "undefined" ? SEED_MENU : g.SEED_MENU;
     g.SEED_HOURS = typeof SEED_HOURS !== "undefined" ? SEED_HOURS : g.SEED_HOURS;
     g.SEED_HOURS_NOTE = typeof SEED_HOURS_NOTE !== "undefined" ? SEED_HOURS_NOTE : g.SEED_HOURS_NOTE;
     g.SEED_HOURS_EXCEPTIONS = typeof SEED_HOURS_EXCEPTIONS !== "undefined" ? SEED_HOURS_EXCEPTIONS : g.SEED_HOURS_EXCEPTIONS;
     g.SEED_SETTINGS = typeof SEED_SETTINGS !== "undefined" ? SEED_SETTINGS : g.SEED_SETTINGS;
-    g.SEED_COPY = typeof SEED_COPY !== "undefined" ? SEED_COPY : g.SEED_COPY;`)(seedEnv);
+    g.SEED_COPY = typeof SEED_COPY !== "undefined" ? SEED_COPY : g.SEED_COPY;
+    g.SEED_BREAKFAST_BUILDER = typeof SEED_BREAKFAST_BUILDER !== "undefined" ?
+      SEED_BREAKFAST_BUILDER : g.SEED_BREAKFAST_BUILDER;`)(seedEnv);
 }
 
 export const hhmmss = (m) =>
@@ -170,6 +172,7 @@ export function menuRows(edit) {
       courses.push({
         id: "c" + cid, page, course_key: c.key, tab_label: c.tabLabel, heading: c.heading,
         sizes: c.sizes || null, is_static: !!c.isStatic, static_id: c.staticId || null,
+        is_hidden: !!c.hidden,
         sort_order: ci
       });
       (c.items || []).forEach((it, ii) => {
@@ -241,6 +244,18 @@ function settingRows() {
 export function seedRows({ menu, hours, exceptions = {} } = {}) {
   const week = hours || seedEnv.SEED_HOURS;
   const { courses, items } = menuRows(menu);
+  const builder = seedEnv.SEED_BREAKFAST_BUILDER || { base: [], bagel: [], add: [] };
+  const builderOptions = [];
+  ["base", "bagel", "add"].forEach((group_key) => {
+    (builder[group_key] || []).forEach((option, i) => {
+      builderOptions.push({
+        id: `b_${group_key}_${i + 1}`, group_key, label: option.label,
+        price: option.price == null ? null : String(option.price),
+        hint: option.hint || null, sub_key: option.sub || null,
+        is_hidden: false, sort_order: i
+      });
+    });
+  });
   return {
     site_settings: settingRows(),
     business_hours: week.map((h, i) => ({
@@ -259,6 +274,7 @@ export function seedRows({ menu, hours, exceptions = {} } = {}) {
     site_copy: Object.keys(seedEnv.SEED_COPY).map((key) => ({ key, value: seedEnv.SEED_COPY[key] })),
     menu_courses: courses,
     menu_items: items,
+    menu_builder_options: builderOptions,
     photos: []
   };
 }

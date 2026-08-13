@@ -36,8 +36,10 @@ the features around it, not adding a new architecture.
 - The browser may contain the publishable Supabase key. It must never contain a
   service-role, secret, or other privileged key.
 - Keep one owner account until there is a real need for more accounts.
-- Do not break the hardcoded Build Your Own Breakfast block, the crêpe options,
-  or the Reserve a Table placeholder without an explicit request.
+- Do not break the hand-written Build Your Own Breakfast layout or interaction,
+  the crêpe options, or the Reserve a Table placeholder without an explicit
+  request. Its base, bagel varieties and add-ons are now CMS-backed through
+  `menu_builder_options`; keep the iOS-sensitive markup and event model fixed.
 - Prices are stored as text and their order is explicit. Do not turn them into
   numbers or rely on database order.
 - A one-off date is added to the week, never merged into it. It appears on its
@@ -130,7 +132,8 @@ the features around it, not adding a new architecture.
 - `config.js` identifies the Supabase project and contains only the publishable
   key.
 - `data/seed-copy.js`, `data/seed-hours.js`, `data/seed-settings.js`,
-  `data/seed-menu.js` and `data/seed-photos.js` are the offline fallback.
+  `data/seed-menu.js`, `data/seed-photos.js` and
+  `data/seed-breakfast-builder.js` are the offline fallback.
 - `supabase/migrations/` contains the database setup and seed migrations.
 - `supabase/POLICIES.md` explains the database permissions in plain language.
 - `tools/` contains extractors, generators and checks. Nothing in it ships to
@@ -146,6 +149,7 @@ the features around it, not adding a new architecture.
 | One-off closures | `hours_exceptions` | `SEED_HOURS_EXCEPTIONS`, same file |
 | Contact details and links | `site_settings` | `data/seed-settings.js` |
 | Menu courses and items | `menu_courses`, `menu_items`, related menu tables | `data/seed-menu.js` |
+| Build Your Own Breakfast choices | `menu_builder_options` | `data/seed-breakfast-builder.js` |
 | Photos and descriptions | `photos` and the `site-photos` bucket | `data/seed-photos.js` |
 | FAQ questions | `faq_entries` | Not populated yet |
 
@@ -526,4 +530,6 @@ Migrations: `supabase/migrations/20260801000000_init_cms.sql`,
 `supabase/migrations/20260801000400_photos.sql`,
 `supabase/migrations/20260804000000_menu_item_hidden.sql`,
 `supabase/migrations/20260806000000_sizes_max_3.sql` and
-`supabase/migrations/20260806000100_allowlist_second_editor.sql`.
+`supabase/migrations/20260806000100_allowlist_second_editor.sql` and
+`supabase/migrations/20260812000100_breakfast_builder.sql` and
+`supabase/migrations/20260812000200_menu_course_hidden.sql`.

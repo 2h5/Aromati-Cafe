@@ -106,6 +106,13 @@ function hostileRows(payload) {
     }
   });
 
+  rows.menu_builder_options = rows.menu_builder_options.map((r) => ({
+    ...r,
+    label: next(),
+    hint: r.group_key === "base" ? next() : r.hint,
+    price: r.group_key === "bagel" ? null : "1"
+  }));
+
   rows.site_copy = rows.site_copy.map((r) => ({ key: r.key, value: next() }));
 
   /* Settings are not uniform: the phone is ten digits or render.js refuses to

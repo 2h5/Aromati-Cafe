@@ -41,10 +41,11 @@ var AROMATI_DATA = (function () {
      than half-understood — a rename that silently reads `undefined` renders a
      blank menu, which looks like a data-loss bug and is very hard to trace.
 
-     v2 added the photographs. v3 added the one-off dates. A returning visitor
+     v2 added the photographs. v3 added the one-off dates. v4 adds the
+     Build Your Own Breakfast choices. A returning visitor
      whose cache is thrown away is served the seeds for one paint and the live
      content a moment later, which is the ordinary path. */
-  var CACHE_KEY = "aromati:content:v3";
+  var CACHE_KEY = "aromati:content:v4";
 
   /* CACHE_KEY was once spelled twice — photo-boot.js read it from <head> to
      find the photographs it should preload, and a guard here warned when the
@@ -66,6 +67,8 @@ var AROMATI_DATA = (function () {
         ? SEED_HOURS_EXCEPTIONS : {},
       settings:  typeof SEED_SETTINGS === "object" && SEED_SETTINGS ? SEED_SETTINGS : null,
       copy:      typeof SEED_COPY === "object" && SEED_COPY ? SEED_COPY : null,
+      builder:   typeof SEED_BREAKFAST_BUILDER === "object" && SEED_BREAKFAST_BUILDER
+        ? SEED_BREAKFAST_BUILDER : { base: [], bagel: [], add: [] },
       photos:    seedPhotos()
     };
   }
@@ -98,6 +101,7 @@ var AROMATI_DATA = (function () {
       c.hours && c.hours.length === 7 &&
       c.settings && typeof c.settings === "object" &&
       c.copy && typeof c.copy === "object" &&
+      c.builder && typeof c.builder === "object" &&
       c.photos && typeof c.photos === "object" &&
       /* An empty object is the ordinary state here, so this asks for the key
          rather than for content in it — but it does ask. A cache written
@@ -473,6 +477,7 @@ var AROMATI_DATA = (function () {
         tabLabel: c.tab_label,
         heading: c.heading
       };
+      if (c.is_hidden) course.isHidden = true;
       if (c.sizes && c.sizes.length) course.sizes = c.sizes;
 
       if (c.is_static) {
@@ -500,6 +505,35 @@ var AROMATI_DATA = (function () {
     return pages;
   }
 
+  /* Build Your Own Breakfast is a static layout with editable choices. Keep
+     the data shape deliberately smaller than the database row: the public
+     page needs a label, an optional price, a base hint and the system-owned
+     relationship that opens the bagel choices. Hidden rows are pruned here,
+     just as hidden menu items are pruned in shapeMenu(). */
+  function shapeBuilder(rows) {
+    var out = { base: [], bagel: [], add: [] };
+    (rows || []).slice().sort(bySort).forEach(function (row) {
+      var group = row && row.group_key;
+      if (!Object.prototype.hasOwnProperty.call(out, group) || row.is_hidden) return;
+      if (typeof row.label !== "string" || !row.label.trim()) return;
+
+      var option = { label: row.label };
+      if (row.price !== null && row.price !== undefined && String(row.price) !== "") {
+        option.price = String(row.price);
+      }
+      if (typeof row.hint === "string" && row.hint) option.hint = row.hint;
+      if (group === "base" && row.sub_key === "bagel") option.sub = "bagel";
+      out[group].push(option);
+    });
+    return out;
+  }
+
+  function builderUsable(builder) {
+    if (!builder || !Array.isArray(builder.base) || !builder.base.length) return false;
+    return builder.base.some(function (option) { return option.sub === "bagel"; }) &&
+      Array.isArray(builder.bagel) && builder.bagel.length > 0;
+  }
+
   /* ── fetch, shape, and hand back only if it is genuinely different ──
      Re-rendering identical content would replay the entrance choreography over
      a board that is already on screen — a flicker with nothing behind it. */
@@ -516,7 +550,7 @@ var AROMATI_DATA = (function () {
       get("site_settings?select=key,value"),
       get("business_hours?select=day_of_week,is_closed,opens_at,closes_at"),
       get("site_copy?select=key,value"),
-      get("menu_courses?select=id,page,course_key,tab_label,heading,sizes,is_static,static_id,sort_order&order=sort_order"),
+      get("menu_courses?select=id,page,course_key,tab_label,heading,sizes,is_static,static_id,is_hidden,sort_order&order=sort_order"),
       get("menu_items?select=id,course_id,name,tag,description,price,prices,price_all_sizes,no_price,is_hidden,options_dom_id,sort_order," +
           "menu_item_pours(id,label,price,sort_order),menu_item_options(id,name,price,sort_order)&order=sort_order"),
       /* Nothing on a public page reads the result of this one any more — the
@@ -528,12 +562,21 @@ var AROMATI_DATA = (function () {
          shape. Deleting it costs no round trip and loses that check.
          PHOTOGRAPHS.md §8. */
       get("photos?select=slot,storage_path,alt"),
-      get("hours_exceptions?select=on_date,is_closed,opens_at,closes_at,note&order=on_date")
+      get("hours_exceptions?select=on_date,is_closed,opens_at,closes_at,note&order=on_date"),
+      /* This table was added after the first CMS schema. It is deliberately
+         optional while an older deployment is being migrated: a 404 must not
+         take the rest of the live content down, and the seed builder remains
+         correct until the migration is applied. */
+      get("menu_builder_options?select=id,group_key,label,price,hint,sub_key,is_hidden,sort_order&order=sort_order")
+        .catch(function () { return null; })
     ];
 
     Promise.all(wanted).then(function (r) {
       var hours = shapeHours(r[1]);
       var menu = shapeMenu(r[3], r[4]);
+      var builderRows = shapeBuilder(r[7]);
+      var seedBuilder = seedContent().builder;
+      var builder = builderUsable(builderRows) ? builderRows : seedBuilder;
 
       /* An empty result is not fresh content, it is a project that has not
          been seeded — or a policy that stopped returning rows. Rendering it
@@ -558,6 +601,7 @@ var AROMATI_DATA = (function () {
         exceptions: shapeExceptions(r[6]),
         settings: shapeSettings(r[0]),
         copy: shapeCopy(r[2]),
+        builder: builder,
         photos: shapePhotos(r[5])
       };
 

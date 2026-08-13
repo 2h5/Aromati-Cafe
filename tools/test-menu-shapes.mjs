@@ -288,10 +288,10 @@ console.log("\nthe six price shapes, drawn from database rows\n");
 }
 
 /* ══ 4. the two blocks that are out of scope to change ═══════════════════
-   Build Your Own is hand-written markup the editor never touches. It is listed
-   in memory.md as out of scope to build — which also means out of scope to
-   break, and a rebuild of the board around it is exactly how it would be
-   broken. The expandable options row is generated, but the behaviour that
+   Build Your Own keeps hand-written markup and interaction; the editor may
+   replace its choices but never its layout. It is listed in memory.md as a
+   fixed boundary, and a rebuild of the board around it is exactly how it would
+   be broken. The expandable options row is generated, but the behaviour that
    opens it is script.js's and is rebound on every rebuild, so it is checked in
    the same place for the same reason.
 
@@ -303,22 +303,31 @@ console.log("\nthe six price shapes, drawn from database rows\n");
 {
   console.log("\nthe hand-written blocks, after a rebuild around them");
   const OPTS_ON = "Protein Plate";
+  const rows = seedRows({ menu: (pages) => {
+    /* a real change, so the board is genuinely replaced rather than compared
+       equal and left alone */
+    pages.food[1].items[0].name = "CHANGED SO THE BOARD IS REBUILT";
+  } });
+  rows.menu_builder_options = [
+    { id: "bb1", group_key: "base", label: "CMS base", price: "11",
+      hint: "A CMS-fed base.", sub_key: "bagel", is_hidden: false, sort_order: 1 },
+    { id: "bb2", group_key: "bagel", label: "Sesame", price: null,
+      hint: null, sub_key: null, is_hidden: false, sort_order: 1 },
+    { id: "ba1", group_key: "add", label: "CMS topping", price: "2",
+      hint: null, sub_key: null, is_hidden: false, sort_order: 1 }
+  ];
+  const host = (rows.menu_items || []).find((it) => it.name === OPTS_ON);
+  if (!host) {
+    throw new Error(
+      `test-menu-shapes: no item named "${OPTS_ON}" to hang the options ` +
+      `fixture on — the seed data moved, point OPTS_ON at an item that exists`
+    );
+  }
+  host.options_dom_id = "shapesOpts";
+  host.menu_item_options = [{ id: "shapeOpt1", item_id: host.id,
+    name: "A topping", price: "1.00", sort_order: 1 }];
   const p = boot("menu-food.html", {
-    fetcher: serve(seedRows({ menu: (pages) => {
-      /* a real change, so the board is genuinely replaced rather than compared
-         equal and left alone */
-      pages.food[1].items[0].name = "CHANGED SO THE BOARD IS REBUILT";
-
-      const host = pages.food[0].items.find((it) => it.name === OPTS_ON);
-      if (!host) {
-        throw new Error(
-          `test-menu-shapes: no item named "${OPTS_ON}" to hang the options ` +
-          `fixture on — the seed data moved, point OPTS_ON at an item that exists`
-        );
-      }
-      host.optionsId = "shapesOpts";
-      host.options = [{ name: "A topping", price: "1.00" }];
-    } }))
+    fetcher: serve(rows)
   });
   await settle();
 
@@ -326,7 +335,15 @@ console.log("\nthe six price shapes, drawn from database rows\n");
   check("Build Your Own is still on the page", !!build, true);
   check("it is still in the board, not orphaned",
         !!(build && build.closest("#carteBody")), true);
-  check("its chips survived", (build ? build.querySelectorAll(".chip").length : 0) > 0, true);
+  check("its CMS-fed base replaced the seed choice",
+        build && build.querySelector('[data-group="base"] .chip').getAttribute("data-name"),
+        "CMS base");
+  check("its CMS-fed bagel variety is present",
+        build && build.querySelector('[data-group="bagel"] .chip').getAttribute("data-name"),
+        "Sesame");
+  check("its CMS-fed add-on is present",
+        build && build.querySelector('[data-group="add"] .chip').getAttribute("data-name"),
+        "CMS topping");
 
   if (build) {
     const chip = build.querySelector('[data-group="base"] .chip');
@@ -338,6 +355,8 @@ console.log("\nthe six price shapes, drawn from database rows\n");
     check("clicking a chip threw nothing", p.thrown, []);
     check("and the chip took the selection",
           chip.classList.contains("is-on") && chip.getAttribute("aria-pressed") === "true", true);
+    check("the CMS base opens its CMS-fed bagel choices",
+          build.querySelector("#bagelField").classList.contains("is-open"), true);
     if (total) check("and the total is a bare price", /^\d/.test(total.textContent.trim()), true);
     else fail("Build Your Own has no total element to check");
   }

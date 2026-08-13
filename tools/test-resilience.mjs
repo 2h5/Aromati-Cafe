@@ -77,7 +77,8 @@ console.log("\nthe site with the data taken away\n");
   const cache = JSON.parse(JSON.stringify({
     menu: seedEnv.SEED_MENU, hours: seedEnv.SEED_HOURS,
     hoursNote: seedEnv.SEED_HOURS_NOTE || "", exceptions: {},
-    settings: seedEnv.SEED_SETTINGS, copy: seedEnv.SEED_COPY, photos: {}
+    settings: seedEnv.SEED_SETTINGS, copy: seedEnv.SEED_COPY, photos: {},
+    builder: seedEnv.SEED_BREAKFAST_BUILDER
   }));
   cache.menu.food[0].items[0].name = "CACHED, NOT SEEDED";
 

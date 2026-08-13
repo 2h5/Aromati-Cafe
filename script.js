@@ -816,7 +816,11 @@
       requestAnimationFrame(function () { spacer.style.height = "0px"; });
     }
 
-    var courses = Array.prototype.slice.call(menuBody.querySelectorAll(".course"));
+    /* A whole course can be held by the CMS. The renderer keeps a hidden
+       static block in the DOM so it can be restored on a later refresh, but
+       navigation and entrance observers only see published courses. */
+    var courses = Array.prototype.slice.call(menuBody.querySelectorAll(".course"))
+      .filter(function (course) { return !course.hidden; });
 
     spacer.className = "menu-spacer";
     spacer.setAttribute("aria-hidden", "true");
@@ -1112,7 +1116,9 @@
       linesEl.innerHTML = "";
       if (base) {
         var name = base.getAttribute("data-name");
-        if (name === "Bagel" && bagel) name = bagel.getAttribute("data-name") + " bagel";
+        if (base.getAttribute("data-sub") === "bagel" && bagel) {
+          name = bagel.getAttribute("data-name") + " bagel";
+        }
         linesEl.appendChild(line(name, parseFloat(base.getAttribute("data-price")), true));
       }
       adds.forEach(function (c) {
@@ -1140,7 +1146,10 @@
         if (sub) bagelField.removeAttribute("inert");
         else bagelField.setAttribute("inert", "");
       }
-      if (base && hintEl) hintEl.textContent = HINTS[base.getAttribute("data-name")] || "";
+      if (base && hintEl) {
+        var hint = base.getAttribute("data-hint") || HINTS[base.getAttribute("data-name")] || "";
+        hintEl.textContent = hint;
+      }
     }
 
     function line(name, price, isBase) {

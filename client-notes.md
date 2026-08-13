@@ -144,9 +144,12 @@ description, the price, the extra lines. Untick it and it is back exactly as it
 was. Delete is permanent, and if it was the only item in a section the section
 goes too. Use Hide for anything that might return, which is most things.
 
-One block on the food menu — **Build Your Own Breakfast** — is built into the
-page rather than stored here. You can move where it sits on the menu; changing
-what is in it needs a developer.
+One block on the food menu — **Build Your Own Breakfast** — keeps its fixed
+layout and interaction, but its choices are editable here. In the Menus panel,
+open the block to change the **base**, **which bagel?** varieties and **pile it
+on** add-ons. Save changes at the bottom right; the choices are live on the next
+page load. Keep at least one visible base, and use Hide for a choice that may
+return later rather than deleting it.
 
 ### Photos
 
@@ -222,7 +225,8 @@ shows unsaved changes, they were never sent.
 
 ## What is not editable here, and that is deliberate
 
-- **Build Your Own Breakfast** on the food menu — its ingredients and prices.
+- The fixed **Build Your Own Breakfast** layout and interaction. Its base,
+  bagel varieties and add-ons are editable in the Menus panel.
 - The **crêpe toppings** list.
 - **Reserve a Table** — it is a placeholder button and says so when pressed.
   Wiring it to a real booking system is a separate job whenever you want it.

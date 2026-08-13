@@ -42,7 +42,7 @@ const fail = (msg, detail) => {
 const pass = (msg) => console.log(`  ok   ${msg}`);
 
 const SEEDS = ["data/seed-settings.js", "data/seed-hours.js", "data/seed-menu.js",
-               "data/seed-copy.js", "data/seed-photos.js"];
+               "data/seed-copy.js", "data/seed-photos.js", "data/seed-breakfast-builder.js"];
 const seedSrc = SEEDS.map((f) => readFileSync(f, "utf8")).join("\n");
 const dataSrc = readFileSync("data.js", "utf8");
 const configSrc = readFileSync("config.js", "utf8");
@@ -66,9 +66,9 @@ g.window = g;
 const keys = Object.keys(g);
 const fn = new Function(...keys,
   `${configSrc}\n${seedSrc}\n${dataSrc}\n` +
-  `return { AROMATI_CONFIG, AROMATI_DATA, SEED_MENU, SEED_HOURS, SEED_SETTINGS, SEED_COPY, SEED_PHOTOS, SEED_HOURS_EXCEPTIONS };`);
+  `return { AROMATI_CONFIG, AROMATI_DATA, SEED_MENU, SEED_HOURS, SEED_SETTINGS, SEED_COPY, SEED_PHOTOS, SEED_BREAKFAST_BUILDER, SEED_HOURS_EXCEPTIONS };`);
 const { AROMATI_CONFIG, AROMATI_DATA, SEED_MENU, SEED_HOURS, SEED_SETTINGS, SEED_COPY, SEED_PHOTOS,
-        SEED_HOURS_EXCEPTIONS } =
+        SEED_BREAKFAST_BUILDER, SEED_HOURS_EXCEPTIONS } =
   fn(...keys.map((k) => g[k]));
 
 console.log(`\nthe live project against this working copy\n`);
@@ -98,6 +98,7 @@ if (!live) {
     ["the hours", live.hours, SEED_HOURS],
     ["the settings", live.settings, SEED_SETTINGS],
     ["the copy", live.copy, SEED_COPY],
+    ["the breakfast builder", live.builder, SEED_BREAKFAST_BUILDER],
     /* The photographs compare as what render.js writes rather than as the seed
        file's own shape — see the same note in tools/test-live.mjs. But only the
        *descriptions* are compared here. Whether a slot is showing an upload is

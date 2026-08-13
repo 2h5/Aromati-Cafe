@@ -128,6 +128,20 @@ const WRITES = [
   ["change the phone number",
    `update public.site_settings set value = '5551234567' where key = 'phone_digits'`],
 
+  ["change a breakfast builder choice",
+   `update public.menu_builder_options set label = 'Updated topping'
+    where id = (select id from public.menu_builder_options where group_key = 'add'
+                order by sort_order limit 1)`],
+
+  ["add a breakfast builder choice",
+   `insert into public.menu_builder_options (group_key, label, price, sort_order)
+    values ('add', 'New topping', '1', 99)`],
+
+  ["delete a breakfast builder choice",
+   `delete from public.menu_builder_options
+    where id = (select id from public.menu_builder_options where group_key = 'add'
+                order by sort_order desc limit 1)`],
+
   ["rewrite a headline",
    `update public.site_copy set value = 'Rewritten'
     where key = (select key from public.site_copy order by key limit 1)`],
@@ -166,7 +180,8 @@ const READS = [
   ["the hours",    `select 1 from public.business_hours limit 1`],
   ["the copy",     `select 1 from public.site_copy limit 1`],
   ["the settings", `select 1 from public.site_settings limit 1`],
-  ["the pours",    `select 1 from public.menu_item_pours limit 1`]
+  ["the pours",    `select 1 from public.menu_item_pours limit 1`],
+  ["the breakfast builder", `select 1 from public.menu_builder_options limit 1`]
 ];
 
 const ACTORS = [

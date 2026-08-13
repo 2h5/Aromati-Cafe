@@ -760,6 +760,10 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
   margin-bottom:clamp(14px,2vh,26px); color:var(--parchment);
 }
 .hero__title{
+  /* The illustrated lockup is a block of artwork, not a text line. Keeping
+     the heading's line box at zero makes the spacing below follow the art's
+     actual aspect-ratio box on every engine. */
+  line-height:0;
   margin-bottom:clamp(18px,3vh,38px);
   /* ── TEST: drop shadow on the wordmark ──────────────────────────────
      Delete the two declarations below to revert; nothing else depends on them.
@@ -791,7 +795,13 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
 /* The mark carries "cafè wine bar" itself, so the gold line that used to sit
    under the word is gone from the markup with it. */
 .hero__title .logo{
-  width:min(84vw, 880px);
+  /* The old wordmark could use almost the whole width because it was only
+     one line of type. This lockup also contains the cook and the cafe/wine
+     line, so cap it by both viewport width and height. The height cap keeps
+     short tablet/desktop viewports from pushing the eyebrow out of position. */
+  width:min(74vw, 760px, 76vh);
+  width:min(74vw, 760px, 76svh);
+  max-width:100%;
   opacity:0; transform:translateY(30px);
   transition:opacity 1.1s var(--ease-exp), transform 1.1s var(--ease-exp);
 }
@@ -999,6 +1009,10 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
 .kitchen__lede{
   grid-column:9 / 13; padding-bottom:.5em;
   font-size:clamp(15px,1.1vw,17px); font-weight:300; line-height:1.8; opacity:.8;
+  /* It already shares the kitchen intro's scroll reveal; let the headline
+     establish itself first so the two columns read as one entrance. This is
+     presentation-only: render.js replaces the text node, not this element. */
+  transition-delay:.24s;
 }
 
 /* ── the reel ──────────────────────────────────
@@ -2814,6 +2828,7 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
 @media (prefers-reduced-motion: reduce){
   *,*::before,*::after{ animation-duration:.01ms !important; transition-duration:.01ms !important; }
   html{ scroll-behavior:auto; }
+  .kitchen__lede{ transition-delay:0s !important; }
   /* the mobile menu's choreography is all transition-delay, which the rule
      above does not touch — without this the panel is instant but its contents
      still trickle in over most of a second */

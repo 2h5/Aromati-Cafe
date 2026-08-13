@@ -179,7 +179,8 @@ var AROMATI_ADMIN = (function () {
 
   var TABLES = [
     "site_settings", "site_copy", "business_hours", "hours_exceptions",
-    "menu_courses", "menu_items", "menu_item_pours", "faq_entries", "photos"
+    "menu_courses", "menu_items", "menu_item_pours", "menu_builder_options",
+    "faq_entries", "photos"
   ];
 
   /* The columns the editor may write. Everything else on those tables is the
@@ -196,10 +197,14 @@ var AROMATI_ADMIN = (function () {
        one is live, and carries the reason for a closure. */
     business_hours:  ["is_closed", "opens_at", "closes_at"],
     hours_exceptions: ["on_date", "is_closed", "opens_at", "closes_at", "note"],
-    menu_courses:    ["page", "course_key", "tab_label", "heading", "sizes", "sort_order"],
+    menu_courses:    ["page", "course_key", "tab_label", "heading", "sizes", "is_hidden", "sort_order"],
     menu_items:      ["course_id", "name", "tag", "description", "price", "prices", "is_hidden",
                       "price_all_sizes", "no_price", "sort_order"],
     menu_item_pours: ["item_id", "label", "price", "sort_order"],
+    /* `sub_key` is the system-owned link from the Bagel base to the Which
+       bagel? group. It is read so the editor can validate the fixed builder,
+       but there is deliberately no owner control for it. */
+    menu_builder_options: ["group_key", "label", "price", "hint", "is_hidden", "sort_order"],
     faq_entries:     ["question", "answer", "is_published", "sort_order"],
     /* A photo slot is a position in the markup. Which picture is in it and how
        it is described are the owner's; the slot name, the label and whether it
@@ -213,7 +218,8 @@ var AROMATI_ADMIN = (function () {
      by what the site renders, by there being seven days in a week, and by how
      many places the markup has a photograph in. The database has no insert or
      delete policy for them either. */
-  var CAN_ADD = ["hours_exceptions", "menu_courses", "menu_items", "menu_item_pours", "faq_entries"];
+  var CAN_ADD = ["hours_exceptions", "menu_courses", "menu_items", "menu_item_pours",
+                 "menu_builder_options", "faq_entries"];
 
   var sb = null;              // the Supabase client
   var account = null;         // the signed-in user
@@ -1023,7 +1029,7 @@ var AROMATI_ADMIN = (function () {
     copy: ["site_copy"],
     hours: ["business_hours", "hours_exceptions"],
     contact: ["site_settings"],
-    menu: ["menu_courses", "menu_items", "menu_item_pours"],
+    menu: ["menu_courses", "menu_items", "menu_item_pours", "menu_builder_options"],
     photos: ["photos"],
     faq: ["faq_entries"]
   };
@@ -1793,6 +1799,26 @@ var AROMATI_ADMIN = (function () {
       .sort(function (a, b) { return (a.sort_order || 0) - (b.sort_order || 0); });
   }
 
+  var BUILDER_GROUPS = [
+    { key: "base", label: "Base", help: "Choose one base for the plate. The bagel base opens the Which bagel? choices." },
+    { key: "bagel", label: "Which bagel?", help: "Shown when a bagel base is selected. Varieties are included in the base price." },
+    { key: "add", label: "Pile it on", help: "Optional add-ons. Visitors can choose more than one." }
+  ];
+
+  function builderOptions(group) {
+    return rowsOf("menu_builder_options").filter(function (row) {
+      return row.group_key === group;
+    }).sort(function (a, b) {
+      var d = (a.sort_order || 0) - (b.sort_order || 0);
+      return d || (String(a.id) < String(b.id) ? -1 : 1);
+    });
+  }
+
+  function builderGroupLabel(group) {
+    var found = BUILDER_GROUPS.filter(function (g) { return g.key === group; })[0];
+    return found ? found.label : group;
+  }
+
   function matchesSearch(item) {
     if (!ui.search) return true;
     var needle = ui.search.toLowerCase();
@@ -1816,11 +1842,13 @@ var AROMATI_ADMIN = (function () {
      nothing here would have guessed correctly. */
 
   var REORDER_MS = 300;
-  var REORDABLE = "[data-section],[data-item]";
+  var REORDABLE = "[data-section],[data-item],[data-builder-option]";
 
   function reorderKey(node) {
-    return node.getAttribute("data-section") ||
-      ("item:" + node.getAttribute("data-item"));
+    var section = node.getAttribute("data-section");
+    var item = node.getAttribute("data-item");
+    var builder = node.getAttribute("data-builder-option");
+    return section || (item ? "item:" + item : "builder:" + builder);
   }
 
   /* A row the search has hidden has no box to measure, and measuring it
@@ -2005,6 +2033,8 @@ var AROMATI_ADMIN = (function () {
 
     return courses.map(function (course) {
       var items = itemsIn(course.id);
+      var builder = course.is_static && course.static_id === "build"
+        ? rowsOf("menu_builder_options") : [];
       /* The count is what is on the site, with the held-back ones named after
          it. "6 items" when one of them is hidden would be a lie told in the
          one place the owner looks to check their work. */
@@ -2014,14 +2044,16 @@ var AROMATI_ADMIN = (function () {
         id: "course:" + course.id,
         group: pageName,
         label: course.heading || "(untitled section)",
-        count: course.is_static ? "built in"
+        count: course.is_static ? plural(builder.filter(function (row) {
+            return !row.is_hidden;
+          }).length, "choice", "choices")
           : plural(shown, "item", "items") + (hidden ? ", " + hidden + " hidden" : ""),
         changed: (rowChanged("menu_courses", course) ? 1 : 0) +
-          items.filter(function (i) { return rowChanged("menu_items", i); }).length,
+          items.filter(function (i) { return rowChanged("menu_items", i); }).length +
+          builder.filter(function (row) { return rowChanged("menu_builder_options", row); }).length,
         describe: course.is_static
-          ? "A block the page builds for itself. Where it sits on the menu can be " +
-            "changed with the arrows beside it in the list; what is in it cannot " +
-            "be edited here."
+          ? "A block with a fixed layout and editable choices for the base, bagel " +
+            "varieties and add-ons. Its position can also be moved with the arrows."
           : "One block on the " + pageName.toLowerCase() + ", with its own heading " +
             "and its own filter tab. Type prices without the dollar sign — the " +
             "site adds it, and 7.50 stays 7.50 instead of becoming 7.5.",
@@ -2045,6 +2077,101 @@ var AROMATI_ADMIN = (function () {
     return moves;
   }
 
+  function renderBuilderOption(host, option, siblings, group) {
+    var row = el("div", "builder-option builder-option--" + group.key);
+    row.setAttribute("data-builder-option", option.id);
+    var cardId = "course:build:builder:" + option.id;
+
+    row.appendChild(makeField({
+      table: "menu_builder_options", row: option, col: "label",
+      cardId: cardId, tab: "menu",
+      label: "Menu label", value: option.label, placeholder: "Avocado toast",
+      onInput: function (v) { option.label = v; }
+    }).wrap);
+
+    if (group.key !== "bagel") {
+      row.appendChild(makeField({
+        table: "menu_builder_options", row: option, col: "price",
+        cardId: cardId, tab: "menu", extra: "field--narrow",
+        label: "Price", value: option.price || "", placeholder: "6",
+        onInput: function (v) { option.price = v; }
+      }).wrap);
+    }
+
+    if (group.key === "base") {
+      row.appendChild(makeField({
+        table: "menu_builder_options", row: option, col: "hint",
+        cardId: cardId, tab: "menu", type: "textarea", rows: 2,
+        label: "Short description", value: option.hint || "",
+        help: "The small sentence beneath the selected base.",
+        onInput: function (v) { option.hint = v; }
+      }).wrap);
+      /* The Bagel base's link to the Which bagel? group is fixed in the
+         content model. Keeping it out of the form avoids an extra choice the
+         owner cannot usefully change, while the hidden marker still lets the
+         public renderer and validator identify that base safely. */
+    }
+
+    row.appendChild(makeCheck("Hide this choice", option.is_hidden, function (hidden) {
+      option.is_hidden = hidden;
+      renderAll();
+    }).wrap);
+
+    var tools = el("div", "tools");
+    [["▲", -1], ["▼", 1]].forEach(function (pair) {
+      var b = el("button", "mini", pair[0]);
+      b.type = "button";
+      b.title = pair[1] < 0 ? "Move this choice up" : "Move this choice down";
+      var at = siblings.indexOf(option);
+      b.disabled = pair[1] < 0 ? at === 0 : at === siblings.length - 1;
+      on(b, "click", function (e) {
+        e.stopPropagation();
+        move(siblings, option, pair[1]);
+      });
+      tools.appendChild(b);
+    });
+
+    var del = el("button", "btn btn--small btn--danger", "Delete");
+    del.type = "button";
+    on(del, "click", function () {
+      if (!window.confirm("Delete \u201c" + (option.label || "this choice") + "\u201d from " +
+          builderGroupLabel(group.key) + "?")) return;
+      deleteRow("menu_builder_options", option);
+    });
+    tools.appendChild(del);
+    row.appendChild(tools);
+    host.appendChild(row);
+  }
+
+  function renderBuilderGroup(host, group) {
+    var options = builderOptions(group.key);
+    var wrap = el("div", "pours builder-group");
+    wrap.appendChild(el("p", "pours__title", group.label));
+    wrap.appendChild(el("span", "field__help", group.help));
+    options.forEach(function (option) {
+      renderBuilderOption(wrap, option, options, group);
+    });
+
+    var add = el("button", "btn btn--small btn--add", "Add a " +
+      (group.key === "add" ? "topping" : group.key === "bagel" ? "bagel variety" : "base"));
+    add.type = "button";
+    on(add, "click", function () {
+      draft.menu_builder_options.push({
+        id: tempId(),
+        group_key: group.key,
+        label: "",
+        price: group.key === "bagel" ? null : "",
+        hint: group.key === "base" ? "" : null,
+        sub_key: null,
+        is_hidden: false,
+        sort_order: options.length + 1
+      });
+      renderAll();
+    });
+    wrap.appendChild(add);
+    host.appendChild(wrap);
+  }
+
   function renderCourse(host, course) {
     var items = itemsIn(course.id);
     var cardId = "course:" + course.id;
@@ -2053,10 +2180,27 @@ var AROMATI_ADMIN = (function () {
     host.appendChild(card.wrap);
 
     if (course.is_static) {
-      card.body.appendChild(el("p", "static",
-        "Build Your Own Breakfast is built into the page rather than stored here. " +
-        "Its position on the menu can be moved with the arrows beside it in the " +
-        "list; its contents are not editable — ask a developer."));
+      if (course.static_id === "build") {
+        var intro = el("div", "builder-course__intro");
+        intro.appendChild(el("p", "static",
+          "The layout and interaction stay fixed so the builder remains reliable on " +
+          "touch devices. The choices inside it are editable below; save to put " +
+          "changes live on the site."));
+        intro.appendChild(makeCheck("Hide entire section", course.is_hidden, function (hidden) {
+          course.is_hidden = hidden;
+          renderAll();
+        }).wrap);
+        card.body.appendChild(intro);
+      } else {
+        card.body.appendChild(el("p", "static",
+          "This block's layout and interaction are fixed here; ask a developer " +
+          "before changing what it contains."));
+      }
+      if (course.static_id === "build") {
+        BUILDER_GROUPS.forEach(function (group) {
+          renderBuilderGroup(card.body, group);
+        });
+      }
       return;
     }
 
@@ -4052,6 +4196,57 @@ var AROMATI_ADMIN = (function () {
       }
     });
 
+    var builderRows = rowsOf("menu_builder_options");
+    builderRows.forEach(function (option) {
+      var group = option.group_key;
+      if (["base", "bagel", "add"].indexOf(group) < 0) {
+        add("A breakfast builder choice has an unknown group. Choose Base, Which bagel?, or Pile it on.",
+            "menu_builder_options", option.id, "group_key");
+      }
+      if (isBlank(option.label)) {
+        add("A breakfast builder choice has no label.",
+            "menu_builder_options", option.id, "label");
+      }
+      if ((group === "base" || group === "add") && isBlank(option.price)) {
+        add("A visible breakfast base or topping needs a price.",
+            "menu_builder_options", option.id, "price");
+      }
+      if (group !== "base" && option.sub_key !== null && option.sub_key !== undefined &&
+          !isBlank(option.sub_key)) {
+        add("Only a breakfast base can open the bagel choices.",
+            "menu_builder_options", option.id, "sub_key");
+      }
+      if (group === "base" && option.sub_key !== null && option.sub_key !== undefined &&
+          !isBlank(option.sub_key) && option.sub_key !== "bagel") {
+        add("The breakfast base link must be the fixed bagel link.",
+            "menu_builder_options", option.id, "sub_key");
+      }
+    });
+    var visibleBases = builderRows.filter(function (option) {
+      return option.group_key === "base" && !option.is_hidden && !isBlank(option.label);
+    });
+    if (!visibleBases.length) {
+      add("Keep at least one visible breakfast base so Build Your Own Breakfast has a starting choice.",
+          "menu_builder_options", null, "label");
+    }
+    var visibleBagelBases = visibleBases.filter(function (option) {
+      return option.sub_key === "bagel";
+    });
+    /* The bagel relationship is fixed rather than owner-configurable. If
+       another base is visible but the Bagel base is not, the public disclosure
+       can never be reached, so do not let that broken state be saved. */
+    if (visibleBases.length && !visibleBagelBases.length) {
+      add("Keep the Bagel base visible so visitors can choose a bagel variety.",
+          "menu_builder_options", null, "label");
+    }
+    if (visibleBagelBases.length &&
+        !builderRows.some(function (option) {
+          return option.group_key === "bagel" && !option.is_hidden && !isBlank(option.label);
+        })) {
+      add("The bagel base needs at least one visible bagel variety.",
+          "menu_builder_options", null, "label");
+    }
+
     /* A photograph with no description is a photograph a screen reader
        announces as nothing at all. The database refuses it too — same rule,
        same sentence, deliberately in both places. Decoration is exempt, and
@@ -4250,6 +4445,13 @@ var AROMATI_ADMIN = (function () {
       return menuChild(course, (item ? item.name : "An item") + " · " +
                                (row.label || "a pour"));
     }
+    if (table === "menu_builder_options") {
+      var build = rowsOf("menu_courses").filter(function (course) {
+        return course.is_static && course.static_id === "build";
+      })[0];
+      return menuChild(build, builderGroupLabel(row.group_key) + " · " +
+                               (row.label || "a choice"));
+    }
     if (table === "photos") {
       var prefix = String(row.slot).split(".")[0];
       return { tab: "photos", section: "photos:" + prefix,
@@ -4286,12 +4488,16 @@ var AROMATI_ADMIN = (function () {
     hours_exceptions: { on_date: "Date", is_closed: "Closed all day",
                         opens_at: "Opens", closes_at: "Closes", note: "Reason" },
     menu_courses:    { page: "Menu", course_key: "Filter key", tab_label: "Filter tab",
-                       heading: "Heading", sizes: "Size columns", sort_order: "Position" },
+                       heading: "Heading", sizes: "Size columns", is_hidden: "Hidden from the site",
+                       sort_order: "Position" },
     menu_items:      { course_id: "Section", name: "Name", tag: "Note beside the name",
                        description: "Description", price: "Price", prices: "Price per size",
                        is_hidden: "Hidden from the site", price_all_sizes: "One price across sizes",
                        no_price: "No price", sort_order: "Position" },
     menu_item_pours: { item_id: "Item", label: "Pour", price: "Price", sort_order: "Position" },
+    menu_builder_options: { group_key: "Group", label: "Menu label", price: "Price",
+                            hint: "Short description", is_hidden: "Hidden from the site",
+                            sort_order: "Position" },
     faq_entries:     { question: "Question", answer: "Answer",
                        is_published: "Published", sort_order: "Position" },
     photos:          { storage_path: "Photograph", source_path: "Unframed original",
@@ -4349,6 +4555,7 @@ var AROMATI_ADMIN = (function () {
     if (table === "menu_courses") return was.heading || "(untitled section)";
     if (table === "menu_items") return was.name || "(unnamed item)";
     if (table === "menu_item_pours") return was.label || "a pour";
+    if (table === "menu_builder_options") return was.label || "a choice";
     if (table === "faq_entries") return was.question || "(a question)";
     return "A row";
   }
@@ -4358,6 +4565,7 @@ var AROMATI_ADMIN = (function () {
     menu_courses:     "Menus",
     menu_items:       "Menus",
     menu_item_pours:  "Menus",
+    menu_builder_options: "Menus",
     faq_entries:      "Questions"
   };
 
@@ -4639,6 +4847,8 @@ var AROMATI_ADMIN = (function () {
       if ((col === "course_id" || col === "item_id") && idMap[value]) value = idMap[value];
       if (typeof value === "string" && value === "" &&
           (col === "tag" || col === "description" || col === "note")) value = null;
+      if (table === "menu_builder_options" && typeof value === "string" && value === "" &&
+          (col === "price" || col === "hint")) value = null;
       out[col] = value === undefined ? null : value;
     });
     return out;
@@ -4743,14 +4953,14 @@ var AROMATI_ADMIN = (function () {
       }
     });
 
-    ["menu_item_pours", "menu_items", "menu_courses", "hours_exceptions", "faq_entries"]
+    ["menu_builder_options", "menu_item_pours", "menu_items", "menu_courses", "hours_exceptions", "faq_entries"]
       .forEach(function (table) {
         (removed[table] || []).forEach(function (id) {
           steps.push({ what: "delete", table: table, id: id });
         });
       });
 
-    ["menu_courses", "menu_items", "menu_item_pours", "hours_exceptions", "faq_entries"]
+    ["menu_courses", "menu_items", "menu_builder_options", "menu_item_pours", "hours_exceptions", "faq_entries"]
       .forEach(function (table) {
         rowsOf(table).forEach(function (row) {
           if (isNew(row)) steps.push({ what: "insert", table: table, row: row });
@@ -5006,9 +5216,10 @@ var AROMATI_ADMIN = (function () {
        See WRITABLE above for why nothing may write it. */
     business_hours: "id,day_of_week,is_closed,opens_at,closes_at,note,sort_order",
     hours_exceptions: "id,on_date,is_closed,opens_at,closes_at,note",
-    menu_courses: "id,page,course_key,tab_label,heading,sizes,is_static,static_id,sort_order",
+    menu_courses: "id,page,course_key,tab_label,heading,sizes,is_static,static_id,is_hidden,sort_order",
     menu_items: "id,course_id,name,tag,description,price,prices,price_all_sizes,no_price,is_hidden,options_dom_id,sort_order",
     menu_item_pours: "id,item_id,label,price,sort_order",
+    menu_builder_options: "id,group_key,label,price,hint,sub_key,is_hidden,sort_order",
     faq_entries: "id,question,answer,is_published,sort_order",
     photos: "id,slot,label,storage_path,source_path,alt,width,height,is_decorative,sort_order"
   };
@@ -5025,6 +5236,7 @@ var AROMATI_ADMIN = (function () {
     hours_exceptions: "on_date",
     menu_courses: "sort_order",
     menu_items: "sort_order",
+    menu_builder_options: "sort_order",
     menu_item_pours: "sort_order",
     faq_entries: "sort_order",
     photos: "sort_order"

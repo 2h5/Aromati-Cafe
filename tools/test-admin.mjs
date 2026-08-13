@@ -86,10 +86,11 @@ function fixture() {
     hours_exceptions: [],
     menu_courses: [
       { id: "k1", page: "food", course_key: "breakfast", tab_label: "Breakfast",
-        heading: "Breakfast", sizes: null, is_static: false, static_id: null, sort_order: 1 },
+        heading: "Breakfast", sizes: null, is_static: false, static_id: null,
+        is_hidden: false, sort_order: 1 },
       { id: "k2", page: "drinks", course_key: "coffee", tab_label: "Coffee",
         heading: "Coffee & Espresso", sizes: ["Small", "Large"], is_static: false,
-        static_id: null, sort_order: 1 }
+        static_id: null, is_hidden: false, sort_order: 1 }
     ],
     menu_items: [
       { id: "i1", course_id: "k1", name: "Morning Plate", tag: null,
@@ -101,6 +102,18 @@ function fixture() {
     ],
     menu_item_pours: [
       { id: "p1", item_id: "i1", label: "Bottle", price: "60", sort_order: 1 }
+    ],
+    menu_builder_options: [
+      { id: "b1", group_key: "base", label: "Avocado toast", price: "6",
+        hint: "Smashed avocado on grilled sourdough.", sub_key: null,
+        is_hidden: false, sort_order: 1 },
+      { id: "b2", group_key: "base", label: "Bagel of your choice", price: "3",
+        hint: "Plain or everything, toasted to order.", sub_key: "bagel",
+        is_hidden: false, sort_order: 2 },
+      { id: "b3", group_key: "bagel", label: "Plain", price: null,
+        hint: null, sub_key: null, is_hidden: false, sort_order: 1 },
+      { id: "b4", group_key: "add", label: "Cream cheese", price: "2",
+        hint: null, sub_key: null, is_hidden: false, sort_order: 1 }
     ],
     faq_entries: [],
     /* One described photograph and one backdrop, which are the two cases the
@@ -1076,20 +1089,97 @@ console.log("\nthe section that is built into the page");
     data: Object.assign(fixture(), {
       menu_courses: [{ id: "k9", page: "food", course_key: "breakfast", tab_label: "Breakfast",
                        heading: "Build Your Own Breakfast", sizes: null, is_static: true,
-                       static_id: "build", sort_order: 1 }],
+                       static_id: "build", is_hidden: false, sort_order: 1 }],
       menu_items: [], menu_item_pours: []
     })
   });
   await r.signIn();
   r.tab("Menus");
-  check("Build Your Own offers no fields to edit",
-        r.all(".card .field__input").length, 0);
-  check("and says where its contents live instead",
-        r.q(".static").textContent.includes("built into the page"), true);
+  check("Build Your Own keeps its fixed layout note",
+        r.q(".static").textContent.includes("choices inside it are editable"), true);
+  const hideSection = r.q(".builder-course__intro input[type=checkbox]");
+  check("and exposes a whole-section visibility switch",
+        hideSection && hideSection.checked, false);
+  hideSection.click();
+  await r.save();
+  check("hiding the builder writes only its course row",
+        r.writes().filter((w) => w.what === "update").map((w) => w.table),
+        ["menu_courses"]);
+  check("and sends the hidden flag",
+        r.writes().find((w) => w.what === "update" && w.table === "menu_courses").payload.is_hidden,
+        true);
+  check("and exposes the base group",
+        r.all(".pours__title").map((n) => n.textContent), ["Base", "Which bagel?", "Pile it on"]);
+  check("base rows no longer expose the special-choice control",
+        r.all(".builder-option--base .field__label")
+          .some((n) => n.textContent.trim().startsWith("Special choices")), false);
+  check("the bagel link is system-owned, not a CMS write",
+        r.window.AROMATI_ADMIN._test.WRITABLE.menu_builder_options.includes("sub_key"), false);
+  check("builder prices have no currency helper text",
+        r.all(".builder-option .field--narrow .field__help").length, 0);
+  check("with one add button per group",
+        r.all(".pours .btn--add").length, 3);
+  check("and the seeded builder fields are present",
+        r.all(".pours .field").length > 0, true);
+
+  const added = r.all(".btn--add").find((b) => b.textContent === "Add a topping");
+  added.click();
+  const newRow = r.all(".pours")[2].querySelector(".builder-option:last-of-type");
+  const newFields = newRow.querySelectorAll(".field__input");
+  r.type(newFields[0], "Bacon");
+  r.type(newFields[1], "3");
+  await r.save();
+  check("adding a builder topping writes only the builder table",
+        r.writes().filter((w) => w.what === "insert").map((w) => w.table),
+        ["menu_builder_options"]);
+  const bacon = r.all(".pours .field__input").find((n) => n.value === "Bacon");
+  bacon.closest(".builder-option").querySelector(".btn--danger").click();
+  await r.save();
+  check("removing a builder topping writes only the builder table",
+        r.writes().filter((w) => w.what === "delete").map((w) => w.table),
+        ["menu_builder_options"]);
 }
 
 
 /* ═══ 7. hours ══════════════════════════════════════════════════════════════ */
+
+console.log("\nthe fixed bagel relationship stays usable");
+{
+  const data = Object.assign(fixture(), {
+    menu_courses: [{ id: "k9", page: "food", course_key: "breakfast", tab_label: "Breakfast",
+                     heading: "Build Your Own Breakfast", sizes: null, is_static: true,
+                     static_id: "build", is_hidden: false, sort_order: 1 }],
+    menu_items: [], menu_item_pours: []
+  });
+  const r = await boot({ data });
+  await r.signIn();
+  r.tab("Menus");
+  const bagelBase = r.all(".builder-option--base")
+    .find((row) => [...row.querySelectorAll(".field__input")]
+      .some((field) => field.value === "Bagel of your choice"));
+  bagelBase.querySelector('input[type="checkbox"]').click();
+  await r.save();
+  check("hiding the Bagel base is refused", r.writes(), []);
+  check("and explains why the fixed choice must stay visible",
+        r.problems().some((p) => /Keep the Bagel base visible/.test(p)), true);
+}
+
+{
+  const data = Object.assign(fixture(), {
+    menu_courses: [{ id: "k9", page: "food", course_key: "breakfast", tab_label: "Breakfast",
+                     heading: "Build Your Own Breakfast", sizes: null, is_static: true,
+                     static_id: "build", is_hidden: false, sort_order: 1 }],
+    menu_items: [], menu_item_pours: []
+  });
+  const r = await boot({ data });
+  await r.signIn();
+  r.tab("Menus");
+  r.all(".builder-option--bagel input[type=checkbox]").forEach((box) => box.click());
+  await r.save();
+  check("hiding both bagel varieties is refused", r.writes(), []);
+  check("and keeps the visible-variety safeguard",
+        r.problems().some((p) => /at least one visible bagel variety/.test(p)), true);
+}
 
 console.log("\nhours");
 {
@@ -2201,7 +2291,13 @@ console.log("\nthe section ids the list mints are the ones the panels mint");
      perfectly fine and simply goes nowhere when pressed. So every row in the
      fixture is located, and the id it produces is required to exist in its
      panel's own list. */
-  const r = await boot({ data: withExtras() });
+  const locateData = withExtras();
+  locateData.menu_courses.push({
+    id: "k-build", page: "food", course_key: "breakfast", tab_label: "Breakfast",
+    heading: "Build Your Own Breakfast", sizes: null, is_static: true,
+    static_id: "build", is_hidden: false, sort_order: 99
+  });
+  const r = await boot({ data: locateData });
   await r.signIn();
   const api = r.window.AROMATI_ADMIN._test;
 
