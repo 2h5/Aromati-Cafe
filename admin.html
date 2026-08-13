@@ -37,8 +37,8 @@
 <body>
 
 <noscript>
-  <p class="noscript">The editor needs JavaScript. The site itself does not —
-  if you are reading this on the live site, everything a visitor sees is
+  <p class="noscript">The editor needs JavaScript, but the public site does not.
+  If you are reading this on the live site, everything a visitor sees is still
   working.</p>
 </noscript>
 
@@ -64,9 +64,9 @@
 
     <p class="msg" id="gateMsg" role="alert" hidden></p>
 
-    <p class="gate__foot">There is one account, and it is yours. If the
-      password has been forgotten, it is reset from the Supabase dashboard —
-      there is no reset link here on purpose.</p>
+    <p class="gate__foot">There is one account, and it is yours. If you forget
+      the password, reset it from the Supabase dashboard. There is no reset link
+      here by design.</p>
   </form>
 </div>
 
@@ -85,7 +85,9 @@
 <div class="app" id="app" hidden>
 
   <header class="topbar">
-    <span class="topbar__brand">Aromati</span>
+    <span class="topbar__brand">
+      <img src="assets/logos/aromati-lockup.svg" alt="Aromati café wine bar">
+    </span>
     <span class="topbar__who" id="who"></span>
     <span class="topbar__spacer"></span>
     <span class="topbar__msg" id="publishMsg" role="status" hidden></span>
@@ -103,7 +105,19 @@
         <p><strong>Only photo changes require Publish. Text changes do not.</strong> Text, menu, hours, and other non-photo content can be changed and saved independently. They do not use a photo rebuild. For text changes, just press Save changes at the bottom right.</p>
       </div>
     </div>
-    <button class="btn btn--quiet" type="button" id="publishBtn"><span>Publish</span></button>
+    <div class="topbar__publish" id="publishControl">
+      <button class="btn btn--quiet" type="button" id="publishBtn"
+              aria-haspopup="dialog" aria-expanded="false"
+              aria-controls="publishConfirm"><span>Publish</span></button>
+      <div class="publish-confirm" id="publishConfirm" role="dialog"
+           aria-labelledby="publishConfirmTitle" aria-hidden="true">
+        <p class="publish-confirm__title" id="publishConfirmTitle">Publish now?</p>
+        <div class="publish-confirm__actions">
+          <button class="btn btn--small btn--ghost" type="button" id="publishCancel">Cancel</button>
+          <button class="btn btn--small btn--primary" type="button" id="publishConfirmBtn">Confirm</button>
+        </div>
+      </div>
+    </div>
     <button class="btn btn--quiet" type="button" id="signOut"><span>Sign out</span></button>
   </header>
 

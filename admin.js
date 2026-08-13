@@ -297,7 +297,7 @@ var AROMATI_ADMIN = (function () {
 
   var SETTING_RULES = [
     { key: /^phone_digits$/, ok: /^[0-9]{10}$/,
-      message: "The phone number needs exactly 10 digits and nothing else — no spaces, brackets or dashes. For (332) 207-3847 enter 3322073847." },
+      message: "The phone number needs exactly 10 digits with no spaces, brackets or dashes. For (332) 207-3847 enter 3322073847." },
 
     { key: /^phone_country$/, ok: /^[0-9]{1,3}$/,
       message: "The country code should be 1 to 3 digits. For the United States enter 1." },
@@ -306,7 +306,7 @@ var AROMATI_ADMIN = (function () {
       message: "That does not look like an email address. It needs an @ and a dot after it, for example info@aromatinyc.com." },
 
     { key: /^instagram_handle$/, bad: /^@/,
-      message: "Leave the @ off the Instagram handle — enter aromatinyc, not @aromatinyc. The site adds the @ where it shows one." },
+      message: "Leave the @ off the Instagram handle. Enter aromatinyc, not @aromatinyc. The site adds the @ where it shows one." },
 
     { key: /^instagram_handle$/, ok: /^[A-Za-z0-9._]{1,30}$/,
       message: "An Instagram handle can only use letters, numbers, dots and underscores." },
@@ -315,7 +315,7 @@ var AROMATI_ADMIN = (function () {
        taken off the site. Which is why this rule reads "length > 0 and not
        https", exactly as the trigger does. */
     { key: /^order_[a-z0-9]+_url$/, ok: /^https:\/\//, allowEmpty: true,
-      message: "An ordering link has to be the whole web address, starting with https:// — paste it from the address bar. To remove the service from the site, clear this field instead." },
+      message: "Paste the full ordering link from the address bar. It must start with https://. To remove the service from the site, clear this field instead." },
 
     { key: /^address_region$/, ok: /^[A-Z]{2}$/,
       message: "The state should be its two-letter abbreviation in capitals, for example NY." },
@@ -327,7 +327,7 @@ var AROMATI_ADMIN = (function () {
   /* The migration writes this with a %s for the label. Same sentence, same
      substitution. */
   function mustNotBeEmpty(label) {
-    return 'The field "' + label + '" cannot be left empty — it appears on every page.';
+    return 'The field "' + label + '" cannot be left empty because it appears on every page.';
   }
 
   function settingProblem(row) {
@@ -357,8 +357,8 @@ var AROMATI_ADMIN = (function () {
     var stars = value.length - value.replace(/\*/g, "").length;
 
     if (stars % 2 !== 0) {
-      return "There is an odd number of * characters here. They work in pairs — " +
-             "*like this* makes italics — so one on its own would show up on the page " +
+      return "There is an odd number of * characters here. They work in pairs. " +
+             "*like this* makes italics, so one on its own would show up on the page " +
              "as a star.";
     }
     if (row.max_length && value.length > row.max_length) {
@@ -1012,8 +1012,8 @@ var AROMATI_ADMIN = (function () {
       emptyIndex: "This page has no sections yet." },
     { id: "photos",  name: "Photos",  sections: photoSections, note: photoNote,
       emptyIndex: "No photograph slots yet.",
-      emptyEditor: "No photograph slots in the database yet. The site is showing " +
-        "the pictures in its own markup, which is correct — but nothing here can " +
+      emptyEditor: "No photograph slots are in the database yet. The site is showing " +
+        "the pictures in its own markup as expected, but nothing here can " +
         "be changed until the photographs migration has been run." },
     { id: "faq",     name: "FAQ",     sections: faqSections,
       note: faqNote, indexFoot: faqIndexFoot,
@@ -1290,6 +1290,9 @@ var AROMATI_ADMIN = (function () {
     var chosen = null;
     var lastGroup = null;
     sections.forEach(function (section) {
+      if (section.division) {
+        list.appendChild(el("div", "index__division"));
+      }
       if (section.group && section.group !== lastGroup) {
         lastGroup = section.group;
         list.appendChild(el("p", "index__group", section.group));
@@ -1426,27 +1429,17 @@ var AROMATI_ADMIN = (function () {
      photograph swapped in after the page has painted is a photograph the
      visitor watches change.
 
-     Two things this must get right. It must not say "live straight away",
-     which was true under the old design and is the one sentence an owner would
-     act on wrongly — they would upload and walk away. And it must give the
-     delay a shape: about a minute, ending by itself, not something to press
-     Publish twice for. The quota detail lives in the information control beside
-     Publish, so this panel note can stay focused on the action. */
+     The one fact that must remain here is that saving alone does not publish a
+     photograph. Timing, quota detail and the photo-versus-text distinction live
+     in the information control beside Publish; this panel note stays short and
+     focused on the sequence the owner needs while editing photos. */
   function photoNote() {
     return makeNote(function (node) {
-      node.appendChild(el("strong", null, "Saving is not enough on this page. "));
+      node.appendChild(el("strong", null, "Photos require Publish. "));
       node.appendChild(document.createTextNode(
-        "A photograph you save shows here right away, but the site keeps the " +
-        "old one until you press Publish at the top of this page. Nothing " +
-        "looks broken in the meantime — visitors simply see the previous " +
-        "picture."));
-      node.appendChild(el("br"));
-      node.appendChild(el("br"));
-      node.appendChild(el("strong", null, "Change as many as you like first. "));
-      node.appendChild(document.createTextNode(
-        "One Publish covers every photograph you changed, so upload them all, " +
-        "look them over, and publish once at the end. The site takes about a " +
-        "minute to catch up, and you do not have to wait or press it again."));
+        "Save all your photo changes and review them here, then press Publish " +
+        "once at the top of the page to update the site. Until the update " +
+        "finishes, visitors continue seeing the current photos."));
     });
   }
 
@@ -1471,13 +1464,14 @@ var AROMATI_ADMIN = (function () {
     Object.keys(PAGE_NAMES).forEach(function (page) {
       if (!byPage[page]) return;
 
-      Object.keys(byPage[page]).forEach(function (section) {
+      Object.keys(byPage[page]).forEach(function (section, sectionIndex) {
         var rows = byPage[page][section];
         var id = "copy:" + page + ":" + section;
 
         out.push({
           id: id,
           group: PAGE_NAMES[page],
+          division: page === "food" && sectionIndex === 0,
           label: section,
           count: plural(rows.length, "field", "fields"),
           changed: rows.filter(function (r) { return rowChanged("site_copy", r); }).length,
@@ -1536,14 +1530,37 @@ var AROMATI_ADMIN = (function () {
   /* Closing a day has to clear its times. The database will not accept a
      closed day that still has them, and neither will the constraint that says
      so — this is not a convenience, it is the only state that saves. */
-  function setClosed(row, isClosed) {
+  function setClosed(row, isClosed, rerender) {
     row.is_closed = isClosed;
     if (isClosed) { row.opens_at = null; row.closes_at = null; }
     else {
       if (!row.opens_at) row.opens_at = "07:00:00";
       if (!row.closes_at) row.closes_at = "22:00:00";
     }
-    renderAll();
+    if (rerender !== false) renderAll();
+  }
+
+  /* The usual week stays in place while a day changes state. Keeping both
+     visual states in one grid cell lets the time fields fade and settle rather
+     than making the whole editor rebuild around the checkbox. */
+  function syncWeekAvailability(line, times, shut, fields, row) {
+    var isClosed = !!row.is_closed;
+    line.classList.toggle("hours__row--shut", isClosed);
+    times.setAttribute("aria-hidden", isClosed ? "true" : "false");
+    shut.setAttribute("aria-hidden", isClosed ? "false" : "true");
+
+    if (isClosed) times.setAttribute("inert", "");
+    else times.removeAttribute("inert");
+
+    fields.forEach(function (field) {
+      var value = field.col === "opens_at" ? row.opens_at : row.closes_at;
+      field.input.value = toInputTime(value);
+      field.input.disabled = isClosed;
+      var toggle = field.wrap.querySelector(".timefield__toggle");
+      if (toggle) toggle.disabled = isClosed;
+      if (isClosed && field.picker) field.picker.close(false);
+      field.refresh();
+    });
   }
 
   function hoursSections() {
@@ -1559,7 +1576,7 @@ var AROMATI_ADMIN = (function () {
         changed: days.filter(function (r) { return rowChanged("business_hours", r); }).length,
         describe: "The hours you keep every week. They drive the open/closed " +
           "pill on the home page, the table under Visit, the footer, the mobile " +
-          "menu and what Google is told — change them here and all five update " +
+          "menu and the information sent to Google. Change them here and all five update " +
           "together.",
         render: renderWeek
       },
@@ -1599,30 +1616,38 @@ var AROMATI_ADMIN = (function () {
       var line = el("div", "hours__row" + (row.is_closed ? " hours__row--shut" : ""));
       line.appendChild(el("span", "hours__day", name));
 
+      var times = el("div", "hours__times");
+      var shut = el("span", "hours__shut", "Closed all day");
+      var fields;
+
       var closed = makeCheck("Closed all day", row.is_closed, function (isClosed) {
-        setClosed(row, isClosed);
+        setClosed(row, isClosed, false);
+        syncWeekAvailability(line, times, shut, fields, row);
+        updateSavebar();
       });
       closed.wrap.className = "check check--bare";
       line.appendChild(closed.wrap);
 
-      if (row.is_closed) {
-        line.appendChild(el("span", "hours__shut", "Closed all day"));
-      } else {
-        addTimes(line, [
-          makeField({
-            table: "business_hours", row: row, col: "opens_at",
-            cardId: "hours:week", tab: "hours", extra: "field--bare",
-            label: "Opens on " + name, type: "time", value: toInputTime(row.opens_at),
-            onInput: function (v) { row.opens_at = v ? v + ":00" : null; }
-          }),
-          makeField({
-            table: "business_hours", row: row, col: "closes_at",
-            cardId: "hours:week", tab: "hours", extra: "field--bare",
-            label: "Closes on " + name, type: "time", value: toInputTime(row.closes_at),
-            onInput: function (v) { row.closes_at = v ? v + ":00" : null; }
-          })
-        ]);
-      }
+      fields = addTimes(times, [
+        makeField({
+          table: "business_hours", row: row, col: "opens_at",
+          cardId: "hours:week", tab: "hours", extra: "field--bare",
+          label: "Opens on " + name, type: "time", value: toInputTime(row.opens_at),
+          onInput: function (v) { row.opens_at = v ? v + ":00" : null; }
+        }),
+        makeField({
+          table: "business_hours", row: row, col: "closes_at",
+          cardId: "hours:week", tab: "hours", extra: "field--bare",
+          label: "Closes on " + name, type: "time", value: toInputTime(row.closes_at),
+          onInput: function (v) { row.closes_at = v ? v + ":00" : null; }
+        })
+      ]);
+
+      var availability = el("div", "hours__availability");
+      availability.appendChild(times);
+      availability.appendChild(shut);
+      line.appendChild(availability);
+      syncWeekAvailability(line, times, shut, fields, row);
 
       grid.appendChild(line);
     });
@@ -1760,8 +1785,7 @@ var AROMATI_ADMIN = (function () {
               table: "site_settings", row: row, col: "value",
               cardId: id, tab: "contact",
               label: row.label,
-              help: row.is_editable ? row.help
-                : (row.help ? row.help + " This one is not editable here." : "Not editable here."),
+              help: row.is_editable ? row.help : null,
               disabled: !row.is_editable,
               value: row.value,
               onInput: function (value, field) {
@@ -1825,6 +1849,16 @@ var AROMATI_ADMIN = (function () {
     return String(item.name || "").toLowerCase().indexOf(needle) >= 0 ||
            String(item.description || "").toLowerCase().indexOf(needle) >= 0 ||
            String(item.tag || "").toLowerCase().indexOf(needle) >= 0;
+  }
+
+  function matchesBuilderSearch(option) {
+    if (!ui.search) return true;
+    var needle = ui.search.toLowerCase();
+    return String(option.label || "").toLowerCase().indexOf(needle) >= 0 ||
+           String(option.hint || "").toLowerCase().indexOf(needle) >= 0 ||
+           String(option.price || "").toLowerCase().indexOf(needle) >= 0 ||
+           String(builderGroupLabel(option.group_key) || "").toLowerCase()
+             .indexOf(needle) >= 0;
   }
 
   function renumber(rows) {
@@ -1930,7 +1964,7 @@ var AROMATI_ADMIN = (function () {
     var search = el("div", "search");
     var input = el("input", "search__input");
     input.type = "search";
-    input.placeholder = "Find an item on this page…";
+    input.placeholder = "Find an item or choice on this page…";
     input.value = ui.search;
     on(input, "input", function () {
       ui.search = input.value;
@@ -1989,22 +2023,42 @@ var AROMATI_ADMIN = (function () {
     host.appendChild(add);
   }
 
-  /* Only the section on screen has its items in the document, so a search that
-     matched inside another one would find nothing a person could see. Two
-     passes: hide the item rows that do not match in the section on screen, and
-     dim the index rows whose sections hold no match at all. The count is over
-     the whole page either way, because that is the question being asked. */
+  /* Only the section on screen has its entries in the document, so a search
+     that matched inside another one would find nothing a person could see.
+     Two passes: hide the item or builder-choice rows that do not match in the
+     section on screen, and dim the index rows whose sections hold no match at
+     all. The count is over the whole page either way, because that is the
+     question being asked. */
   function applyMenuSearch() {
     rowsOf("menu_items").forEach(function (item) {
       var node = document.querySelector('[data-item="' + item.id + '"]');
       if (node) node.hidden = !!ui.search && !matchesSearch(item);
     });
 
-    var total = 0, matched = 0;
+    rowsOf("menu_builder_options").forEach(function (option) {
+      var node = document.querySelector('[data-builder-option="' + option.id + '"]');
+      if (node) node.hidden = !!ui.search && !matchesBuilderSearch(option);
+    });
+
+    BUILDER_GROUPS.forEach(function (group) {
+      var node = document.querySelector('[data-builder-group="' + group.key + '"]');
+      if (node) {
+        var hasMatch = builderOptions(group.key).some(matchesBuilderSearch);
+        node.hidden = !!ui.search && !hasMatch;
+      }
+    });
+
+    var total = 0, matched = 0, itemTotal = 0, choiceTotal = 0;
     coursesOn(ui.menuPage).forEach(function (course) {
       var items = itemsIn(course.id);
-      var hits = items.filter(matchesSearch).length;
-      total += items.length;
+      var choices = course.is_static && course.static_id === "build"
+        ? rowsOf("menu_builder_options") : [];
+      var hits = choices.length
+        ? choices.filter(matchesBuilderSearch).length
+        : items.filter(matchesSearch).length;
+      itemTotal += items.length;
+      choiceTotal += choices.length;
+      total += items.length + choices.length;
       matched += hits;
       var row = document.querySelector('[data-section="course:' + course.id + '"]');
       if (row) row.hidden = !!ui.search && hits === 0;
@@ -2012,8 +2066,11 @@ var AROMATI_ADMIN = (function () {
 
     var note = document.querySelector(".search__note");
     if (note) {
+      var noun = choiceTotal
+        ? (itemTotal ? "items and choices" : "choices")
+        : "items";
       note.textContent = ui.search
-        ? matched + " of " + total + " items on this page match “" + ui.search + "”"
+        ? matched + " of " + total + " " + noun + " on this page match “" + ui.search + "”"
         : "";
     }
 
@@ -2055,8 +2112,8 @@ var AROMATI_ADMIN = (function () {
           ? "A block with a fixed layout and editable choices for the base, bagel " +
             "varieties and add-ons. Its position can also be moved with the arrows."
           : "One block on the " + pageName.toLowerCase() + ", with its own heading " +
-            "and its own filter tab. Type prices without the dollar sign — the " +
-            "site adds it, and 7.50 stays 7.50 instead of becoming 7.5.",
+            "and its own filter tab. Prices stay exactly as typed, so 7.50 remains " +
+            "7.50 instead of becoming 7.5.",
         extra: function (row) { row.appendChild(courseMoves(course, courses)); },
         render: function (host) { renderCourse(host, course); }
       };
@@ -2146,6 +2203,7 @@ var AROMATI_ADMIN = (function () {
   function renderBuilderGroup(host, group) {
     var options = builderOptions(group.key);
     var wrap = el("div", "pours builder-group");
+    wrap.setAttribute("data-builder-group", group.key);
     wrap.appendChild(el("p", "pours__title", group.label));
     wrap.appendChild(el("span", "field__help", group.help));
     options.forEach(function (option) {
@@ -2224,8 +2282,8 @@ var AROMATI_ADMIN = (function () {
       table: "menu_courses", row: course, col: "course_key",
       cardId: cardId, tab: "menu",
       label: "Filter name", value: course.course_key,
-      help: "Lowercase letters, numbers and dashes. It is not shown to anyone — " +
-            "it is how the tab knows which items to show.",
+      help: "Use lowercase letters, numbers and dashes only. This name is not shown " +
+            "to anyone. It connects the tab to the items it should show.",
       onInput: function (v) { course.course_key = v; }
     }).wrap);
 
@@ -2449,9 +2507,9 @@ var AROMATI_ADMIN = (function () {
     body.appendChild(makeField({
       table: "menu_items", row: item, col: "tag",
       cardId: "course:" + course.id, openId: "item:" + item.id, tab: "menu",
-      label: "Qualifier", value: item.tag || "",
-      placeholder: "2022 · 750 ml · 7 toppings",
-      help: "The small note beside the name, if there is one. Leave empty for none.",
+      label: "Short note beside the name", value: item.tag || "",
+      placeholder: "2022 · 750 ml · serves 2 · 7 toppings",
+      help: "Optional small text shown beside the item name. Leave empty for none.",
       onInput: function (v) { item.tag = v ? v : null; }
     }).wrap);
 
@@ -2498,7 +2556,7 @@ var AROMATI_ADMIN = (function () {
         table: "menu_items", row: item, col: "price",
         cardId: "course:" + course.id, openId: "item:" + item.id, tab: "menu",
         label: "Price", value: item.price || "", placeholder: "21",
-        help: "Without the dollar sign. 7.50 and 21 both stay exactly as typed.",
+        help: "7.50 and 21 both stay exactly as typed.",
         onInput: function (v) { item.price = v; }
       }).wrap);
     } else if (shape === "all") {
@@ -2530,9 +2588,10 @@ var AROMATI_ADMIN = (function () {
     /* ── pours ── */
     var pours = poursOf(item.id);
     var poursWrap = el("div", "pours");
-    poursWrap.appendChild(el("p", "pours__title", "Other pours or sizes"));
+    poursWrap.appendChild(el("p", "pours__title", "Additional priced options"));
     poursWrap.appendChild(el("span", "field__help",
-      "Extra priced lines under the item, like “Bottle 60”. Leave empty for none."));
+      "Optional label-and-price lines under the item, such as “Glass 14”, " +
+      "“Bottle 60” or “Add chicken 4”."));
 
     pours.forEach(function (pour) {
       var row = el("div", "pour");
@@ -2556,7 +2615,7 @@ var AROMATI_ADMIN = (function () {
       poursWrap.appendChild(row);
     });
 
-    var addPour = el("button", "btn btn--small btn--add", "Add a pour");
+    var addPour = el("button", "btn btn--small btn--add", "Add a priced option");
     addPour.type = "button";
     on(addPour, "click", function () {
       draft.menu_item_pours.push({
@@ -2571,7 +2630,7 @@ var AROMATI_ADMIN = (function () {
     if (item.options_dom_id) {
       body.appendChild(el("p", "static",
         "This item has an expandable list of options on the site. That list is not " +
-        "editable here yet — ask a developer to change it."));
+        "editable here yet. Ask a developer to change it."));
     }
 
     /* Deliberately the last thing before Delete. Nine times in ten the owner
@@ -2584,8 +2643,8 @@ var AROMATI_ADMIN = (function () {
       renderAll();
     }).wrap);
     hideWrap.appendChild(el("span", "field__help",
-      "Hidden items come off the site at the next save and keep everything they " +
-      "have — the description, the price, the extra lines. Untick to put it back. " +
+      "Hidden items come off the site at the next save. They keep their description, " +
+      "price and extra lines. Untick to put the item back. " +
       "Use this rather than Delete for anything that might return."));
     body.appendChild(hideWrap);
 
@@ -2754,7 +2813,7 @@ var AROMATI_ADMIN = (function () {
 
   var HEIC_MESSAGE =
     "That is a HEIC file, which is what an iPhone saves by default and which no " +
-    "browser can open. The photograph itself is fine — it just needs to come out " +
+    "browser can open. The photograph itself is fine, but it needs to be saved " +
     "as a JPEG. On the phone: Settings → Camera → Formats → Most Compatible for " +
     "new photos, or open this one, tap Share, choose Options and turn on Most " +
     "Compatible.";
@@ -2795,19 +2854,24 @@ var AROMATI_ADMIN = (function () {
       groups[prefix].push(row);
     });
 
+    var otherPagesStarted = false;
     return order.map(function (prefix) {
       var group = groups[prefix];
       var id = "photos:" + prefix;
-      var where = HOME_PHOTO_GROUPS[prefix] ? "Home page" : "Other pages";
+      var isHomePage = !!HOME_PHOTO_GROUPS[prefix];
+      var where = isHomePage ? "Home page" : "Other pages";
+      var division = !isHomePage && !otherPagesStarted;
+      if (!isHomePage) otherPagesStarted = true;
       return {
         id: id,
         group: where,
+        division: division,
         label: PHOTO_GROUPS[prefix] || prefix,
         count: plural(group.length, "photo", "photos"),
         changed: group.filter(function (r) { return rowChanged("photos", r); }).length,
-        describe: "The photographs in the " + (PHOTO_GROUPS[prefix] || prefix) +
-          " block. Choosing a new one does not change the site until you press " +
-          "Save, and “Put the original back” is always available.",
+        describe: "The photographs used in the " + (PHOTO_GROUPS[prefix] || prefix) +
+          " block. Choose a new image below, adjust its framing, and save when " +
+          "it looks right.",
         render: function (host) {
           var card = makeCard(null);
           group.forEach(function (row) { card.body.appendChild(renderPhoto(row, id)); });
@@ -2866,18 +2930,18 @@ var AROMATI_ADMIN = (function () {
 
     function describeState() {
       if (row._upload) {
-        view.say("Ready to upload — " + row._upload.width + " × " + row._upload.height +
+        view.say("Ready to upload: " + row._upload.width + " × " + row._upload.height +
                  ", " + kb(row._upload.bytes) + ". Nothing has been sent yet.", "new");
         shapeWarning(row, view);
         return;
       }
       if (row.storage_path) {
-        view.say("Uploaded" + (row.width ? " — " + row.width + " × " + row.height : "") + ".");
+        view.say("Uploaded" + (row.width ? ": " + row.width + " × " + row.height : "") + ".");
         return;
       }
       var seed = builtIn(row.slot);
       view.say("The photograph the site was built with" +
-               (seed && seed.width ? " — " + seed.width + " × " + seed.height : "") + ".");
+               (seed && seed.width ? ": " + seed.width + " × " + seed.height : "") + ".");
     }
 
     /* ── choose a file ── */
@@ -2942,10 +3006,16 @@ var AROMATI_ADMIN = (function () {
 
     /* ── the description ── */
     if (row.is_decorative) {
-      side.appendChild(el("p", "field__help",
-        "This one is background — it sits behind a scrim and a screen reader is " +
-        "told to ignore it, so it needs no description. Whatever goes here should " +
-        "be texture rather than something a reader would want described."));
+      var backgroundFor = {
+        menuFood: "the Food menu",
+        menuDrinks: "the Drinks menu",
+        menuWine: "the Wine list",
+        wine: "the Wine Bar section"
+      }[String(row.slot).split(".")[0]];
+      if (backgroundFor) {
+        side.appendChild(el("p", "field__help",
+          "This is the background image behind " + backgroundFor + "."));
+      }
     } else {
       side.appendChild(makeField({
         table: "photos", row: row, col: "alt",
@@ -2997,8 +3067,8 @@ var AROMATI_ADMIN = (function () {
     view.problem(
       "This photograph is a very different shape from the one it replaces (" +
       shapeName(now) + " against " + shapeName(was) + "). The space on the page " +
-      "does not change shape to fit, so the picture will be cropped to fill it — " +
-      "worth looking at the page before you save."
+      "does not change shape to fit, so the picture will be cropped to fill it. " +
+      "Check the page before you save."
     );
   }
 
@@ -3164,7 +3234,7 @@ var AROMATI_ADMIN = (function () {
     var makeBitmap = window.createImageBitmap;
     if (typeof makeBitmap !== "function") {
       view.problem("This browser cannot resize a photograph before uploading it. " +
-                   "Chrome, Safari and Firefox all can — try one of those.");
+                   "Chrome, Safari and Firefox support this. Try one of those.");
       return;
     }
 
@@ -3313,7 +3383,7 @@ var AROMATI_ADMIN = (function () {
 
     if (typeof window.createImageBitmap !== "function") {
       view.problem("This browser cannot open a photograph for framing. " +
-                   "Chrome, Safari and Firefox all can — try one of those.");
+                   "Chrome, Safari and Firefox support this. Try one of those.");
       return;
     }
 
@@ -3435,8 +3505,8 @@ var AROMATI_ADMIN = (function () {
           "the photograph to choose what sits inside it, and zoom in to crop " +
           "closer. What you see here is what the site shows."
         : "This space changes shape with the window, so nothing here can be an " +
-          "exact preview — the shape offered first is the one it is usually " +
-          "closest to. Drag the photograph to move it, zoom in to crop closer, " +
+          "exact preview. The first shape offered is usually the closest match. " +
+          "Drag the photograph to move it, zoom in to crop closer, " +
           "and keep anything that matters away from the edges."));
 
       var shapes = null;
@@ -3794,14 +3864,7 @@ var AROMATI_ADMIN = (function () {
 
   function faqNote() {
     return makeNote(function (node) {
-      node.appendChild(el("strong", null, "The FAQ page is still undecided. "));
-      node.appendChild(document.createTextNode(
-        "The eighteen questions on it today are placeholder text written by the " +
-        "studio, and the page itself carries a notice saying so. Nothing has been " +
-        "moved into the editor yet. Dropping the page would waste the work, and " +
-        "rewriting it would waste it twice. Say the word and the questions get " +
-        "transcribed, or the page gets removed. Until then, anything added here " +
-        "goes live on the site as soon as it is saved."));
+      node.appendChild(el("strong", null, "The FAQ page is still undecided."));
     });
   }
 
@@ -3917,7 +3980,7 @@ var AROMATI_ADMIN = (function () {
     var names = withOptions.map(function (i) { return "“" + (i.name || "an item") + "”"; });
     return "\n\n" + (names.length === 1 ? names[0] + " has" : names.join(", ") + " have") +
       " an expandable list of options on the site. That list is deleted too, and " +
-      "it cannot be rebuilt here — it would take a developer to put it back.";
+      "it cannot be rebuilt here. A developer would need to put it back.";
   }
 
   function deleteCourse(course) {
@@ -4033,8 +4096,8 @@ var AROMATI_ADMIN = (function () {
 
       field.setNote("This takes an extra line " + where + " (" +
         worse[0].after + " instead of " + worse[0].before +
-        "). Nothing breaks, but the section below it moves down — worth a look " +
-        "at the page before you save.", true);
+        "). Nothing breaks, but the section below it moves down. Check the page " +
+        "before you save.", true);
     });
   }
 
@@ -4443,7 +4506,7 @@ var AROMATI_ADMIN = (function () {
       var item = findRow("menu_items", row.item_id);
       var course = item ? findRow("menu_courses", item.course_id) : null;
       return menuChild(course, (item ? item.name : "An item") + " · " +
-                               (row.label || "a pour"));
+                               (row.label || "a priced option"));
     }
     if (table === "menu_builder_options") {
       var build = rowsOf("menu_courses").filter(function (course) {
@@ -4494,7 +4557,7 @@ var AROMATI_ADMIN = (function () {
                        description: "Description", price: "Price", prices: "Price per size",
                        is_hidden: "Hidden from the site", price_all_sizes: "One price across sizes",
                        no_price: "No price", sort_order: "Position" },
-    menu_item_pours: { item_id: "Item", label: "Pour", price: "Price", sort_order: "Position" },
+    menu_item_pours: { item_id: "Item", label: "Option", price: "Price", sort_order: "Position" },
     menu_builder_options: { group_key: "Group", label: "Menu label", price: "Price",
                             hint: "Short description", is_hidden: "Hidden from the site",
                             sort_order: "Position" },
@@ -4554,7 +4617,7 @@ var AROMATI_ADMIN = (function () {
     if (table === "hours_exceptions") return was.on_date ? String(was.on_date) : "A date";
     if (table === "menu_courses") return was.heading || "(untitled section)";
     if (table === "menu_items") return was.name || "(unnamed item)";
-    if (table === "menu_item_pours") return was.label || "a pour";
+    if (table === "menu_item_pours") return was.label || "a priced option";
     if (table === "menu_builder_options") return was.label || "a choice";
     if (table === "faq_entries") return was.question || "(a question)";
     return "A row";
@@ -5155,15 +5218,52 @@ var AROMATI_ADMIN = (function () {
     });
   }
 
+  function setPublishConfirm(open, returnFocus) {
+    var root = byId("publishControl");
+    var panel = byId("publishConfirm");
+    var trigger = byId("publishBtn");
+    var cancel = byId("publishCancel");
+    if (!root || !panel || !trigger) return;
+
+    root.classList.toggle("is-open", open);
+    panel.setAttribute("aria-hidden", open ? "false" : "true");
+    trigger.setAttribute("aria-expanded", open ? "true" : "false");
+
+    if (open) {
+      nextFrame(function () {
+        if (panel.getAttribute("aria-hidden") === "false" && cancel) cancel.focus();
+      });
+    } else if (returnFocus && !trigger.disabled) {
+      trigger.focus();
+    }
+  }
+
   function publish() {
     var btn = byId("publishBtn");
     if (!btn || btn.disabled) return;
 
     if (changeCount() > 0) {
-      publishMessage("Save your changes first — publishing builds the site from what is saved.", true);
+      setPublishConfirm(false, false);
+      publishMessage("Save your changes first. Publishing builds the site from saved content.", true);
       return;
     }
 
+    setPublishConfirm(true, false);
+  }
+
+  function startPublish() {
+    var btn = byId("publishBtn");
+    if (!btn || btn.disabled) return;
+
+    /* Recheck at the irreversible edge rather than trusting that nothing
+       changed while the question was open. */
+    if (changeCount() > 0) {
+      setPublishConfirm(false, false);
+      publishMessage("Save your changes first. Publishing builds the site from saved content.", true);
+      return;
+    }
+
+    setPublishConfirm(false, true);
     btn.disabled = true;
     publishMessage("Publishing…", false);
 
@@ -5193,6 +5293,29 @@ var AROMATI_ADMIN = (function () {
          this design rather than an edge case. Do not promise more. */
       publishMessage("Publishing. The site updates in about a minute.", false);
     }, refused);
+  }
+
+  function wirePublishConfirm() {
+    var root = byId("publishControl");
+    var trigger = byId("publishBtn");
+    var cancel = byId("publishCancel");
+    var confirm = byId("publishConfirmBtn");
+    if (!root || !trigger || !cancel || !confirm) return;
+
+    on(trigger, "click", publish);
+    on(cancel, "click", function () { setPublishConfirm(false, true); });
+    on(confirm, "click", startPublish);
+    on(document, "mousedown", function (e) {
+      if (!root.contains(e.target)) setPublishConfirm(false, false);
+    });
+    on(document, "focusin", function (e) {
+      if (!root.contains(e.target)) setPublishConfirm(false, false);
+    });
+    on(document, "keydown", function (e) {
+      if (e.key !== "Escape" ||
+          byId("publishConfirm").getAttribute("aria-hidden") !== "false") return;
+      setPublishConfirm(false, true);
+    });
   }
 
   function discard() {
@@ -5327,7 +5450,7 @@ var AROMATI_ADMIN = (function () {
     }).catch(function (err) {
       bootMessage("Signed in, but the content would not load: " +
                   ((err && err.message) || err) +
-                  " The site itself is unaffected — visitors are still being served " +
+                  " The site itself is unaffected. Visitors are still being served " +
                   "from what is cached and from the files in the repository.", true);
     });
   }
@@ -5386,8 +5509,8 @@ var AROMATI_ADMIN = (function () {
         !/^https:\/\//.test(String(AROMATI_CONFIG.url || "")) ||
         String(AROMATI_CONFIG.anonKey || "").length <= 20) {
       bootMessage("config.js has no project in it, so there is nothing to sign in to. " +
-                  "The public site is fine — it falls back to the content stored in the " +
-                  "repository — but the editor needs a project URL and a publishable key.", true);
+                  "The public site still works because it falls back to content stored in " +
+                  "the repository. The editor needs a project URL and a publishable key.", true);
       return;
     }
 
@@ -5413,7 +5536,7 @@ var AROMATI_ADMIN = (function () {
     restoreSections();
     wireGate();
     wirePublishHelp();
-    on(byId("publishBtn"), "click", publish);
+    wirePublishConfirm();
     on(byId("signOut"), "click", signOut);
     on(byId("saveBtn"), "click", save);
     on(byId("discardBtn"), "click", discard);

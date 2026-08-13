@@ -153,8 +153,18 @@ button{ font-family: inherit; }
   background: var(--maroon-900); color: var(--cream);
 }
 .topbar__brand{
-  font: 500 20px/1 var(--serif);
-  letter-spacing: .04em;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  width: 96px;
+  height: 100%;
+}
+.topbar__brand img{
+  display: block;
+  width: 96px;
+  height: auto;
+  max-height: 46px;
+  filter: brightness(0) invert(1);
 }
 .topbar__who{ font-size: 13px; color: rgba(247,242,234,.66); }
 .topbar__spacer{ flex: 1 1 auto; }
@@ -234,6 +244,50 @@ button{ font-family: inherit; }
 .topbar__help-tip strong{ color: var(--maroon-800); font-weight: 600; }
 .topbar__help-tip p{ margin: 0; }
 .topbar__help-tip p + p{ margin-top: 10px; }
+
+/* The last step before a rebuild is deliberately small and local to the
+   Publish button. It is still a dialog to assistive technology, but visually
+   it behaves like a short anchored question rather than a page-blocking
+   browser alert. */
+.topbar__publish{
+  position: relative; z-index: 11;
+  display: inline-flex; flex: 0 0 auto;
+}
+.publish-confirm{
+  position: absolute; z-index: 45;
+  top: calc(100% + 10px); right: 0;
+  width: min(232px, calc(100vw - 28px));
+  padding: 14px 14px 13px;
+  border: 1px solid var(--line-input); border-radius: 10px;
+  background: var(--card); color: var(--ink);
+  box-shadow: 0 14px 34px rgba(42,26,21,.18);
+  opacity: 0; visibility: hidden; pointer-events: none;
+  transform: translateY(-4px) scale(.985);
+  transform-origin: top right;
+  transition: opacity 180ms ease, transform 180ms var(--ease),
+    visibility 0s linear 180ms;
+}
+.publish-confirm::before{
+  content: ""; position: absolute;
+  right: 36px; bottom: 100%;
+  width: 9px; height: 9px;
+  border-left: 1px solid var(--line-input);
+  border-top: 1px solid var(--line-input);
+  background: var(--card); transform: translateY(5px) rotate(45deg);
+}
+.topbar__publish.is-open .publish-confirm{
+  opacity: 1; visibility: visible; pointer-events: auto; transform: none;
+  transition-delay: 0s;
+}
+.publish-confirm__title{
+  margin: 0; text-align: center;
+  color: var(--maroon-800); font-size: 14px; font-weight: 600;
+}
+.publish-confirm__actions{
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px; margin-top: 12px;
+}
+.publish-confirm__actions .btn{ width: 100%; padding: 8px 10px; }
 
 #publishBtn,
 #signOut{
@@ -435,6 +489,11 @@ button{ font-family: inherit; }
   margin: 14px 0 6px; padding: 0 8px;
 }
 .index__group:first-child{ margin-top: 4px; }
+.index__division{
+  margin: 20px 8px 10px;
+  border-top: 2px solid var(--maroon-600);
+}
+.index__division + .index__group{ margin-top: 0; }
 
 .index__row{
   position: relative; z-index: 1;
@@ -778,13 +837,56 @@ button{ font-family: inherit; }
   border-bottom: 1px solid var(--line);
 }
 .hours__row:last-child{ border-bottom: 0; padding-bottom: 0; }
-.hours__day{ font-size: 15px; font-weight: 500; }
+.hours__day{
+  font-size: 15px;
+  font-weight: 500;
+  transition: color 220ms var(--ease);
+}
 .hours__row--shut .hours__day{ color: var(--ink-soft); }
-.hours__shut{
+.hours__availability{
+  position: relative;
   grid-column: span 2;
-  font-size: 13px; color: var(--ink-faint);
+  display: grid;
+  grid-template-areas: "state";
+  min-width: 0;
+}
+.hours__times,
+.hours__shut{
+  grid-area: state;
+  transition:
+    opacity 220ms var(--ease),
+    transform 220ms var(--ease),
+    visibility 0s linear 220ms;
+}
+.hours__times{
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  min-width: 0;
+  transition-delay: 0s, 0s, 0s;
+}
+.hours__shut{
+  align-self: center;
+  font-size: 13px;
+  color: var(--ink-faint);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(4px);
+}
+.hours__row--shut .hours__times{
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px);
+  transition-delay: 0s, 0s, 220ms;
+}
+.hours__row--shut .hours__shut{
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  transition-delay: 45ms, 45ms, 0s;
 }
 .hours__row > .field{ margin: 0; min-width: 0; }
+.hours__times > .field{ margin: 0; min-width: 0; }
 
 .row{ display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
 .row > .field{ flex: 1 1 160px; margin-top: 12px; }
@@ -1494,7 +1596,8 @@ body.is-framing{ overflow: hidden; }
   .hours__day{ grid-column: 1 / -1; }
   .check--bare{ grid-column: 1 / -1; }
   .check--bare span{ font-size: 14px; }
-  .hours__shut{ grid-column: 1 / -1; }
+  .hours__availability{ grid-column: 1 / -1; }
+  .hours__times{ gap: 10px; }
 
   .row--hours{
     display: grid;
@@ -1512,6 +1615,8 @@ body.is-framing{ overflow: hidden; }
 
 @media (max-width: 620px){
   .topbar{ gap: 10px; padding: 0 14px; }
+  .topbar__brand,
+  .topbar__brand img{ width: 82px; }
   .topbar__who{ display: none; }
   .topbar__link span:first-child{ font-size: 12px; }
   .topbar__help-tip{
@@ -1531,13 +1636,14 @@ body.is-framing{ overflow: hidden; }
   .is-settling{ transition: none; }
   .app--enter .topbar__link, .app--enter #signOut{ animation: none; }
   .topbar__link-go, #signOut, #signOut::before,
-  .topbar__help-btn, .topbar__help-tip{ transition: none; }
+  .topbar__help-btn, .topbar__help-tip, .publish-confirm{ transition: none; }
   .tab__dot, .tab__dot--leaving,
   .field--edited > .field__label::after, .field--edited-leaving > .field__label::after{
     animation: none;
   }
   .editor__page--enter, .index__list--enter{ animation: none; }
-  .item__body, .tpick, .tpick__cols{ transition: none; }
+  .item__body, .tpick, .tpick__cols,
+  .hours__day, .hours__times, .hours__shut{ transition: none; }
   .tpick__cols{ transform: none; }
   .tpick__opt{ transition: none; }
   .tpick__opt--on{ animation: none; }

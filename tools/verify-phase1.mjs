@@ -44,6 +44,26 @@ const INTENDED = [
   { page: "index.html", was: "Book a Table", now: "Reserve a Table",
     why: "renamed on request, 2026-08-01" },
 
+  { page: "index.html", was: "Georgian kitchen, all day", now: "Georgian kitchen",
+    why: "menu summary shortened on request, 2026-08-12" },
+  { page: "faq.html", was: "Georgian kitchen, all day", now: "Georgian kitchen",
+    why: "menu summary shortened on request, 2026-08-12" },
+  { page: "menu-food.html", was: "Georgian kitchen, all day", now: "Georgian kitchen",
+    why: "menu summary shortened on request, 2026-08-12" },
+  { page: "menu-drinks.html", was: "Georgian kitchen, all day", now: "Georgian kitchen",
+    why: "menu summary shortened on request, 2026-08-12" },
+  { page: "menu-wine.html", was: "Georgian kitchen, all day", now: "Georgian kitchen",
+    why: "menu summary shortened on request, 2026-08-12" },
+
+  { page: "index.html",
+    was: "Everything comes out of the open kitchen on the ground floor. Khachapuri is blistered to order and khinkali is pleated by hand.",
+    now: "Everything comes out of the open kitchen on the ground floor. Khachapuri is blistered to order, with Georgian favorites served all day.",
+    why: "unverified preparation claim replaced on request, 2026-08-12" },
+  { page: "menu-food.html",
+    was: "Everything comes out of the open kitchen on the ground floor. Khachapuri is blistered to order and khinkali is pleated by hand. Served all day.",
+    now: "Everything comes out of the open kitchen on the ground floor. Khachapuri is blistered to order, with Georgian favorites served all day.",
+    why: "unverified preparation claim replaced on request, 2026-08-12" },
+
   /* The café's address changed, on every page that prints it. Five entries and
      not one, because a rewrite is scoped to a page on purpose: an allowance
      that applied everywhere would go on forgiving this string on a page that
@@ -91,7 +111,13 @@ const REMOVED = [
   /* Same day, same reason, on the hero: the seven letters of AROMATI and the
      gold "Café ✦ Wine Bar" under them are both inside the lockup now. */
   { page: "index.html", sel: ".hero__title", why: "hero wordmark is the lockup, 2026-08-06" },
-  { page: "index.html", sel: ".hero__sub",   why: "the lockup carries this line, 2026-08-06" }
+  { page: "index.html", sel: ".hero__sub",   why: "the lockup carries this line, 2026-08-06" },
+
+  { page: "index.html",       sel: ".studio-credit", why: "portfolio credit removed on request, 2026-08-12" },
+  { page: "faq.html",         sel: ".studio-credit", why: "portfolio credit removed on request, 2026-08-12" },
+  { page: "menu-food.html",   sel: ".studio-credit", why: "portfolio credit removed on request, 2026-08-12" },
+  { page: "menu-drinks.html", sel: ".studio-credit", why: "portfolio credit removed on request, 2026-08-12" },
+  { page: "menu-wine.html",   sel: ".studio-credit", why: "portfolio credit removed on request, 2026-08-12" }
 ];
 
 /* Content added since the baseline, named by selector rather than by the words

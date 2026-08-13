@@ -532,4 +532,5 @@ Migrations: `supabase/migrations/20260801000000_init_cms.sql`,
 `supabase/migrations/20260806000000_sizes_max_3.sql` and
 `supabase/migrations/20260806000100_allowlist_second_editor.sql` and
 `supabase/migrations/20260812000100_breakfast_builder.sql` and
-`supabase/migrations/20260812000200_menu_course_hidden.sql`.
+`supabase/migrations/20260812000200_menu_course_hidden.sql` and
+`supabase/migrations/20260812000300_smooth_admin_validation_copy.sql`.

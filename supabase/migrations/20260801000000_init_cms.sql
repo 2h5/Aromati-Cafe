@@ -158,7 +158,7 @@ declare
   v text := btrim(new.value);
 begin
   if new.key = 'phone_digits' and v !~ '^[0-9]{10}$' then
-    raise exception 'The phone number needs exactly 10 digits and nothing else — no spaces, brackets or dashes. For (332) 207-3847 enter 3322073847.';
+    raise exception 'The phone number needs exactly 10 digits with no spaces, brackets or dashes. For (332) 207-3847 enter 3322073847.';
   end if;
 
   if new.key = 'phone_country' and v !~ '^[0-9]{1,3}$' then
@@ -172,7 +172,7 @@ begin
 
   if new.key = 'instagram_handle' then
     if v ~ '^@' then
-      raise exception 'Leave the @ off the Instagram handle — enter aromatinyc, not @aromatinyc. The site adds the @ where it shows one.';
+      raise exception 'Leave the @ off the Instagram handle. Enter aromatinyc, not @aromatinyc. The site adds the @ where it shows one.';
     end if;
     if v !~ '^[A-Za-z0-9._]{1,30}$' then
       raise exception 'An Instagram handle can only use letters, numbers, dots and underscores.';
@@ -182,7 +182,7 @@ begin
   -- Delivery links. Loose on purpose: these are whole URLs pasted out of a
   -- browser, and the only thing worth insisting on is that it is a link.
   if new.key ~ '^order_[a-z0-9]+_url$' and length(v) > 0 and v !~ '^https://' then
-    raise exception 'An ordering link has to be the whole web address, starting with https:// — paste it from the address bar. To remove the service from the site, clear this field instead.';
+    raise exception 'Paste the full ordering link from the address bar. It must start with https://. To remove the service from the site, clear this field instead.';
   end if;
 
   if new.key = 'address_region' and v !~ '^[A-Z]{2}$' then
@@ -197,7 +197,7 @@ begin
   -- in it. The one exception is an ordering link: blank is how the owner says
   -- the café has left that service, and the site removes the link.
   if new.is_editable and length(v) = 0 and new.key !~ '^order_[a-z0-9]+_url$' then
-    raise exception 'The field "%" cannot be left empty — it appears on every page.', new.label;
+    raise exception 'The field "%" cannot be left empty because it appears on every page.', new.label;
   end if;
 
   return new;

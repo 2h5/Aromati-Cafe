@@ -51,7 +51,37 @@ function check(what, got, want) {
 
 const ADMIN_JS = readFileSync("admin.js", "utf8");
 const ADMIN_CSS = readFileSync("admin.css", "utf8");
+const ADMIN_HTML = readFileSync("admin.html", "utf8");
 const MIGRATION = readFileSync("supabase/migrations/20260801000000_init_cms.sql", "utf8");
+
+function withoutCodeComments(source) {
+  return source
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "");
+}
+
+console.log("\nthe owner-facing copy");
+{
+  const jsCopy = withoutCodeComments(ADMIN_JS).replaceAll('"—"', "");
+  const htmlCopy = ADMIN_HTML.replace(/<!--[\s\S]*?-->/g, "");
+  const databaseMessages = (MIGRATION.match(/raise exception[\s\S]*?;/g) || []).join("\n");
+
+  check("uses no em dash as sentence punctuation in the editor", jsCopy.includes("—"), false);
+  check("uses none in the visible editor shell", htmlCopy.includes("—"), false);
+  check("and keeps the database's fallback messages equally clear",
+        databaseMessages.includes("—"), false);
+}
+
+console.log("\nthe editor brand");
+{
+  const shell = new JSDOM(ADMIN_HTML).window.document;
+  const logo = shell.querySelector(".topbar__brand img");
+  check("uses the transparent vector lockup in the top-left brand slot",
+        [logo && logo.getAttribute("src"), logo && logo.getAttribute("alt")],
+        ["assets/logos/aromati-lockup.svg", "Aromati café wine bar"]);
+  check("renders the existing artwork in white without baking a background into it",
+        ADMIN_CSS.includes("filter: brightness(0) invert(1)"), true);
+}
 
 
 /* ═══ the fixture ═══════════════════════════════════════════════════════════
@@ -199,6 +229,15 @@ function fakeSupabase(data, log, opts) {
     rpc: (name) => {
       log.push({ what: "rpc", name });
       return Promise.resolve({ data: name === "is_owner" ? opts.isOwner !== false : null, error: null });
+    },
+
+    functions: {
+      invoke: (name, options) => {
+        log.push({ what: "invoke", name, options });
+        return Promise.resolve(opts.refusePublish
+          ? { data: null, error: { message: opts.refusePublish } }
+          : { data: {}, error: null });
+      }
     },
 
     /* The bucket. upload() and remove() are the only two methods admin.js
@@ -700,8 +739,8 @@ console.log("\nthe messages the owner sees exist once, in two places");
 
   /* The one message that carries a substitution, checked on its own so the
      filter above cannot hide it. */
-  const withLabel = /The field "%" cannot be left empty — it appears on every page\./.test(MIGRATION);
-  const inJs = ADMIN_JS.includes('cannot be left empty — it appears on every page.');
+  const withLabel = /The field "%" cannot be left empty because it appears on every page\./.test(MIGRATION);
+  const inJs = ADMIN_JS.includes('cannot be left empty because it appears on every page.');
   check("the empty-field sentence matches too", [withLabel, inJs], [true, true]);
 }
 
@@ -741,6 +780,51 @@ console.log("\nthe gate");
 }
 
 
+console.log("\nthe shortened helper copy");
+{
+  const r = await boot();
+  await r.signIn();
+  r.tab("Contact");
+  r.section("How Google files the business");
+  const locked = r.fieldShowing("CafeOrCoffeeShop").closest(".field");
+  check("a disabled setting does not explain a control the owner cannot use",
+        [locked.querySelector(".field__input").disabled,
+         !!locked.querySelector(".field__help")], [true, false]);
+
+  r.tab("FAQ");
+  check("the FAQ notice is only its first sentence",
+        r.q("#panels .note").textContent.trim(),
+        "The FAQ page is still undecided.");
+}
+
+console.log("\nthe Words page index");
+{
+  const data = fixture();
+  data.site_copy.push({
+    id: "c3", key: "menuFood.title", page: "food", section: "Food menu",
+    label: "Page title", help: null, value: "The Food Menu",
+    max_length: null, sort_order: 3
+  });
+  data.site_copy.push({
+    id: "c4", key: "menuFood.note", page: "food", section: "Food note",
+    label: "Page note", help: null, value: "Served daily",
+    max_length: null, sort_order: 4
+  });
+  const r = await boot({ data });
+  await r.signIn();
+  const division = r.q(".index__division");
+  const divisions = r.all(".index__division");
+  const groups = r.all(".index__group");
+  check("adds one unlabelled divider before the Food menu area",
+        [divisions.length,
+         division.textContent,
+         groups[0].textContent,
+         groups[1].textContent,
+         division.nextElementSibling === groups[1]],
+        [1, "", "Home page", "Food menu", true]);
+}
+
+
 console.log("\nthe publishing explanation");
 {
   const r = await boot();
@@ -759,6 +843,83 @@ console.log("\nthe publishing explanation");
 
   r.doc.dispatchEvent(new r.window.MouseEvent("mousedown", { bubbles: true }));
   check("clicking elsewhere closes it", button.getAttribute("aria-expanded"), "false");
+}
+
+console.log("\npublishing requires a deliberate confirmation");
+{
+  const r = await boot();
+  await r.signIn();
+  const button = r.q("#publishBtn");
+  button.click();
+  await settle();
+
+  const panel = r.q("#publishConfirm");
+  check("Publish opens a small anchored dialog instead of a browser confirmation",
+        [panel.getAttribute("aria-hidden"), panel.getAttribute("role"),
+         button.getAttribute("aria-expanded"), r.confirms()],
+        ["false", "dialog", "true", []]);
+  check("the popout is only a concise confirmation",
+        [r.q("#publishConfirmTitle").textContent,
+         r.q("#publishConfirmBtn").textContent,
+         /500|quota|cannot be cancelled/i.test(panel.textContent)],
+        ["Publish now?", "Confirm", false]);
+  check("the safer action receives focus first",
+        r.doc.activeElement.id, "publishCancel");
+  check("opening it sends no publish request",
+        r.log.filter((entry) => entry.what === "invoke"), []);
+
+  r.q("#publishCancel").click();
+  check("Cancel closes the popout, returns focus, and sends nothing",
+        [panel.getAttribute("aria-hidden"), button.getAttribute("aria-expanded"),
+         r.doc.activeElement.id,
+         r.log.filter((entry) => entry.what === "invoke")],
+        ["true", "false", "publishBtn", []]);
+
+  button.click();
+  await settle();
+  r.doc.dispatchEvent(new r.window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  check("Escape closes it too",
+        [panel.getAttribute("aria-hidden"), r.doc.activeElement.id], ["true", "publishBtn"]);
+
+  button.click();
+  await settle();
+  r.doc.body.dispatchEvent(new r.window.MouseEvent("mousedown", { bubbles: true }));
+  check("and clicking elsewhere dismisses it without publishing",
+        [panel.getAttribute("aria-hidden"),
+         r.log.filter((entry) => entry.what === "invoke")], ["true", []]);
+}
+
+{
+  const r = await boot();
+  await r.signIn();
+  r.q("#publishBtn").click();
+  await settle();
+  r.q("#publishConfirmBtn").click();
+  await settle();
+
+  check("Publish now starts exactly one rebuild",
+        r.log.filter((entry) => entry.what === "invoke")
+          .map((entry) => [entry.name, entry.options.method]),
+        [["publish-site", "POST"]]);
+  check("and closes the popout while keeping the existing in-progress message",
+        [r.q("#publishConfirm").getAttribute("aria-hidden"),
+         r.q("#publishMsg").textContent],
+        ["true", "Publishing. The site updates in about a minute."]);
+}
+
+{
+  const r = await boot();
+  await r.signIn();
+  r.type(r.fieldShowing("Aromati, from the Georgian word for *aroma*."), "Unsaved words");
+  r.q("#publishBtn").click();
+  await settle();
+
+  check("unsaved changes are still blocked before opening the confirmation",
+        [r.q("#publishConfirm").getAttribute("aria-hidden"),
+         r.log.filter((entry) => entry.what === "invoke")], ["true", []]);
+  check("and the owner is still told to save first",
+        r.q("#publishMsg").textContent,
+        "Save your changes first. Publishing builds the site from saved content.");
 }
 
 
@@ -840,7 +1001,7 @@ console.log("\nwhat it will not save");
 
   check("a badly-formed phone number blocks the save", r.writes(), []);
   check("in the database's own words", r.problems(), [
-    "The phone number needs exactly 10 digits and nothing else — no spaces, brackets or dashes. For (332) 207-3847 enter 3322073847."
+    "The phone number needs exactly 10 digits with no spaces, brackets or dashes. For (332) 207-3847 enter 3322073847."
   ]);
 }
 
@@ -852,7 +1013,7 @@ console.log("\nwhat it will not save");
   await r.save();
   check("an ordering link that is not https is refused", r.writes(), []);
   check("and says what to paste instead",
-        r.problems()[0].startsWith("An ordering link has to be the whole web address"), true);
+        r.problems()[0].startsWith("Paste the full ordering link from the address bar"), true);
 }
 
 {
@@ -1083,8 +1244,34 @@ console.log("\nan ordinary item is not warned about a list it does not have");
   check("no mention of options", /options/.test(r.confirms()[0] || ""), false);
 }
 
+console.log("\nmenu item extras use wording that fits every menu");
+{
+  const r = await boot();
+  await r.signIn();
+  r.tab("Menus");
+  r.q(".item__head").click();
+
+  const body = r.q(".item__body");
+  check("the optional note says where it appears",
+        r.all(".item__body .field__label").map((node) => node.textContent)
+          .includes("Short note beside the name"), true);
+  check("extra label-and-price lines use generic wording",
+        [body.querySelector(".pours__title").textContent,
+         body.querySelector(".pours .field__help").textContent,
+         body.querySelector(".pours .btn--add").textContent],
+        ["Additional priced options",
+         "Optional label-and-price lines under the item, such as “Glass 14”, " +
+           "“Bottle 60” or “Add chicken 4”.",
+         "Add a priced option"]);
+  check("the shared item editor no longer calls the control a pour",
+        /\bpour/i.test(body.textContent), false);
+}
+
 console.log("\nthe section that is built into the page");
 {
+  check("the menu editor gives no outdated dollar-sign instructions",
+        /dollar sign/i.test(ADMIN_JS), false);
+
   const r = await boot({
     data: Object.assign(fixture(), {
       menu_courses: [{ id: "k9", page: "food", course_key: "breakfast", tab_label: "Breakfast",
@@ -1121,6 +1308,24 @@ console.log("\nthe section that is built into the page");
         r.all(".pours .btn--add").length, 3);
   check("and the seeded builder fields are present",
         r.all(".pours .field").length > 0, true);
+
+  const search = r.q(".search__input");
+  check("the menu search names builder choices in its prompt",
+        search.placeholder.includes("choice"), true);
+  r.type(search, "cream cheese");
+  check("the search keeps the matching builder choice visible",
+        r.all(".builder-option").filter((row) => !row.hidden)
+          .map((row) => row.querySelector(".field__input").value), ["Cream cheese"]);
+  check("and hides builder groups with no matching choices",
+        r.all("[data-builder-group]").filter((group) => !group.hidden)
+          .map((group) => group.getAttribute("data-builder-group")), ["add"]);
+  check("and counts choices instead of reporting an empty item search",
+        r.q(".search__note").textContent,
+        "1 of 4 choices on this page match “cream cheese”");
+  r.type(search, "");
+  check("clearing the search restores every builder choice and group",
+        [r.all(".builder-option").filter((row) => !row.hidden).length,
+         r.all("[data-builder-group]").filter((group) => !group.hidden).length], [4, 3]);
 
   const added = r.all(".btn--add").find((b) => b.textContent === "Add a topping");
   added.click();
@@ -1182,6 +1387,10 @@ console.log("\nthe fixed bagel relationship stays usable");
 }
 
 console.log("\nhours");
+check("the open and closed states have a targeted transition and a reduced-motion fallback",
+      [ADMIN_CSS.includes("opacity 220ms var(--ease)"),
+       ADMIN_CSS.includes(".hours__day, .hours__times, .hours__shut{ transition: none; }")],
+      [true, true]);
 {
   const r = await boot();
   await r.signIn();
@@ -1198,9 +1407,45 @@ console.log("\nhours");
   const r = await boot();
   await r.signIn();
   r.tab("Hours");
-  /* Tuesday is closed in the fixture, so it shows no time boxes at all — the
-     state the CHECK constraint requires, rather than boxes that cannot save. */
-  check("a closed day shows no times to fill in", r.all("#panels input[type=time]").length, 2);
+  /* Tuesday keeps its time controls in the animated layer, but they are inert,
+     disabled and hidden from assistive technology while the day is closed. */
+  const tuesday = r.all(".hours__row")[1];
+  const unavailable = [...tuesday.querySelectorAll('input[type="time"]')];
+  check("a closed day keeps its times out of use",
+        [tuesday.classList.contains("hours__row--shut"),
+         tuesday.querySelector(".hours__times").hasAttribute("inert"),
+         tuesday.querySelector(".hours__times").getAttribute("aria-hidden"),
+         unavailable.every((input) => input.disabled)],
+        [true, true, "true", true]);
+}
+
+{
+  const r = await boot();
+  await r.signIn();
+  r.tab("Hours");
+  const monday = r.all(".hours__row")[0];
+  const checkbox = monday.querySelector('input[type="checkbox"]');
+  const times = [...monday.querySelectorAll('input[type="time"]')];
+
+  checkbox.click();
+  check("closing a day changes the existing row instead of rebuilding it",
+        r.all(".hours__row")[0] === monday, true);
+  check("the time controls move into the animated closed state",
+        [monday.classList.contains("hours__row--shut"),
+         monday.querySelector(".hours__times").getAttribute("aria-hidden"),
+         times.every((input) => input.disabled)],
+        [true, "true", true]);
+
+  checkbox.click();
+  check("reopening the day uses the same smooth state change",
+        [r.all(".hours__row")[0] === monday,
+         monday.classList.contains("hours__row--shut"),
+         monday.querySelector(".hours__times").getAttribute("aria-hidden"),
+         times.map((input) => input.value),
+         times.every((input) => !input.disabled)],
+        [true, false, "false", ["07:00", "22:00"], true]);
+  check("and returning to the original hours leaves nothing unsaved",
+        r.q("#saveBtn").disabled, true);
 }
 
 /* The picker replaces the browser's dropdown, so the field it writes into has
@@ -1250,7 +1495,12 @@ console.log("\nhours");
   const r = await boot({ mobile: true });
   await r.signIn();
   r.tab("Hours");
-  check("mobile keeps the native time inputs", r.all("#panels input[type=time]").length, 2);
+  const mobileTimes = r.all("#panels input[type=time]");
+  check("mobile keeps native time inputs ready for both open and closed days",
+        [mobileTimes.length,
+         mobileTimes.filter((input) => !input.disabled).length,
+         mobileTimes.filter((input) => input.disabled).length],
+        [4, 2, 2]);
   check("mobile does not add the desktop picker", r.all(".timefield__toggle").length, 0);
   check("mobile has no desktop picker panels", r.all(".tpick").length, 0);
 }
@@ -1458,23 +1708,65 @@ console.log("\nthe photographs, before anything has been uploaded");
   r.tab("Photos");
 
   check("both slots are listed", r.all(".index__row").length, 2);
+  check("the page gives the short photo publishing workflow",
+        r.q(".note").textContent,
+        "Photos require Publish. Save all your photo changes and review them here, " +
+        "then press Publish once at the top of the page to update the site. Until " +
+        "the update finishes, visitors continue seeing the current photos.");
+  check("the block description explains the work without obsolete restoration copy",
+        [r.q(".editor__lede").textContent,
+         /Put the original back/.test(r.q(".editor__lede").textContent)],
+        ["The photographs used in the Opening block. Choose a new image below, " +
+         "adjust its framing, and save when it looks right.", false]);
 
   const hero = r.photo("The photograph behind the opening headline");
   check("showing the photograph the site was built with",
         hero.querySelector(".photo__img").getAttribute("src"),
         "assets/web/hero-dining.jpg");
   check("and saying so", hero.querySelector(".photo__state").textContent,
-        "The photograph the site was built with — 1535 × 1024.");
+        "The photograph the site was built with: 1535 × 1024.");
   check("with the description offered for editing",
         hero.querySelector(".field__area").value, "The upstairs dining room");
 
   const backdrop = r.photo("The Wine Bar — the background behind the section");
   check("the backdrop is offered no description box",
         backdrop.querySelector(".field__area, .field__input"), null);
-  check("and says why", backdrop.querySelector(".field__help").textContent.includes(
-        "a screen reader is told to ignore it"), true);
+  check("and describes its role plainly", backdrop.querySelector(".field__help").textContent,
+        "This is the background image behind the Wine Bar section.");
 
   check("nothing has been sent by looking at any of it", r.sent(), []);
+}
+
+console.log("\nthe other-page photograph index");
+{
+  const data = fixture();
+  data.photos.push(
+    { id: "ph3", slot: "faq.masthead", label: "FAQ page — the banner photograph",
+      storage_path: null, source_path: null, alt: "", width: 1023, height: 1537,
+      is_decorative: true, sort_order: 30 },
+    { id: "ph4", slot: "menuFood.masthead", label: "Food menu — the banner photograph",
+      storage_path: null, source_path: null, alt: "", width: 1747, height: 900,
+      is_decorative: true, sort_order: 40 }
+  );
+  const r = await boot({ data });
+  await r.signIn();
+  r.tab("Photos");
+
+  const divisions = r.all(".index__division");
+  const groups = r.all(".index__group");
+  check("adds one unlabelled divider above Other pages",
+        [divisions.length, divisions[0].textContent,
+         divisions[0].nextElementSibling === groups[1], groups[1].textContent],
+        [1, "", true, "Other pages"]);
+
+  r.section("FAQ");
+  check("gives the FAQ background no unnecessary description",
+        r.photo("FAQ page — the banner photograph").querySelector(".field__help"), null);
+
+  r.section("Food");
+  check("describes a menu background in plain language",
+        r.photo("Food menu — the banner photograph").querySelector(".field__help").textContent,
+        "This is the background image behind the Food menu.");
 }
 
 console.log("\npicking a photograph");
@@ -1498,7 +1790,7 @@ console.log("\npicking a photograph");
      the band is usually closest to first. */
   check("framed to the shape of the space, and the size said out loud",
         after.querySelector(".photo__state").textContent,
-        "Ready to upload — 2000 × 1125, 110 KB. Nothing has been sent yet.");
+        "Ready to upload: 2000 × 1125, 110 KB. Nothing has been sent yet.");
 
   await r.save();
 
@@ -1582,7 +1874,7 @@ console.log("\nthe framing box");
   await r.frame("use");
   check("what comes out is in the frame's own ratio, 3:2",
         r.photo("The Idea — the upper photograph").querySelector(".photo__state").textContent,
-        "Ready to upload — 2000 × 1333, 130 KB. Nothing has been sent yet.");
+        "Ready to upload: 2000 × 1333, 130 KB. Nothing has been sent yet.");
 }
 
 console.log("\nframing a photograph that is already in the slot");
@@ -1689,7 +1981,7 @@ console.log("\nframing a photograph that is already in the slot");
   check("the new framing is what the slot is holding",
         r.photo("The photograph behind the opening headline")
           .querySelector(".photo__state").textContent
-          .startsWith("Ready to upload — 1950 × 1950"), true);
+          .startsWith("Ready to upload: 1950 × 1950"), true);
 
   await r.save();
   const uploads = r.uploads();
@@ -1915,7 +2207,7 @@ console.log("\na photograph taken with the phone on its side");
   check("it comes out the right way up",
         r.photo("The photograph behind the opening headline")
           .querySelector(".photo__state").textContent
-          .startsWith("Ready to upload — 1500 × 2000"), true);
+          .startsWith("Ready to upload: 1500 × 2000"), true);
 
   /* 2600 is the working edge, not the published one: the turn is applied when
      the file is decoded, and the framing box works on that copy. */
