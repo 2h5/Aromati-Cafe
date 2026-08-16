@@ -137,7 +137,10 @@ const ADDED = [
   { page: "index.html",        sel: "[data-order-group]", why: "delivery links, 2026-08-01" },
   { page: "menu-food.html",    sel: "[data-order-group]", why: "delivery links, 2026-08-01" },
   { page: "menu-drinks.html",  sel: "[data-order-group]", why: "delivery links, 2026-08-01" },
-  { page: "menu-wine.html",    sel: "[data-order-group]", why: "delivery links, 2026-08-01" }
+  { page: "menu-wine.html",    sel: "[data-order-group]", why: "delivery links, 2026-08-01" },
+  { page: "index.html",        sel: "#reservationPanel", why: "OpenTable-ready reservation modal, 2026-08-16" },
+  { page: "index.html",        sel: "#navReserve", why: "desktop reservation trigger, 2026-08-16" },
+  { page: "index.html",        sel: "#mobileReserve", why: "mobile-menu reservation trigger, 2026-08-16" }
 ];
 
 /* Content the owner has since replaced outright. The subtree is cut from BOTH
@@ -300,6 +303,13 @@ for (const page of PAGES) {
   dropReseeded(shapeAfter, page);
   for (const remove of REMOVED.filter((r) => r.page === page && r.structure)) {
     for (const n of shapeBefore.querySelectorAll(remove.sel)) n.parentNode.removeChild(n);
+  }
+  /* An intentional addition can carry structural facts too — the reservation
+     modal adds a real tel: CTA. Remove added subtrees from the new side for the
+     same reason their text was removed above: this comparison protects the
+     pre-conversion page; new feature behavior is outside that baseline. */
+  for (const add of ADDED.filter((r) => r.page === page)) {
+    for (const n of shapeAfter.querySelectorAll(add.sel)) n.parentNode.removeChild(n);
   }
 
   const sa = shape(shapeBefore), sb = shape(shapeAfter);

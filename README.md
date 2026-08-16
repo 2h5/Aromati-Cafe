@@ -87,6 +87,62 @@ The menu pages are flat in the root on purpose — every relative path is then
 identical to `index.html`, which is what keeps `file://` working with no
 surprises. Pretty URLs are a hosting rewrite later, not a file move.
 
+### Adding OpenTable
+
+The Reserve a Table button already opens a finished, large reservation modal
+with a temporary call-to-book message. Because the modal is a viewport layer,
+opening it never changes the Visit section or moves its photograph. When
+OpenTable supplies the restaurant's embed:
+
+1. Generate the widget with **Load the widget in an iFrame** enabled. Choose
+   OpenTable's **Wide** style rather than **Standard** when it is available; the
+   standard example is only 224 × 301 pixels.
+2. In `index.html`, find `OPENTABLE WIDGET START`.
+3. Replace only `.reservation__placeholder` with OpenTable's exact generated
+   `<script>` tag. Keep `#opentableWidgetSlot` and the surrounding modal. The
+   slot centers the generated iframe and constrains it on small screens.
+4. Run `npm run check:csp`, then test one complete reservation path on desktop
+   and mobile. The public-page CSP already permits the official
+   `www.opentable.com` script and iframe host; if OpenTable's generated code uses
+   a different host, add that exact host to `_headers` before deploying.
+
+The modal can provide more room, but CSS outside a cross-origin iframe cannot
+redesign or safely stretch the booking controls inside it. Use OpenTable's
+**Wide** theme to actually fill the larger space; pasting a **Standard** widget
+will work, but its provider-controlled UI will remain visually compact.
+
+### Reservation and navigation behavior
+
+The reservation experience is deliberately kept as a viewport layer so the
+site underneath never reflows:
+
+- **Triggers:** `#navReserve` sits in the desktop masthead before Instagram,
+  `#mobileReserve` lives in the mobile drawer, and `#bookBtn` remains in Visit.
+  All three use `data-reservation-trigger`, so replacing the placeholder does
+  not require changing the trigger wiring.
+- **Modal motion:** the backdrop fades in before the card, the close control is
+  centered in its circular button, and the card/backdrop animate out before the
+  panel is removed. Escape and backdrop clicks close it, and focus returns to
+  the initiating control.
+- **Scroll ownership:** opening the modal compensates for the document
+  scrollbar and pauses Lenis, so the page does not shift underneath it. The
+  modal slot is marked `data-lenis-prevent`; an eventual OpenTable iframe can
+  therefore scroll internally without handing wheel events to the page.
+- **Mobile masthead:** at touch widths the fixed masthead slides away while the
+  reservation layer is open and returns only after the close motion settles.
+  The mobile drawer's own scroll area is also Lenis-prevented, which keeps mouse
+  wheels on a narrow desktop viewport inside the drawer. During its close, the
+  drawer track is visually hidden while the document track returns, preventing
+  two side-by-side scrollbars; the drawer's scroll position is preserved.
+- **Desktop navigation:** section links and the logo close an open reservation
+  surface before their normal in-page jump. Reserve, Instagram and the Menus
+  dropdown remain independent controls.
+
+Closing the modal does not recreate `#opentableWidgetSlot`, so an iframe's
+in-page selections remain mounted while the page is open. Those selections are
+not copied into localStorage and may reset if OpenTable navigates the iframe or
+the page is refreshed.
+
 ---
 
 ## Where each kind of content lives

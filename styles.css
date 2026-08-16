@@ -324,6 +324,10 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
 }
 .nav.in{ opacity:1; transform:none; }
 .nav.hidden{ transform:translateY(-110%); }
+/* On touch widths the reservation surface replaces the page, so the fixed
+   masthead should leave with the drawer instead of floating above the modal.
+   JS removes this state only after the close motion has settled. */
+.nav.reservation-modal-hidden{ transform:translateY(-110%); pointer-events:none; }
 .nav.scrolled{
   background:rgba(244,237,225,.9);
   -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px);
@@ -377,6 +381,21 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
   transition:background .4s, color .4s, border-color .4s;
 }
 .nav__cta:hover{ background:var(--gold); border-color:var(--gold); color:var(--ink); }
+.nav__reserve{
+  display:inline-flex; align-items:center; justify-content:center;
+  min-height:38px; padding:10px 20px;
+  background:var(--gold); border-color:var(--gold); color:var(--ink);
+  font-family:var(--sans); cursor:pointer;
+  box-shadow:0 8px 24px rgba(30,8,9,.14);
+  transition:background .35s var(--ease), border-color .35s var(--ease),
+             color .35s var(--ease), transform .35s var(--ease), box-shadow .35s var(--ease);
+}
+.nav__reserve:hover{
+  background:var(--cream); border-color:var(--cream); color:var(--ink);
+  transform:translateY(-2px); box-shadow:0 12px 28px rgba(30,8,9,.2);
+}
+.nav.scrolled .nav__reserve:hover{ background:var(--wine); border-color:var(--wine); color:var(--cream); }
+.nav__reserve:focus-visible{ outline:2px solid var(--gold); outline-offset:3px; }
 .nav__ig{
   display:grid; place-items:center; width:38px; height:38px;
   position:relative; isolation:isolate; overflow:hidden;
@@ -550,11 +569,23 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
     radial-gradient(95% 62% at 4% 104%, rgba(201,163,92,.14), transparent 62%),
     linear-gradient(180deg, #3a1214 0%, var(--oxblood-deep) 46%, #200809 100%);
   border-bottom:1px solid rgba(201,163,92,.5);
-  box-shadow:0 26px 70px rgba(15,4,5,.55);
-  transition:transform .52s var(--ease-exp);
+  /* The panel is already a full-viewport sheet. Its shadow is useful while it
+     is parked over the page, but leaving it on the sheet during the retract
+     paints a dark shelf under the masthead for a beat after the motion ends.
+     Start transparent and let the open state bring it in on the same clock as
+     the sheet; the close therefore takes the shadow with it instead of cutting
+     it off when the visibility delay expires. */
+  box-shadow:0 26px 70px rgba(15,4,5,0);
+  transition:transform .52s var(--ease-exp),
+             box-shadow .52s var(--ease);
 }
 .mmenu.open .mmenu__wash{ transform:none; transition:transform .7s var(--ease-exp); }
-.mmenu.open .mmenu__panel{ transform:none; transition:transform .74s var(--ease-exp) .08s; }
+.mmenu.open .mmenu__panel{
+  transform:none;
+  box-shadow:0 26px 70px rgba(15,4,5,.55);
+  transition:transform .74s var(--ease-exp) .08s,
+             box-shadow .52s var(--ease);
+}
 
 .mmenu__inner{
   position:relative; z-index:1;
@@ -568,6 +599,13 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
   padding:calc(env(safe-area-inset-top, 0px) + 104px) var(--pad)
           calc(env(safe-area-inset-bottom, 0px) + 30px);
 }
+/* The document scrollbar is restored as soon as the close starts. Hide the
+   drawer's own track for that exit frame so a narrow desktop viewport never
+   shows two vertical scrollbars side by side. Keep the scrollport itself alive
+   rather than switching to `clip`: that preserves the drawer's scroll position
+   and prevents its contents from snapping to the top while the sheet retracts. */
+.mmenu:not(.open) .mmenu__inner{ scrollbar-width:none; }
+.mmenu:not(.open) .mmenu__inner::-webkit-scrollbar{ display:none; }
 
 /* ── section links ──
    The word rides up out of a mask with a degree of rotation on it, which makes
@@ -643,6 +681,25 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
 .mmenu__row a:hover, .mmenu__row a:active{ background:var(--gold); border-color:var(--gold); color:var(--oxblood-deep); }
 .mmenu__row a.is-on{ background:var(--gold); border-color:var(--gold); color:var(--oxblood-deep); }
 
+.mmenu__reserve{
+  --d:.73s;
+  display:flex; align-items:center; justify-content:space-between; width:100%;
+  border:1px solid var(--gold); border-radius:14px; padding:15px 18px;
+  background:var(--gold); color:var(--oxblood-deep); cursor:pointer;
+  font-family:var(--sans); font-size:11px; font-weight:700;
+  letter-spacing:.2em; text-transform:uppercase;
+  opacity:0; transform:translateY(14px) scale(.97);
+  transition:opacity .22s var(--ease), transform .22s var(--ease),
+             background .35s var(--ease), color .35s var(--ease);
+}
+.mmenu.open .mmenu__reserve{
+  opacity:1; transform:none;
+  transition:opacity .55s var(--ease) var(--d), transform .85s var(--ease-exp) var(--d),
+             background .35s var(--ease), color .35s var(--ease);
+}
+.mmenu__reserve:hover, .mmenu__reserve:active{ background:var(--cream); color:var(--ink); }
+.mmenu__reserve:focus-visible{ outline:2px solid var(--cream); outline-offset:3px; }
+
 /* ── footer block ── */
 .mmenu__foot{
   position:relative;
@@ -664,9 +721,9 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
   opacity:1; transform:none;
   transition:opacity .55s var(--ease) var(--d), transform .8s var(--ease-exp) var(--d);
 }
-.mmenu__foot > *:nth-child(1){ --d:.74s; }
-.mmenu__foot > *:nth-child(2){ --d:.79s; }
-.mmenu__foot > *:nth-child(3){ --d:.84s; }
+.mmenu__foot > *:nth-child(1){ --d:.80s; }
+.mmenu__foot > *:nth-child(2){ --d:.85s; }
+.mmenu__foot > *:nth-child(3){ --d:.90s; }
 /* Tone lives in the colour's alpha, not in `opacity`. `.mmenu__foot > *` above
    parks every child at opacity:0 to stage the entry, and it is a single class —
    so a plain `opacity` here ties on specificity, wins on source order, and the
@@ -2425,10 +2482,9 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
 }
 .visit__media{ position:relative; min-height:100%; }
 .visit__media[data-reveal-img]{ clip-path:inset(0); opacity:1; }
-/* The storefront is tall; on very wide screens the column would otherwise
-   stretch the panel. Sticking the image lets the panel set the height. */
+/* The panel sets the section height; the photograph simply fills it. */
 /* focal point is the sign and the doorway, a little right of centre */
-.visit__media img{ position:sticky; top:0; height:100vh; max-height:100%; object-position:56% 52%; }
+.visit__media img{ position:absolute; inset:0; height:100%; object-position:56% 52%; }
 .visit__panel{
   display:flex; justify-content:flex-start;
   padding:clamp(56px,7vw,104px) clamp(28px,4.6vw,84px);
@@ -2518,16 +2574,164 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
   font-size:14.5px; opacity:.55; line-height:1.5;
 }
 .visit__actions{ display:flex; gap:14px; flex-wrap:wrap; margin-top:clamp(30px,4vw,44px); }
-/* placeholder reply under the actions — holds no space until it has something
-   to say, then fades up rather than shoving the footer down abruptly */
-.visit__note{
-  font-family:var(--serif); font-style:italic; font-size:15px; line-height:1.5;
-  color:var(--gold); opacity:0; max-height:0; margin-top:0;
-  transform:translateY(6px);
-  transition:opacity .5s var(--ease), transform .55s var(--ease-exp),
-             max-height .5s var(--ease), margin-top .5s var(--ease);
+
+/* ── OpenTable-ready reservation modal ─────────
+   This is a viewport layer, not a disclosure inside Visit: the page beneath it
+   never reflows. OpenTable owns only __slot, which is intentionally wide enough
+   for its Wide iframe theme and safely scrolls in a short viewport. */
+.reservation{
+  position:fixed; inset:0; z-index:220;
+  display:grid; place-items:center; padding:clamp(12px,3vw,36px);
+  color:var(--cream); visibility:hidden; pointer-events:none;
+  overscroll-behavior:none;
 }
-.visit__note.is-on{ opacity:.85; transform:none; max-height:4em; margin-top:18px; }
+.reservation[hidden]{ display:none; }
+.reservation.is-ready{ visibility:visible; pointer-events:auto; }
+/* Removing the root scrollbar normally gives the page ten extra pixels of
+   width. That re-centres the nav and can re-wrap sections above the current
+   scroll position, producing both the sideways and vertical jump visible
+   behind the modal. JS records the exact gutter before locking the root; these
+   two compensations keep the document and fixed nav on their original grid. */
+html.reservation-open body{ padding-right:var(--reservation-scrollbar,0px); }
+html.reservation-open .nav{ right:var(--reservation-scrollbar,0px); }
+.reservation__backdrop{
+  position:absolute; inset:0;
+  background:rgba(24,8,9,.86);
+  -webkit-backdrop-filter:blur(12px) saturate(.78);
+  backdrop-filter:blur(12px) saturate(.78);
+  opacity:0; transform:translateZ(0);
+  transition:opacity .42s cubic-bezier(.4,0,.2,1);
+  will-change:opacity;
+}
+.reservation.is-open .reservation__backdrop{ opacity:1; }
+.reservation__dialog{
+  position:relative; z-index:1;
+  display:flex; flex-direction:column;
+  width:min(1040px,100%); height:min(720px,calc(100svh - clamp(24px,6vw,72px)));
+  min-height:min(560px,calc(100svh - 24px)); overflow:hidden;
+  border:1px solid rgba(244,237,225,.24); border-radius:24px;
+  background:
+    radial-gradient(circle at 8% 0%, rgba(203,161,88,.15), transparent 31%),
+    linear-gradient(145deg, #411416 0%, #2b0c0e 58%, #21090b 100%);
+  box-shadow:0 38px 110px rgba(8,2,3,.54);
+  opacity:0; transform:translateY(28px) scale(.975);
+  transition:opacity .36s var(--ease), transform .56s var(--ease-exp);
+  transition-delay:0s;
+  will-change:transform,opacity;
+}
+.reservation.is-open .reservation__dialog{
+  opacity:1; transform:none; transition-delay:.09s;
+}
+.reservation__dialog:focus{ outline:none; }
+.reservation__head{
+  display:flex; align-items:flex-start; justify-content:space-between;
+  gap:28px; padding:clamp(24px,3vw,36px) clamp(24px,4vw,50px) clamp(20px,2.4vw,28px);
+  border-bottom:1px solid var(--hairline-lt);
+}
+.reservation__eyebrow{
+  display:block; margin-bottom:7px; color:var(--gold);
+  font-size:10.5px; font-weight:700; letter-spacing:.3em; text-transform:uppercase;
+}
+.reservation__head h3{
+  margin:0; font-family:var(--serif); font-size:clamp(34px,4vw,52px);
+  font-weight:400; line-height:1.05; letter-spacing:-.025em;
+}
+.reservation__head p{
+  margin-top:8px; font-size:14px; font-weight:300; letter-spacing:.015em; opacity:.58;
+}
+.reservation__close{
+  position:relative; display:grid; place-items:center;
+  flex:0 0 auto; width:44px; height:44px;
+  border:1px solid var(--hairline-lt); border-radius:50%; padding:0;
+  background:transparent; color:var(--cream); cursor:pointer;
+  transition:background .35s var(--ease), color .35s var(--ease), transform .35s var(--ease);
+}
+.reservation__close span{ font-size:0; }
+.reservation__close::before,
+.reservation__close::after{
+  content:""; position:absolute; top:50%; left:50%;
+  width:12px; height:1.5px; border-radius:2px; background:currentColor;
+  transform:translate(-50%,-50%) rotate(45deg);
+}
+.reservation__close::after{ transform:translate(-50%,-50%) rotate(-45deg); }
+.reservation__close:hover{ background:var(--cream); color:var(--ink); transform:rotate(8deg); }
+.reservation__close:focus-visible,
+.reservation__phone:focus-visible{ outline:2px solid var(--gold); outline-offset:3px; }
+.reservation__slot{
+  display:grid; place-items:center; flex:1 1 auto; min-height:0; overflow:auto;
+  padding:clamp(28px,4vw,54px) clamp(24px,5vw,64px); text-align:center;
+  overscroll-behavior:contain;
+}
+/* OpenTable's recommended embed renders a fixed-size iframe. These rules keep
+   the generated Wide version centered and stop it overflowing a narrow phone.
+   The provider still controls the layout inside the cross-origin iframe. */
+.reservation__slot > iframe,
+.reservation__slot > div:not(.reservation__placeholder){ display:block; max-width:100%; margin-inline:auto; }
+.reservation__slot > iframe{ border:0; }
+.reservation__placeholder{
+  display:grid; grid-template-columns:auto minmax(0,1fr) minmax(220px,.62fr);
+  align-items:center; gap:clamp(22px,3.4vw,46px); width:100%; text-align:left;
+}
+.reservation__placeholder-mark{
+  display:grid; place-items:center; width:72px; height:72px;
+  border:1px solid rgba(203,161,88,.65); border-radius:50%; color:var(--gold);
+  box-shadow:inset 0 0 0 7px rgba(203,161,88,.045);
+  font-family:var(--serif); font-size:22px; letter-spacing:-.04em;
+}
+.reservation__placeholder-kicker,
+.reservation__placeholder-call > span{
+  display:block; margin-bottom:9px; color:var(--gold);
+  font-size:9.5px; font-weight:700; letter-spacing:.25em; text-transform:uppercase;
+}
+.reservation__placeholder strong{
+  display:block; font-family:var(--serif); font-size:clamp(24px,2.7vw,34px);
+  font-weight:400; line-height:1.08; letter-spacing:-.02em;
+}
+.reservation__placeholder p{ max-width:500px; margin-top:12px; font-size:14px; line-height:1.65; opacity:.62; }
+.reservation__placeholder-call{
+  align-self:stretch; display:flex; flex-direction:column; justify-content:center;
+  padding-left:clamp(22px,3vw,40px); border-left:1px solid var(--hairline-lt);
+}
+.reservation__phone{
+  align-self:flex-start; color:var(--cream); font-family:var(--serif);
+  font-size:clamp(19px,2vw,24px); line-height:1.2;
+  border-bottom:1px solid rgba(203,161,88,.55); padding-bottom:5px;
+  transition:color .3s var(--ease), border-color .3s var(--ease);
+}
+.reservation__phone:hover{ color:var(--gold); border-color:var(--gold); }
+.reservation__placeholder-call small{ margin-top:10px; font-size:12px; opacity:.5; }
+.reservation__foot{
+  display:flex; justify-content:space-between; gap:20px;
+  padding:15px clamp(24px,4vw,50px); border-top:1px solid var(--hairline-lt);
+  color:rgba(244,237,225,.48); font-size:10px; font-weight:600;
+  letter-spacing:.16em; text-transform:uppercase;
+}
+@media (max-width:760px){
+  .reservation{ padding:10px; }
+  .reservation__dialog{ height:calc(100svh - 20px); min-height:0; border-radius:18px; }
+  .reservation__head{ padding:22px 20px 18px; }
+  .reservation__head h3{ font-size:34px; }
+  .reservation__head p{ font-size:13px; }
+  .reservation__close{ width:40px; height:40px; }
+  .reservation__slot{ place-items:start center; padding:28px 20px; }
+  .reservation__placeholder{
+    grid-template-columns:1fr; justify-items:center; gap:20px; text-align:center;
+  }
+  .reservation__placeholder p{ margin-inline:auto; }
+  .reservation__placeholder-call{
+    align-self:auto; width:100%; align-items:center; padding:22px 0 0;
+    border-left:0; border-top:1px solid var(--hairline-lt);
+  }
+  .reservation__phone{ align-self:center; }
+  .reservation__foot{ padding:14px 20px; font-size:9px; letter-spacing:.12em; }
+}
+@media (max-width:420px){
+  .reservation__head p{ max-width:230px; }
+  .reservation__placeholder-mark{ width:62px; height:62px; }
+  .reservation__placeholder strong{ font-size:27px; }
+  .reservation__foot{ justify-content:center; text-align:center; }
+  .reservation__foot span:last-child{ display:none; }
+}
 
 /* ═══════════ FOOTER ═══════════ */
 .footer{ background:#180809; color:var(--cream); overflow:hidden; }
@@ -2671,6 +2875,14 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
   .build__ticket{ position:static; }
   .footer__cols{ gap:38px; }
   .footer--menu .footer__cols{ grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@media (min-width:761px) and (max-width:900px){
+  .nav{ padding-inline:24px; }
+  .nav__links{ gap:14px; }
+  .nav__links a{ font-size:10px; letter-spacing:.14em; }
+  .nav__end{ gap:8px; }
+  .nav__cta{ padding:10px 16px; }
+  .nav__reserve{ padding-inline:14px; }
 }
 @media (max-width: 760px){
   .nav__links, .nav__cta{ display:none; }

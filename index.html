@@ -67,6 +67,10 @@
     <a href="#visit">Visit</a>
   </nav>
   <div class="nav__end">
+    <button class="nav__cta nav__reserve" id="navReserve" type="button"
+            data-reservation-trigger aria-expanded="false" aria-controls="reservationPanel">
+      <span>Reserve</span>
+    </button>
     <a class="nav__ig" href="https://www.instagram.com/aromatinyc" target="_blank" rel="noopener" aria-label="Aromati on Instagram — @aromatinyc">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5.2"/><circle cx="12" cy="12" r="4.1"/><circle cx="17.3" cy="6.7" r="1.15" fill="currentColor" stroke="none"/></svg>
     </a>
@@ -92,7 +96,7 @@
 <div class="mmenu" id="mmenu" aria-hidden="true" inert>
   <div class="mmenu__wash" aria-hidden="true"></div>
   <div class="mmenu__panel" aria-hidden="true"></div>
-  <div class="mmenu__inner">
+    <div class="mmenu__inner" data-lenis-prevent>
     <nav class="mmenu__links" aria-label="Sections">
       <a href="#story"><span class="mml__w"><span>Story</span></span></a>
       <a href="#kitchen"><span class="mml__w"><span>Kitchen</span></span></a>
@@ -108,6 +112,10 @@
         <a href="menu-wine.html">Wine</a>
       </div>
     </div>
+    <button class="mmenu__reserve" id="mobileReserve" type="button"
+            data-reservation-trigger aria-expanded="false" aria-controls="reservationPanel">
+      <span>Reserve a table</span><span aria-hidden="true">↗</span>
+    </button>
     <div class="mmenu__foot">
       <p class="mmenu__addr">103 E 34th Street<br>New York, NY 10016</p>
       <p class="mmenu__hours">Sun–Tue 7am–10pm · Wed–Sat 7am–11pm</p>
@@ -461,14 +469,59 @@
 
         <div class="visit__actions">
           <a class="btn btn--solid" href="https://maps.google.com/?q=Aromati+Cafe+and+Wine+Bar+103+E+34th+St+New+York+NY+10016" target="_blank" rel="noopener"><span>Get Directions</span></a>
-          <!-- Placeholder until the reservation system is wired up. Still a
-               real button so it keeps the hover and press animations. -->
-          <button type="button" class="btn btn--ghostlight" id="bookBtn" aria-describedby="bookNote"><span>Reserve a Table</span></button>
+          <button type="button" class="btn btn--ghostlight" id="bookBtn" data-reservation-trigger aria-expanded="false" aria-controls="reservationPanel"><span>Reserve a Table</span></button>
         </div>
-        <p class="visit__note" id="bookNote" role="status" aria-live="polite"></p>
       </div>
     </div>
   </section>
+
+  <!-- Reservation handoff. This modal lives outside the Visit grid so opening
+       it never changes the page layout. Keep the modal and widget slot; replace
+       only the placeholder inside #opentableWidgetSlot with OpenTable's
+       iframe-based Wide widget. See README.md, "Adding OpenTable". -->
+  <div class="reservation" id="reservationPanel" role="dialog" aria-modal="true" data-lenis-prevent
+       aria-labelledby="reservationTitle" aria-describedby="reservationIntro"
+       aria-hidden="true" inert hidden>
+    <div class="reservation__backdrop" data-reservation-dismiss aria-hidden="true"></div>
+    <div class="reservation__dialog" role="document" tabindex="-1">
+      <div class="reservation__head">
+        <div>
+          <span class="reservation__eyebrow">Reservations</span>
+          <h3 id="reservationTitle">Find your table.</h3>
+          <p id="reservationIntro">Reservations at Aromati Café &amp; Wine Bar.</p>
+        </div>
+        <button class="reservation__close" id="reservationClose" type="button" aria-label="Close reservations">
+          <span aria-hidden="true">×</span>
+        </button>
+      </div>
+
+      <div class="reservation__slot" id="opentableWidgetSlot">
+        <!-- OPENTABLE WIDGET START
+             Replace the .reservation__placeholder element below with the exact
+             iframe widget code supplied by OpenTable. Choose the Wide theme so
+             the live booking controls use this modal's full available width.
+             OPENTABLE WIDGET END -->
+        <div class="reservation__placeholder">
+          <span class="reservation__placeholder-mark" aria-hidden="true">OT</span>
+          <div class="reservation__placeholder-copy">
+            <span class="reservation__placeholder-kicker">OpenTable calendar</span>
+            <strong>Online reservations are coming soon.</strong>
+            <p>Guests will soon be able to choose their party, date and time without leaving this page.</p>
+          </div>
+          <div class="reservation__placeholder-call">
+            <span>Need a table now?</span>
+            <a class="reservation__phone" href="tel:+13322073847"><span>+1 (332) 207-3847</span></a>
+            <small>We’ll be happy to help.</small>
+          </div>
+        </div>
+      </div>
+
+      <div class="reservation__foot" aria-label="Restaurant details">
+        <span>103 E 34th Street, New York</span>
+        <span>Daily from 7:00 am</span>
+      </div>
+    </div>
+  </div>
 
   <!-- ══════════ FOOTER ══════════ -->
   <footer class="footer">

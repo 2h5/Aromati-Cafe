@@ -251,9 +251,9 @@
       // a fragment on this page scrolls; it does not load
       return !(url.hash && url.pathname === location.pathname && url.search === location.search);
     }
-    mmenu.querySelectorAll("a").forEach(function (a) {
-      a.addEventListener("click", function (e) {
-        if (leavesDocument(a, e)) return;
+    mmenu.querySelectorAll('a, button[data-reservation-trigger]').forEach(function (control) {
+      control.addEventListener("click", function (e) {
+        if (control.matches("a") && leavesDocument(control, e)) return;
         setMobileMenu(false);
       });
     });
@@ -271,7 +271,9 @@
       if (e.key !== "Tab") return;
       // the panel covers the page, so tabbing has to cycle the burger and the
       // panel's own links rather than walking off into the hidden document
-      var stops = [burger].concat(Array.prototype.slice.call(mmenu.querySelectorAll("a[href]")));
+      var stops = [burger].concat(Array.prototype.slice.call(
+        mmenu.querySelectorAll('a[href], button[data-reservation-trigger]')
+      ));
       var first = stops[0], last = stops[stops.length - 1];
       if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
       else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
@@ -1187,18 +1189,147 @@
     render(false);
   });
 
-  /* ── book a table: placeholder until reservations are wired up ──
-     The button is deliberately inert. This is a demo build, so the note says
-     so plainly rather than pretending to be real copy. */
+  /* ── book a table ─────────────────────────────
+     The site owns the modal; OpenTable will own only #opentableWidgetSlot.
+     Keeping the two separate means the eventual iframe can replace the
+     placeholder without changing the interaction or the Visit layout. */
   boot("book a table", function () {
-    var btn = document.getElementById("bookBtn");
-    var note = document.getElementById("bookNote");
-    if (!btn || !note) return;
+    var triggers = Array.prototype.slice.call(document.querySelectorAll("[data-reservation-trigger]"));
+    var panel = document.getElementById("reservationPanel");
+    var close = document.getElementById("reservationClose");
+    var dialog = panel && panel.querySelector(".reservation__dialog");
+    var backdrop = panel && panel.querySelector("[data-reservation-dismiss]");
+    if (!triggers.length || !panel || !close || !dialog) return;
+    var motionId = 0;
+    var settleTimer = 0;
+    var lastTrigger = triggers[0];
+    var restoreFocus = false;
 
-    btn.addEventListener("click", function () {
-      lockNav(900); // the note opening nudges everything below it
-      note.textContent = "Placeholder. The booking form would open here.";
-      note.classList.add("is-on");
+    /* The mobile trigger lives inside a drawer that closes before this modal
+       paints. Keep the fixed masthead out of the reservation surface for the
+       whole motion, then restore it after the panel has fully retracted. */
+    function setReservationNavHidden(hidden) {
+      if (!nav) return;
+      var hide = hidden && window.matchMedia("(max-width: 760px)").matches;
+      nav.classList.toggle("reservation-modal-hidden", hide);
+    }
+
+    function finishMotion(id, open) {
+      if (id !== motionId) return;
+      window.clearTimeout(settleTimer);
+      if (!open) {
+        panel.classList.remove("is-ready");
+        panel.hidden = true;
+        setReservationNavHidden(false);
+        if (restoreFocus && lastTrigger) lastTrigger.focus({ preventScroll: true });
+        restoreFocus = false;
+      }
+    }
+
+    function lockPage(open) {
+      var root = document.documentElement;
+      if (open) {
+        /* Measure before hiding the scrollbar. Body and the fixed nav use the
+           value in CSS so their content box stays exactly where it was. Both
+           style changes happen in this task, before the browser can paint the
+           intermediate state. */
+        var gutter = Math.max(0, window.innerWidth - root.clientWidth);
+        root.style.setProperty("--reservation-scrollbar", gutter + "px");
+        root.classList.add("reservation-open");
+        root.style.overflowY = "hidden";
+        /* Hiding overflow blocks native document scrolling, but Lenis owns the
+           site's wheel animation and can still advance window.scrollY. Pause
+           that controller as well. The modal carries data-lenis-prevent, so
+           its own scrollable slot (and the eventual widget) remains native. */
+        if (lenis) lenis.stop();
+      } else {
+        root.style.overflowY = "";
+        root.classList.remove("reservation-open");
+        root.style.removeProperty("--reservation-scrollbar");
+        if (lenis) lenis.start();
+      }
+    }
+
+    function setOpen(open, returnFocus, source) {
+      var id = ++motionId;
+      window.clearTimeout(settleTimer);
+      triggers.forEach(function (trigger) {
+        trigger.setAttribute("aria-expanded", String(open));
+      });
+      if (open && source) {
+        /* The mobile trigger is inside a drawer that closes before the modal
+           opens. Return to the still-visible burger, not to an inert button in
+           the hidden drawer. Desktop and Visit triggers return to themselves. */
+        lastTrigger = mmenu && mmenu.contains(source) && burger ? burger : source;
+      }
+      restoreFocus = !open && returnFocus;
+      lockNav(700);
+      lockPage(open);
+      if (open) setReservationNavHidden(true);
+      document.dispatchEvent(new CustomEvent("aromati:reservation-toggle"));
+
+      if (open) {
+        panel.hidden = false;
+        panel.inert = false;
+        panel.removeAttribute("aria-hidden");
+        /* Give the browser two frames to put the blur layer on the compositor
+           before either it or the card becomes visible. The card then starts a
+           beat behind the backdrop, so the background never flashes sharply
+           through an already-open reservation surface. */
+        panel.classList.add("is-ready");
+        requestAnimationFrame(function () {
+          requestAnimationFrame(function () {
+            if (id !== motionId) return;
+            panel.classList.add("is-open");
+            dialog.focus({ preventScroll: true });
+          });
+        });
+      } else {
+        panel.inert = true;
+        panel.setAttribute("aria-hidden", "true");
+        panel.classList.remove("is-open");
+      }
+
+      settleTimer = window.setTimeout(function () { finishMotion(id, open); }, prefersReduced ? 0 : 620);
+    }
+
+    triggers.forEach(function (trigger) {
+      trigger.addEventListener("click", function () {
+        setOpen(trigger.getAttribute("aria-expanded") !== "true", false, trigger);
+      });
+    });
+    close.addEventListener("click", function () { setOpen(false, true); });
+    if (backdrop) backdrop.addEventListener("click", function () { setOpen(false, true); });
+
+    /* The desktop masthead sits above the reservation layer on purpose, so its
+       in-page links remain reachable. A section jump is also an implicit way
+       out of the modal: close it first, then let the site's normal anchor/Lenis
+       handling carry the visitor to the requested section. The three controls
+       on the right stay outside this set — Reserve toggles the modal, Instagram
+       leaves the page, and Menus owns its own dropdown. */
+    if (nav) {
+      nav.querySelectorAll('a[href^="#"]').forEach(function (link) {
+        link.addEventListener("click", function () {
+          if (!panel.hidden) setOpen(false, false);
+        });
+      });
+    }
+    panel.addEventListener("keydown", function (event) {
+      if (event.key === "Escape") { setOpen(false, true); return; }
+      if (event.key !== "Tab") return;
+      var stops = Array.prototype.slice.call(panel.querySelectorAll(
+        'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),iframe,[tabindex]:not([tabindex="-1"])'
+      )).filter(function (el) { return !el.hidden && el.offsetParent !== null; });
+      if (!stops.length) { event.preventDefault(); close.focus(); return; }
+      var first = stops[0], last = stops[stops.length - 1];
+      if (document.activeElement === dialog) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      } else if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault(); last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault(); first.focus();
+      }
     });
   });
 
@@ -1383,13 +1514,20 @@
     var btn = document.getElementById("toTop");
     var top = document.querySelector(".hero, .mhead");
     if (!btn || !top) return;
+    var pastOpening = false;
 
     function show(on) {
-      btn.classList.toggle("is-up", on);
-      btn.setAttribute("aria-hidden", on ? "false" : "true");
-      if (on) btn.removeAttribute("tabindex");
+      pastOpening = on;
+      var visible = pastOpening && !document.documentElement.classList.contains("reservation-open");
+      btn.classList.toggle("is-up", visible);
+      btn.setAttribute("aria-hidden", visible ? "false" : "true");
+      if (visible) btn.removeAttribute("tabindex");
       else btn.setAttribute("tabindex", "-1");
     }
+
+    document.addEventListener("aromati:reservation-toggle", function () {
+      show(pastOpening);
+    });
 
     btn.addEventListener("click", function () {
       if (lenis) lenis.scrollTo(0, { duration: 1, force: true });

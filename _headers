@@ -11,12 +11,13 @@
 # into a blocked request in the console.
 #
 # It is strict because it can be. The site has no inline scripts, no inline
-# style attributes and no third-party origins — the fonts were the last one and
-# they are self-hosted now. Verified by tools/check-csp.mjs, which fails the
-# build if anything is added that this policy would silently block.
+# style attributes. OpenTable's official widget host is the one public-page
+# exception, pre-authorized for the reservation slot in index.html. Verified by
+# tools/check-csp.mjs, which fails the build if anything else is added that this
+# policy would silently block.
 
 /*
-  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https://yofoiqgknsqzsuwtlqvh.supabase.co; font-src 'self' data:; connect-src 'self' https://yofoiqgknsqzsuwtlqvh.supabase.co; frame-ancestors 'self' https://aragvelipalazzolo.com https://www.aragvelipalazzolo.com; base-uri 'self'; form-action 'self'; object-src 'none'
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://www.opentable.com; style-src 'self'; img-src 'self' data: https://yofoiqgknsqzsuwtlqvh.supabase.co; font-src 'self' data:; connect-src 'self' https://yofoiqgknsqzsuwtlqvh.supabase.co; frame-src 'self' https://www.opentable.com; frame-ancestors 'self' https://aragvelipalazzolo.com https://www.aragvelipalazzolo.com; base-uri 'self'; form-action 'self'; object-src 'none'
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: geolocation=(), microphone=(), camera=(), payment=(), interest-cohort=()
@@ -24,12 +25,15 @@
 # Notes on the individual directives, because the next person to change one
 # will want to know what it is holding up:
 #
-#   script-src 'self'      No 'unsafe-inline'. The JSON-LD blocks are
-#                          type="application/ld+json", which browsers never
-#                          execute and CSP therefore does not gate — render.js
-#                          fills them with textContent, which is DOM work and
-#                          not script evaluation. Adding one inline <script>
-#                          anywhere breaks the whole site under this policy.
+#   script-src             'self' plus www.opentable.com for the generated
+#                          reservation widget in index.html. Still no
+#                          'unsafe-inline'. The JSON-LD blocks are inert;
+#                          render.js fills them with textContent. Adding any
+#                          other inline script still breaks under this policy.
+#
+#   frame-src              'self' for the editor's page-measuring frame, plus
+#                          www.opentable.com for the iframe-based reservation
+#                          widget. Keep iframe=true in the generated embed.
 #
 #   style-src 'self'       No 'unsafe-inline', which is only safe because
 #                          there are zero style="…" attributes in the markup.
