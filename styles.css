@@ -1604,29 +1604,32 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
   max-width:var(--maxw); margin-inline:auto; padding:clamp(90px,13vh,160px) var(--pad) clamp(70px,9vh,120px);
 }
 
-/* masthead: title left, lede offset right */
-.wine__masthead{
-  display:grid; grid-template-columns:repeat(12,1fr);
-  column-gap:clamp(20px,3vw,48px); row-gap:clamp(24px,3vw,36px);
-  align-items:end;
-  margin-bottom:clamp(52px,7vw,104px);
+/* One tall editorial row: the photograph spans the complete left column while
+   the headline, notes and CTA share its top and bottom edges on the right. */
+.wine__intro{ grid-column:8 / 13; grid-row:1; }
+.wine__title{
+  width:100%; max-width:none;
+  font-size:clamp(38px,3.8vw,60px);
+  line-height:1.02;
 }
-.wine__title{ grid-column:1 / 8; max-width:14ch; }
 .wine__lede{
-  grid-column:8 / 13; padding-bottom:.4em;
-  font-size:clamp(15.5px,1.15vw,17.5px); font-weight:300; opacity:.82; line-height:1.8;
+  width:100%; max-width:none; margin-top:clamp(18px,2vw,28px);
+  font-size:clamp(14.5px,1vw,16.5px); font-weight:300; opacity:.82; line-height:1.7;
 }
 
-/* body: portrait plate left, numbered list right */
+/* body: the image establishes the desktop height; the three right-side pieces
+   occupy that same row without asking any one piece to shrink dramatically. */
 .wine__body{
   display:grid; grid-template-columns:repeat(12,1fr);
-  column-gap:clamp(20px,3vw,48px); row-gap:clamp(36px,4vw,56px);
+  grid-template-rows:auto 1fr auto;
+  column-gap:clamp(20px,3vw,48px);
+  min-height:clamp(720px,50vw,860px);
   align-items:start;
 }
-/* the plate stretches to match the list column, so the two always bottom out together */
+/* The board keeps its established width and spans the full editorial row. */
 .wine__board{
-  grid-column:1 / 7; align-self:stretch;
-  min-height:min(72vh, 620px);
+  grid-column:1 / 7; grid-row:1 / 4; align-self:stretch;
+  min-height:0;
   border-radius:6px; overflow:hidden; position:relative;
   /* The only one of these on a dark ground (--oxblood-deep, #2d0d0f). The warm
      near-black used on the cream sections is lighter than this backdrop and
@@ -1656,12 +1659,15 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
 .wine__board.in::after{ opacity:1; }
 .wine__board.in figcaption{ opacity:.92; transform:none; }
 
-.wine__col{ grid-column:8 / 13; }
-.wine__list{ border-top:1px solid var(--hairline-lt); }
+.wine__list{
+  grid-column:8 / 13; grid-row:2; align-self:start;
+  margin-top:clamp(28px,3vw,46px);
+  border-top:1px solid var(--hairline-lt);
+}
 .wine__item{
   display:grid; grid-template-columns:auto 1fr; align-items:baseline;
-  gap:clamp(18px,2.4vw,34px);
-  padding:clamp(22px,2.6vw,34px) clamp(10px,1.4vw,20px) clamp(22px,2.6vw,34px) 0;
+  gap:clamp(16px,2vw,28px);
+  padding:clamp(19px,2vw,28px) clamp(8px,1.2vw,18px) clamp(19px,2vw,28px) 0;
   border-bottom:1px solid var(--hairline-lt);
   position:relative; transition:padding-left .5s var(--ease);
 }
@@ -1679,14 +1685,15 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
 }
 .wine__copy{ position:relative; z-index:1; }
 .wine__key{
-  font-family:var(--serif); font-style:italic; font-size:clamp(26px,2.6vw,38px);
-  line-height:1.1; color:var(--gold); display:block; margin-bottom:10px;
+  font-family:var(--serif); font-style:italic; font-size:clamp(25px,2.2vw,35px);
+  line-height:1.1; color:var(--gold); display:block; margin-bottom:8px;
 }
-.wine__item p{ font-size:14.5px; line-height:1.7; opacity:.76; font-weight:300; max-width:44ch; }
+.wine__item p{ font-size:14px; line-height:1.65; opacity:.76; font-weight:300; max-width:44ch; }
 
 .wine__cta{
+  grid-column:8 / 13; grid-row:3; align-self:end;
   display:flex; align-items:center; flex-wrap:wrap; gap:clamp(16px,2vw,28px);
-  margin-top:clamp(28px,3.4vw,46px);
+  margin-top:clamp(24px,3vw,42px);
 }
 .wine__hours{
   font-size:10.5px; letter-spacing:.28em; text-transform:uppercase;
@@ -2712,8 +2719,14 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
   .story__text p, .story__floors{ max-width:62ch; }
   .story__quote{ grid-column:1/-1; max-width:30ch; }
   .story__img--b{ grid-column:1/-1; aspect-ratio:16/9; }
-  .wine__title{ grid-column:1/-1; max-width:16ch; }
-  .wine__lede{ grid-column:1/-1; padding-bottom:0; max-width:62ch; }
+  .wine__body{
+    grid-template-rows:auto;
+    min-height:0;
+    row-gap:clamp(30px,4vw,44px);
+  }
+  .wine__intro{ grid-column:1/-1; grid-row:auto; }
+  .wine__title{ max-width:16ch; }
+  .wine__lede{ max-width:62ch; }
   /* align-self:start is load-bearing, not tidying. The base rule stretches this
      to match the list column; here it is the only item in its row, and every
      child is position:absolute, so its content height is 0. A stretched item
@@ -2723,8 +2736,9 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
      everywhere we tested. Measured on device: 0px before, 297px after.
      .story__img--a two rules up survives the same treatment only because it
      never had align-self:stretch. */
-  .wine__board{ grid-column:1/-1; aspect-ratio:16/10; min-height:0; align-self:start; }
-  .wine__col{ grid-column:1/-1; }
+  .wine__board{ grid-column:1/-1; grid-row:auto; aspect-ratio:16/10; min-height:0; align-self:start; }
+  .wine__list{ grid-column:1/-1; grid-row:auto; margin-top:0; }
+  .wine__cta{ grid-column:1/-1; grid-row:auto; align-self:start; margin-top:0; }
   .visit{ grid-template-columns:1fr; }
   .visit__media{ min-height:0; }
   .visit__media img{ position:static; height:auto; aspect-ratio:16/10; }
