@@ -7,7 +7,7 @@
 -- Three things happen here, and the order matters:
 --
 --   1. photos gets an is_decorative column, and the alt rule is corrected
---   2. one row per slot, 29 of them
+--   2. one row per slot, 28 of them
 --   3. the storage bucket the uploads go into, with its limits and policies
 -- ============================================================================
 
@@ -16,7 +16,7 @@
 -- 1. Decoration is not a missing description
 --
 -- The original table said: a photograph with a file must have alt text. That is
--- right for a photograph and wrong for a backdrop. 5 of the 29 slots are
+-- right for a photograph and wrong for a backdrop. 4 of the 28 slots are
 -- texture — behind a scrim, behind a gradient, aria-hidden, carrying alt="" on
 -- purpose — and forcing a description onto those would make a screen reader
 -- announce the wallpaper.
@@ -134,17 +134,16 @@ insert into public.photos (slot, label, alt, is_decorative, width, height, sort_
   ('gallery.g5', 'The gallery — 5th photograph', 'Cappuccino with heart latte art', false, 1085, 1450, 230),
   ('gallery.g6', 'The gallery — 6th photograph', 'Strawberry and goat cheese salad', false, 1732, 908, 240),
   ('visit.storefront', 'Visit — the storefront photograph', 'The Aromati storefront on East 34th Street', false, 1456, 1080, 250),
-  ('faq.masthead', 'FAQ page — the banner photograph', '', true, 1023, 1537, 260),
-  ('menuFood.masthead', 'Food menu — the banner photograph', '', true, 1747, 900, 270),
-  ('menuDrinks.masthead', 'Drinks menu — the banner photograph', '', true, 1083, 542, 280),
-  ('menuWine.masthead', 'Wine list — the banner photograph', '', true, 1088, 1445, 290)
+  ('menuFood.masthead', 'Food menu — the banner photograph', '', true, 1747, 900, 260),
+  ('menuDrinks.masthead', 'Drinks menu — the banner photograph', '', true, 1083, 542, 270),
+  ('menuWine.masthead', 'Wine list — the banner photograph', '', true, 1088, 1445, 280)
 on conflict (slot) do nothing;
 
 do $$
 declare n integer;
 begin
   select count(*) into n from public.photos;
-  if n <> 29 then raise exception 'photos: expected 29 rows, found %', n; end if;
+  if n <> 28 then raise exception 'photos: expected 28 rows, found %', n; end if;
 end $$;
 
 

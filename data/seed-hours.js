@@ -13,9 +13,9 @@
    The five consumers, all generated from this file in Phase 1:
      1. the live open/closed pill          (script.js)
      2. the Visit hours table              (index.html)
-     3. the footer prose                   (all five pages)
-     4. the mobile-menu prose              (all five pages, different format)
-     5. the JSON-LD openingHoursSpecification (four pages, not faq.html) */
+     3. the footer prose                   (all four pages)
+     4. the mobile-menu prose              (all four pages, different format)
+     5. the JSON-LD openingHoursSpecification (all four pages) */
 
 var SEED_HOURS = [
   /* 0 Sun */ { closed: false, opens: 7 * 60, closes: 22 * 60 },

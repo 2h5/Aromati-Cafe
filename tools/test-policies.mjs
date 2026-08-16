@@ -103,8 +103,8 @@ mutation(
 
 mutation(
   "4. a write policy that only checks you are logged in",
-  clean.replace('on public.faq_entries for delete to authenticated using (public.is_owner());',
-                'on public.faq_entries for delete to authenticated using (true);'),
+  clean.replace('on public.menu_items for delete to authenticated using (public.is_owner());',
+                'on public.menu_items for delete to authenticated using (true);'),
   "being logged in is not enough"
 );
 

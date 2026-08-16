@@ -301,8 +301,7 @@ create trigger hours_exceptions_touch
 -- same editor panel as every other headline on the site.
 --
 -- What was left of menu_pages after removing them was a slug and a sort order,
--- which is a column, not a table. Same reasoning that dropped faq.footButton
--- from the copy set in Phase 1.
+-- which is a column, not a table.
 --
 -- Three distinct strings per course, all editable, all different in the real
 -- data: course_key is the filter key ("mains"), tab_label is the tab caption
@@ -529,38 +528,7 @@ create trigger menu_item_options_touch
 
 
 -- ----------------------------------------------------------------------------
--- 9. faq_entries
---
--- The table is created; no rows are seeded. faq.html currently opens with a
--- notice saying its 18 questions are placeholder copy and asking the owner
--- whether to keep the page at all. Until that is answered the content is not
--- transcribed — if the page is cut the work is wasted, if it is rewritten the
--- work is wasted twice. See memory.md, "What's still open", item 1.
---
--- Creating an empty table costs fifteen lines and commits to nothing. is_published
--- lets a question be taken down without being destroyed, which is the difference
--- between an owner editing confidently and an owner editing carefully.
--- ----------------------------------------------------------------------------
-
-create table public.faq_entries (
-  id           uuid primary key default gen_random_uuid(),
-  question     text not null check (length(btrim(question)) > 0),
-  answer       text not null check (length(btrim(answer))   > 0),
-  is_published boolean not null default true,
-  sort_order   integer not null default 0,
-  created_at   timestamptz not null default now(),
-  updated_at   timestamptz not null default now()
-);
-
-create index faq_entries_sort_idx on public.faq_entries (sort_order, id);
-
-create trigger faq_entries_touch
-  before update on public.faq_entries
-  for each row execute function public.touch_updated_at();
-
-
--- ----------------------------------------------------------------------------
--- 10. site_copy — the 62 editable strings
+-- 9. site_copy — the editable strings
 --
 -- One row per [data-copy] hook in the markup. The set of slots is defined by
 -- the site, not by the owner: adding one means adding markup to render it,
@@ -587,7 +555,7 @@ create trigger faq_entries_touch
 create table public.site_copy (
   id         uuid primary key default gen_random_uuid(),
   key        text not null unique check (key ~ '^[a-zA-Z0-9]+(\.[a-zA-Z0-9_]+)+$'),
-  page       text not null check (page in ('index', 'food', 'drinks', 'wine', 'faq')),
+  page       text not null check (page in ('index', 'food', 'drinks', 'wine')),
   section    text not null,          -- admin grouping, e.g. "The Kitchen"
   label      text not null,          -- the owner's words, never the column name
   help       text,                   -- one-line hint under the field
@@ -683,7 +651,6 @@ alter table public.menu_courses       enable row level security;
 alter table public.menu_items         enable row level security;
 alter table public.menu_item_pours    enable row level security;
 alter table public.menu_item_options  enable row level security;
-alter table public.faq_entries        enable row level security;
 alter table public.site_copy          enable row level security;
 alter table public.photos             enable row level security;
 
@@ -789,29 +756,6 @@ create policy "menu_item_options owner delete"
   on public.menu_item_options for delete to authenticated using (public.is_owner());
 
 
--- ---- faq_entries -----------------------------------------------------------
-create policy "faq_entries public read"
-  on public.faq_entries for select to anon, authenticated using (true);
-
-create policy "faq_entries owner insert"
-  on public.faq_entries for insert to authenticated with check (public.is_owner());
-
-create policy "faq_entries owner update"
-  on public.faq_entries for update to authenticated
-  using (public.is_owner()) with check (public.is_owner());
-
-create policy "faq_entries owner delete"
-  on public.faq_entries for delete to authenticated using (public.is_owner());
-
--- Note: unpublished entries are readable by anyone. is_published controls what
--- the site renders, not who can see the row. Hiding a draft answer from the
--- public would need the read policy narrowed to
---   using (is_published or public.is_owner())
--- which is a real option if drafts ever hold anything sensitive. Today they
--- would hold placeholder café copy, and a narrower policy costs the ability to
--- preview an unpublished answer on the live site.
-
-
 -- ---- site_copy -------------------------------------------------------------
 create policy "site_copy public read"
   on public.site_copy for select to anon, authenticated using (true);
@@ -848,13 +792,13 @@ grant select on
   public.site_settings, public.business_hours, public.hours_exceptions,
   public.menu_courses, public.menu_items,
   public.menu_item_pours, public.menu_item_options,
-  public.faq_entries, public.site_copy, public.photos
+  public.site_copy, public.photos
   to anon, authenticated;
 
 -- Tables whose rows the owner may create and destroy
 grant insert, update, delete on
   public.hours_exceptions, public.menu_courses, public.menu_items,
-  public.menu_item_pours, public.menu_item_options, public.faq_entries
+  public.menu_item_pours, public.menu_item_options
   to authenticated;
 
 -- Tables whose row set is fixed: values change, rows do not

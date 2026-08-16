@@ -64,8 +64,7 @@ import { createHash } from "node:crypto";
 import { resolve, extname } from "node:path";
 
 const OUT = "dist";
-const PAGES = ["index.html", "faq.html", "menu-food.html", "menu-drinks.html",
-               "menu-wine.html"];
+const PAGES = ["index.html", "menu-food.html", "menu-drinks.html", "menu-wine.html"];
 
 /* admin.html is not in that list and must not be. The editor's thumbnails are
    built by admin.js from the photos table at runtime — it is *looking at* the

@@ -102,14 +102,5 @@ export const COPY_FIELDS = {
   "wineList.headline":   { page: "wine", section: "Wine list", label: "Page title", maxLength: HEAD_PAGE },
   "wineList.lede":       { page: "wine", section: "Wine list", label: "Paragraph under the title" },
   "wineList.footNote":   { page: "wine", section: "Wine list", label: "Note at the foot of the list" },
-  "wineList.footButton": { page: "wine", section: "Wine list", label: "Button at the foot of the list" },
-
-  /* ── FAQ page ──────────────────────────────────────────────────────────
-     The page's own copy only. The 18 questions are a separate table and are
-     deliberately not transcribed yet — see memory.md, "What's still open". */
-
-  "faq.label":    { page: "faq", section: "FAQ page", label: "Section tag" },
-  "faq.headline": { page: "faq", section: "FAQ page", label: "Page title", maxLength: HEAD_PAGE },
-  "faq.lede":     { page: "faq", section: "FAQ page", label: "Paragraph under the title" },
-  "faq.footNote": { page: "faq", section: "FAQ page", label: "Note at the foot of the page" }
+  "wineList.footButton": { page: "wine", section: "Wine list", label: "Button at the foot of the list" }
 };

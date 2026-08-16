@@ -154,16 +154,14 @@ var AROMATI_ADMIN = (function () {
     index: "index.html",
     food: "menu-food.html",
     drinks: "menu-drinks.html",
-    wine: "menu-wine.html",
-    faq: "faq.html"
+    wine: "menu-wine.html"
   };
 
   var PAGE_NAMES = {
     index: "Home page",
     food: "Food menu",
     drinks: "Drinks menu",
-    wine: "Wine list",
-    faq: "FAQ page"
+    wine: "Wine list"
   };
 
 
@@ -180,7 +178,7 @@ var AROMATI_ADMIN = (function () {
   var TABLES = [
     "site_settings", "site_copy", "business_hours", "hours_exceptions",
     "menu_courses", "menu_items", "menu_item_pours", "menu_builder_options",
-    "faq_entries", "photos"
+    "photos"
   ];
 
   /* The columns the editor may write. Everything else on those tables is the
@@ -205,7 +203,6 @@ var AROMATI_ADMIN = (function () {
        bagel? group. It is read so the editor can validate the fixed builder,
        but there is deliberately no owner control for it. */
     menu_builder_options: ["group_key", "label", "price", "hint", "is_hidden", "sort_order"],
-    faq_entries:     ["question", "answer", "is_published", "sort_order"],
     /* A photo slot is a position in the markup. Which picture is in it and how
        it is described are the owner's; the slot name, the label and whether it
        is decoration are the page's, and only_photo_may_change() puts them back
@@ -219,7 +216,7 @@ var AROMATI_ADMIN = (function () {
      many places the markup has a photograph in. The database has no insert or
      delete policy for them either. */
   var CAN_ADD = ["hours_exceptions", "menu_courses", "menu_items", "menu_item_pours",
-                 "menu_builder_options", "faq_entries"];
+                 "menu_builder_options"];
 
   var sb = null;              // the Supabase client
   var account = null;         // the signed-in user
@@ -1014,10 +1011,7 @@ var AROMATI_ADMIN = (function () {
       emptyIndex: "No photograph slots yet.",
       emptyEditor: "No photograph slots are in the database yet. The site is showing " +
         "the pictures in its own markup as expected, but nothing here can " +
-        "be changed until the photographs migration has been run." },
-    { id: "faq",     name: "FAQ",     sections: faqSections,
-      note: faqNote, indexFoot: faqIndexFoot,
-      emptyIndex: "No questions yet." }
+        "be changed until the photographs migration has been run." }
   ];
 
   /* Which tables each area owns. The dot on a rail button is counted from it,
@@ -1030,8 +1024,7 @@ var AROMATI_ADMIN = (function () {
     hours: ["business_hours", "hours_exceptions"],
     contact: ["site_settings"],
     menu: ["menu_courses", "menu_items", "menu_item_pours", "menu_builder_options"],
-    photos: ["photos"],
-    faq: ["faq_entries"]
+    photos: ["photos"]
   };
 
   function panelChangeCount(id) {
@@ -2751,7 +2744,6 @@ var AROMATI_ADMIN = (function () {
   var FRAME_BY_PREFIX = {
     kitchen:    { w: 4, h: 3.2, fixed: true, max: 800 },   /* .plate img */
     cafe:       { w: 3, h: 4.1, fixed: true, max: 1200 },  /* .cafe__card */
-    faq:        { w: 2, h: 1,   fixed: false },  /* .mhead, a wide banner */
     menuFood:   { w: 2, h: 1,   fixed: false },
     menuDrinks: { w: 2, h: 1,   fixed: false },
     menuWine:   { w: 2, h: 1,   fixed: false }
@@ -2792,7 +2784,6 @@ var AROMATI_ADMIN = (function () {
     wine:        "Wine Bar",
     gallery:     "Room",
     visit:       "Visit",
-    faq:         "FAQ",
     menuFood:    "Food",
     menuDrinks:  "Drinks",
     menuWine:    "Wine"
@@ -3853,98 +3844,6 @@ var AROMATI_ADMIN = (function () {
     });
   }
 
-
-  /* ── the FAQ ───────────────────────────────── */
-
-  function faqEntries() {
-    return rowsOf("faq_entries").slice().sort(function (a, b) {
-      return (a.sort_order || 0) - (b.sort_order || 0);
-    });
-  }
-
-  function faqNote() {
-    return makeNote(function (node) {
-      node.appendChild(el("strong", null, "The FAQ page is still undecided."));
-    });
-  }
-
-  function faqIndexFoot(host) {
-    var add = el("button", "btn btn--small btn--add", "Add a question");
-    add.type = "button";
-    on(add, "click", function () {
-      var row = {
-        id: tempId(), question: "", answer: "", is_published: true,
-        sort_order: rowsOf("faq_entries").length + 1
-      };
-      draft.faq_entries.push(row);
-      selectSection("faq", "faq:" + row.id);
-      renderAll();
-    });
-    host.appendChild(add);
-  }
-
-  function faqSections() {
-    var entries = faqEntries();
-
-    return entries.map(function (entry) {
-      return {
-        id: "faq:" + entry.id,
-        group: "Questions",
-        label: entry.question || "(new question)",
-        count: entry.is_published ? null : "hidden",
-        changed: rowChanged("faq_entries", entry) ? 1 : 0,
-        describe: entry.is_published
-          ? "One question and its answer, as they appear on the FAQ page."
-          : "One question and its answer. It is hidden, so nobody visiting the " +
-            "site can see it yet.",
-        render: function (host) { renderFaqEntry(host, entry, entries); }
-      };
-    });
-  }
-
-  function renderFaqEntry(host, entry, entries) {
-    var cardId = "faq:" + entry.id;
-    var card = makeCard(null);
-    host.appendChild(card.wrap);
-
-    card.body.appendChild(makeField({
-      table: "faq_entries", row: entry, col: "question",
-      cardId: cardId, tab: "faq",
-      label: "Question", value: entry.question,
-      onInput: function (v) { entry.question = v; }
-    }).wrap);
-
-    card.body.appendChild(makeField({
-      table: "faq_entries", row: entry, col: "answer",
-      cardId: cardId, tab: "faq",
-      label: "Answer", type: "textarea", rows: 4, value: entry.answer,
-      onInput: function (v) { entry.answer = v; }
-    }).wrap);
-
-    card.body.appendChild(makeCheck("Show this on the site", entry.is_published,
-      function (checked) { entry.is_published = checked; renderAll(); }).wrap);
-
-    var tools = el("div", "tools");
-    [["▲", -1], ["▼", 1]].forEach(function (pair) {
-      var b = el("button", "mini", pair[0]);
-      b.type = "button";
-      b.title = pair[1] < 0 ? "Move this question up" : "Move this question down";
-      var at = entries.indexOf(entry);
-      b.disabled = pair[1] < 0 ? at === 0 : at === entries.length - 1;
-      on(b, "click", function () { move(entries, entry, pair[1]); });
-      tools.appendChild(b);
-    });
-    var del = el("button", "btn btn--small btn--danger", "Delete");
-    del.type = "button";
-    on(del, "click", function () {
-      if (!window.confirm("Delete this question?")) return;
-      deleteRow("faq_entries", entry);
-    });
-    tools.appendChild(del);
-    card.body.appendChild(tools);
-  }
-
-
   /* ═══════════════════════════════════════════════
      5. adding and removing
      ═══════════════════════════════════════════════ */
@@ -4320,13 +4219,6 @@ var AROMATI_ADMIN = (function () {
       if (isBlank(row.alt)) add(needsDescription(row.label), "photos", row.id, "alt");
     });
 
-    rowsOf("faq_entries").forEach(function (entry) {
-      if (isBlank(entry.question) || isBlank(entry.answer)) {
-        add("A question in the FAQ is missing its question or its answer.",
-            "faq_entries", entry.id, isBlank(entry.question) ? "question" : "answer");
-      }
-    });
-
     return found;
   }
 
@@ -4521,10 +4413,6 @@ var AROMATI_ADMIN = (function () {
                where: PHOTO_GROUPS[prefix] || prefix,
                title: row.label || row.slot };
     }
-    if (table === "faq_entries") {
-      return { tab: "faq", section: "faq:" + row.id, where: "Questions",
-               title: row.question || "(new question)" };
-    }
     return null;
   }
 
@@ -4561,8 +4449,6 @@ var AROMATI_ADMIN = (function () {
     menu_builder_options: { group_key: "Group", label: "Menu label", price: "Price",
                             hint: "Short description", is_hidden: "Hidden from the site",
                             sort_order: "Position" },
-    faq_entries:     { question: "Question", answer: "Answer",
-                       is_published: "Published", sort_order: "Position" },
     photos:          { storage_path: "Photograph", source_path: "Unframed original",
                        alt: "Description", width: "Width", height: "Height" }
   };
@@ -4619,7 +4505,6 @@ var AROMATI_ADMIN = (function () {
     if (table === "menu_items") return was.name || "(unnamed item)";
     if (table === "menu_item_pours") return was.label || "a priced option";
     if (table === "menu_builder_options") return was.label || "a choice";
-    if (table === "faq_entries") return was.question || "(a question)";
     return "A row";
   }
 
@@ -4628,12 +4513,10 @@ var AROMATI_ADMIN = (function () {
     menu_courses:     "Menus",
     menu_items:       "Menus",
     menu_item_pours:  "Menus",
-    menu_builder_options: "Menus",
-    faq_entries:      "Questions"
+    menu_builder_options: "Menus"
   };
 
-  /* Every row the next save would touch, in rail order — Words first, FAQ
-     last — so the list reads down the same six areas the rail does. The count
+  /* Every row the next save would touch, in rail order. The count
      is the length of this: both walk rows, and PANEL_TABLES is the one list of
      which tables belong where. */
   function changeEntries() {
@@ -5016,14 +4899,14 @@ var AROMATI_ADMIN = (function () {
       }
     });
 
-    ["menu_builder_options", "menu_item_pours", "menu_items", "menu_courses", "hours_exceptions", "faq_entries"]
+    ["menu_builder_options", "menu_item_pours", "menu_items", "menu_courses", "hours_exceptions"]
       .forEach(function (table) {
         (removed[table] || []).forEach(function (id) {
           steps.push({ what: "delete", table: table, id: id });
         });
       });
 
-    ["menu_courses", "menu_items", "menu_builder_options", "menu_item_pours", "hours_exceptions", "faq_entries"]
+    ["menu_courses", "menu_items", "menu_builder_options", "menu_item_pours", "hours_exceptions"]
       .forEach(function (table) {
         rowsOf(table).forEach(function (row) {
           if (isNew(row)) steps.push({ what: "insert", table: table, row: row });
@@ -5343,7 +5226,6 @@ var AROMATI_ADMIN = (function () {
     menu_items: "id,course_id,name,tag,description,price,prices,price_all_sizes,no_price,is_hidden,options_dom_id,sort_order",
     menu_item_pours: "id,item_id,label,price,sort_order",
     menu_builder_options: "id,group_key,label,price,hint,sub_key,is_hidden,sort_order",
-    faq_entries: "id,question,answer,is_published,sort_order",
     photos: "id,slot,label,storage_path,source_path,alt,width,height,is_decorative,sort_order"
   };
 
@@ -5361,7 +5243,6 @@ var AROMATI_ADMIN = (function () {
     menu_items: "sort_order",
     menu_builder_options: "sort_order",
     menu_item_pours: "sort_order",
-    faq_entries: "sort_order",
     photos: "sort_order"
   };
 

@@ -161,8 +161,7 @@ w("-- in the seed data rather than generated, so this file is stable in a diff -
 w("-- but it also means re-running it after reordering the menu would collide.");
 w("-- If it has to be applied twice, empty the tables first.");
 w("--");
-w("-- Not seeded here: the FAQ (18 entries, held pending the owner's answer on");
-w("-- the demo notice) and the photos (Phase 6 defines the slots).");
+w("-- Not seeded here: the photos (Phase 6 defines the slots).");
 w("-- ============================================================================");
 w();
 

@@ -11,7 +11,7 @@
 
 import { readFileSync, writeFileSync } from "node:fs";
 
-const PAGES = ["index.html", "faq.html", "menu-food.html", "menu-drinks.html", "menu-wine.html"];
+const PAGES = ["index.html", "menu-food.html", "menu-drinks.html", "menu-wine.html"];
 
 /* <h4> heading text -> the attribute its following <p> should carry */
 const HOOKS = [

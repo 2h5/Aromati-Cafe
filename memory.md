@@ -18,8 +18,6 @@ the features around it, not adding a new architecture.
 - The site still renders from its local fallback data if the network or database
   is unavailable.
 - There is one shared owner login for now.
-- The FAQ decision is still pending. The FAQ panel exists, but its placeholder
-  questions have not been moved into the database.
 - Cloudflare deployment is working. A broader security review can happen later.
 - Separate from the CMS work: the Wine 04 photo now appears on affected iOS
   portrait sizes, but it does not move as the page scrolls. The hero and kitchen
@@ -121,8 +119,8 @@ the features around it, not adding a new architecture.
 
 ## Main pieces
 
-- `index.html`, `menu-food.html`, `menu-drinks.html`, `menu-wine.html` and
-  `faq.html` are the public pages.
+- `index.html`, `menu-food.html`, `menu-drinks.html` and `menu-wine.html` are
+  the public pages.
 - `admin.html`, `admin.js` and `admin.css` are the editor.
 - `render.js` builds public menus, copy, hours, contact details and JSON-LD.
 - `data.js` loads network data, cached data or seed data. It does not own the
@@ -151,9 +149,8 @@ the features around it, not adding a new architecture.
 | Menu courses and items | `menu_courses`, `menu_items`, related menu tables | `data/seed-menu.js` |
 | Build Your Own Breakfast choices | `menu_builder_options` | `data/seed-breakfast-builder.js` |
 | Photos and descriptions | `photos` and the `site-photos` bucket | `data/seed-photos.js` |
-| FAQ questions | `faq_entries` | Not populated yet |
 
-The editor has panels for Words, Hours, Contact, Menus, Photos and FAQ. Save is
+The editor has panels for Words, Hours, Contact, Menus and Photos. Save is
 explicit; Discard restores the last confirmed values. Which panel was open is
 kept in `localStorage` under `aromati.admin.tab`, and which section of it under
 `aromati.admin.section`, so a reload lands where the owner was rather than on
@@ -295,9 +292,8 @@ nothing on the site looks wrong until the day the database is unreachable, which
 is the day nobody is in a position to notice. `check-live-project.mjs` reports
 how many slots are overridden on every run, which is the prompt to do it.
 
-New names rather than overwriting the originals, because `story.a` shared
-`dining-corner.jpg` with `faq.masthead`, which was never overridden — replacing
-the file in place would have silently reframed a slot the owner never touched.
+New names rather than overwriting the originals, so replacing a shared source
+file could not silently reframe a second slot the owner never touched.
 
 `tools/extract-photos.mjs` could not read a WebP's dimensions until the same
 day. It returned null and the generator wrote the slot without a width, so a
@@ -428,8 +424,6 @@ needs the offline fallback to include every live edit.
   hardcoded special menu blocks still work.
 - Pick a photo, preview it, discard it, save it, and restore the original. Check
   that it lands in the right place and keeps a useful description.
-- Decide whether the FAQ stays, is removed, or gets real questions. Do not move
-  placeholder questions into live data before that decision.
 
 ### Public-site checks
 
@@ -445,11 +439,6 @@ needs the offline fallback to include every live edit.
 
 - Do the full security sweep around database permissions, storage, headers and
   preview access.
-- Decide whether the FAQ page stays. The `faq_entries` table, its policies and a
-  full editor panel all exist and nothing on the public site reads them —
-  `faq.html` carries its ten questions as markup. The table is empty, so nothing
-  is lost, but the panel is reachable and looks like it works. Wire it or hide
-  it; leaving it is how `hours_exceptions` became a live defect.
 - Leaked-password protection stays off. It is a Pro feature and this project is
   on the free plan, so the Supabase advisor will keep reporting it as a WARN
   forever. Not a finding — do not raise it again.
@@ -532,5 +521,6 @@ Migrations: `supabase/migrations/20260801000000_init_cms.sql`,
 `supabase/migrations/20260806000000_sizes_max_3.sql` and
 `supabase/migrations/20260806000100_allowlist_second_editor.sql` and
 `supabase/migrations/20260812000100_breakfast_builder.sql` and
-`supabase/migrations/20260812000200_menu_course_hidden.sql` and
-`supabase/migrations/20260812000300_smooth_admin_validation_copy.sql`.
+`supabase/migrations/20260812000200_menu_course_hidden.sql`,
+`supabase/migrations/20260812000300_smooth_admin_validation_copy.sql` and
+`supabase/migrations/20260815000000_remove_retired_page.sql`.

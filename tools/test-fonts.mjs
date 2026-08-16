@@ -14,8 +14,8 @@ import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const FILES = ["styles.css", "index.html", "faq.html",
-               "menu-food.html", "menu-drinks.html", "menu-wine.html"];
+const FILES = ["styles.css", "index.html", "menu-food.html",
+               "menu-drinks.html", "menu-wine.html"];
 
 let failures = 0;
 

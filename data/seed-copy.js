@@ -83,10 +83,5 @@ var SEED_COPY = {
   "wineList.headline": "The Wine List",
   "wineList.lede": "Qvevri ambers, Saperavi and natural bottles chosen for the table, alongside a short European list. Poured by the glass or the bottle on the second floor.",
   "wineList.footNote": "Wines are available by the glass or bottle. The selection may change.",
-  "wineList.footButton": "Plan a Visit",
-
-  "faq.label": "Good to Know",
-  "faq.headline": "Questions, answered.",
-  "faq.lede": "The things guests ask most often — when to come, what the upstairs room is like, and how to plan something bigger than a table for two.",
-  "faq.footNote": "Still wondering? Call us — someone is always in."
+  "wineList.footButton": "Plan a Visit"
 };

@@ -84,7 +84,7 @@ offers that; the trigger makes it impossible rather than merely unavailable.
 ### Rows too — the owner adds and removes freely
 
 `hours_exceptions`, `menu_courses`, `menu_items`, `menu_item_pours`,
-`menu_builder_options`, `menu_item_options`, `faq_entries`.
+`menu_builder_options`, `menu_item_options`.
 
 These are the things a café actually gains and loses: a dish, a section, a
 holiday closure, a bottle that sold out.
@@ -138,14 +138,7 @@ For example:
 
 ---
 
-## Two things that are not what they look like
-
-**Unpublished FAQ answers are still readable.** `is_published` controls what the
-website *renders*, not who can *see the row*. Anyone querying the API directly
-can read a draft. This is a deliberate trade — narrowing it would cost the
-ability to preview an unpublished answer on the live site — and it is fine for
-placeholder café copy. It would **not** be fine if drafts ever held anything
-private. The one-line fix is noted in the SQL where the policy is defined.
+## One thing that is not what it looks like
 
 **The public API key is public.** It ships in the website's JavaScript and is
 meant to. It identifies the project, it does not authorise anything. Everything
@@ -210,7 +203,7 @@ refusal proves nothing about the policy that refused.
 the only thing that writes, and it writes exactly what these rules allow: it
 updates `site_settings` and `site_copy` values and never their labels or keys,
 it never inserts or deletes a setting, a copy field or a weekday, and it has
-full run of the menu, the holidays and the FAQ. If a rule below reads wrong to
+full run of the menu and holidays. If a rule below reads wrong to
 you, the editor is wrong too — say so.
 
 ---

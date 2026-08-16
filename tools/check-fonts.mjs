@@ -34,7 +34,7 @@
 
 import { readFileSync, existsSync } from "node:fs";
 
-const PAGES = ["index.html", "faq.html", "menu-food.html", "menu-drinks.html", "menu-wine.html"];
+const PAGES = ["index.html", "menu-food.html", "menu-drinks.html", "menu-wine.html"];
 
 /* Must be inlined, because they are what the nav, the mastheads and the menus
    are set in. Kept in step with CRITICAL in tools/fetch-fonts.mjs. */

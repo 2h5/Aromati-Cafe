@@ -62,8 +62,7 @@ function stageDist() {
 
   cpSync("config.js", resolve(WORK, "config.js"));
 
-  for (const page of ["index.html", "faq.html", "menu-food.html",
-                      "menu-drinks.html", "menu-wine.html"]) {
+  for (const page of ["index.html", "menu-food.html", "menu-drinks.html", "menu-wine.html"]) {
     cpSync(page, resolve(WORK, "dist", page));
   }
   cpSync("data/seed-photos.js", resolve(WORK, "dist/data/seed-photos.js"));
@@ -245,7 +244,7 @@ console.log("\nthe source tree is never written to\n");
      business, and a check that reports those as its own failure is a check
      people learn to ignore. This one is false only if *this run* wrote to the
      source tree. */
-  const WATCHED = ["index.html", "faq.html", "menu-food.html", "menu-drinks.html",
+  const WATCHED = ["index.html", "menu-food.html", "menu-drinks.html",
                    "menu-wine.html", "data/seed-photos.js", "config.js"];
   const before = new Map(WATCHED.map((f) => [f, readFileSync(f, "utf8")]));
 

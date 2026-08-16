@@ -5,15 +5,14 @@
 -- the next run overwrites it, and the site would keep the old values anyway.
 -- To change something here, change the seed data and run the generator.
 --
--- 17 sections, 113 items, 31 pours, 0 options, 61 copy fields.
+-- 17 sections, 113 items, 31 pours, 0 options, 57 copy fields.
 --
 -- Runs once, at Phase 3 step 6. The ids are derived from each row's position
 -- in the seed data rather than generated, so this file is stable in a diff --
 -- but it also means re-running it after reordering the menu would collide.
 -- If it has to be applied twice, empty the tables first.
 --
--- Not seeded here: the FAQ (18 entries, held pending the owner's answer on
--- the demo notice) and the photos (Phase 6 defines the slots).
+-- Not seeded here: the photos (Phase 6 defines the slots).
 -- ============================================================================
 
 -- ---- sections --------------------------------------------------------------
@@ -247,11 +246,7 @@ insert into public.site_copy (key, page, section, label, help, value, max_length
   ('wineList.headline', 'wine', 'Wine list', 'Page title', null, 'The Wine List', 32, 540),
   ('wineList.lede', 'wine', 'Wine list', 'Paragraph under the title', null, 'Qvevri ambers, Saperavi and natural bottles chosen for the table, alongside a short European list. Poured by the glass or the bottle on the second floor.', null, 550),
   ('wineList.footNote', 'wine', 'Wine list', 'Note at the foot of the list', null, 'Wines are available by the glass or bottle. The selection may change.', null, 560),
-  ('wineList.footButton', 'wine', 'Wine list', 'Button at the foot of the list', null, 'Plan a Visit', null, 570),
-  ('faq.label', 'faq', 'FAQ page', 'Section tag', null, 'Good to Know', null, 580),
-  ('faq.headline', 'faq', 'FAQ page', 'Page title', null, 'Questions, answered.', 32, 590),
-  ('faq.lede', 'faq', 'FAQ page', 'Paragraph under the title', null, 'The things guests ask most often — when to come, what the upstairs room is like, and how to plan something bigger than a table for two.', null, 600),
-  ('faq.footNote', 'faq', 'FAQ page', 'Note at the foot of the page', null, 'Still wondering? Call us — someone is always in.', null, 610);
+  ('wineList.footButton', 'wine', 'Wine list', 'Button at the foot of the list', null, 'Plan a Visit', null, 570);
 
 -- ---- did it all land? ------------------------------------------------------
 -- A partial apply leaves a menu quietly missing its last section. This turns
@@ -268,5 +263,5 @@ begin
   select count(*) into n from public.menu_item_options;
   if n <> 0 then raise exception 'menu_item_options: expected 0 rows, found %', n; end if;
   select count(*) into n from public.site_copy;
-  if n <> 61 then raise exception 'site_copy: expected 61 rows, found %', n; end if;
+  if n <> 57 then raise exception 'site_copy: expected 57 rows, found %', n; end if;
 end $$;

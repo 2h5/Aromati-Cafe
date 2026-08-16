@@ -74,9 +74,6 @@ export const PHOTO_SLOTS = [
     ["visit.storefront", "Visit — the storefront photograph", false]
   ]],
 
-  ["faq.html", [
-    ["faq.masthead", "FAQ page — the banner photograph", true]
-  ]],
   ["menu-food.html", [
     ["menuFood.masthead", "Food menu — the banner photograph", true]
   ]],

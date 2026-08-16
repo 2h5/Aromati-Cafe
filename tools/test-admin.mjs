@@ -145,7 +145,6 @@ function fixture() {
       { id: "b4", group_key: "add", label: "Cream cheese", price: "2",
         hint: null, sub_key: null, is_hidden: false, sort_order: 1 }
     ],
-    faq_entries: [],
     /* One described photograph and one backdrop, which are the two cases the
        panel behaves differently for. Neither has been uploaded to, which is
        the state all 29 real slots start in. */
@@ -160,16 +159,10 @@ function fixture() {
   };
 }
 
-/* The fixture leaves faq_entries and hours_exceptions empty, because most of
-   what is tested here does not need them. The change list does: it has a line
-   for every table, and a table with no rows in it is a line nothing has ever
-   walked. */
+/* Most tests do not need a holiday. Change-list tests do, because otherwise
+   the add/remove path for that table would never be walked. */
 function withExtras() {
   const data = fixture();
-  data.faq_entries = [
-    { id: "q1", question: "Do you take walk-ins?", answer: "Always.",
-      is_published: true, sort_order: 1 }
-  ];
   data.hours_exceptions = [
     { id: "x1", on_date: "2026-12-25", is_closed: true,
       opens_at: null, closes_at: null, note: "Christmas Day" }
@@ -790,11 +783,6 @@ console.log("\nthe shortened helper copy");
   check("a disabled setting does not explain a control the owner cannot use",
         [locked.querySelector(".field__input").disabled,
          !!locked.querySelector(".field__help")], [true, false]);
-
-  r.tab("FAQ");
-  check("the FAQ notice is only its first sentence",
-        r.q("#panels .note").textContent.trim(),
-        "The FAQ page is still undecided.");
 }
 
 console.log("\nthe Words page index");
@@ -1668,7 +1656,7 @@ console.log("\nthe headline check has something to look at");
 {
   const { COPY_FIELDS } = await import("../tools/copy-labels.mjs");
   const files = {
-    index: "index.html", faq: "faq.html",
+    index: "index.html",
     food: "menu-food.html", drinks: "menu-drinks.html", wine: "menu-wine.html"
   };
   const html = {};
@@ -1741,9 +1729,6 @@ console.log("\nthe other-page photograph index");
 {
   const data = fixture();
   data.photos.push(
-    { id: "ph3", slot: "faq.masthead", label: "FAQ page — the banner photograph",
-      storage_path: null, source_path: null, alt: "", width: 1023, height: 1537,
-      is_decorative: true, sort_order: 30 },
     { id: "ph4", slot: "menuFood.masthead", label: "Food menu — the banner photograph",
       storage_path: null, source_path: null, alt: "", width: 1747, height: 900,
       is_decorative: true, sort_order: 40 }
@@ -1758,10 +1743,6 @@ console.log("\nthe other-page photograph index");
         [divisions.length, divisions[0].textContent,
          divisions[0].nextElementSibling === groups[1], groups[1].textContent],
         [1, "", true, "Other pages"]);
-
-  r.section("FAQ");
-  check("gives the FAQ background no unnecessary description",
-        r.photo("FAQ page — the banner photograph").querySelector(".field__help"), null);
 
   r.section("Food");
   check("describes a menu background in plain language",
@@ -2560,24 +2541,25 @@ console.log("\na removed row keeps its name");
 {
   const r = await boot({ data: withExtras() });
   await r.signIn();
-  r.tab("FAQ");
+  r.tab("Hours");
+  r.section("Holidays and one-off days");
 
   const remove = [...r.doc.querySelectorAll(".btn--danger")]
-    .find((b) => b.textContent === "Delete");
+    .find((b) => b.textContent === "Remove");
   remove.click();
   await settle();
 
   await r.openChanges();
   const gone = r.changeRows()[0];
   check("it is still listed after it leaves the editor", gone.flag, "removed");
-  check("by the words the owner would recognise", gone.title, "Do you take walk-ins?");
+  check("by the words the owner would recognise", gone.title, "2026-12-25");
   check("with nowhere to be sent, because it is not there any more", gone.canGo, false);
   check("and no put back — Discard is the way back", gone.canUndo, false);
 }
 
 console.log("\nthe section ids the list mints are the ones the panels mint");
 {
-  /* The drift guard. locate() builds a section id per table; the six section
+  /* The drift guard. locate() builds a section id per table; the five section
      builders in part 4 build theirs independently. Nothing in the running
      editor compares them — an entry pointing at an id no panel produces looks
      perfectly fine and simply goes nowhere when pressed. So every row in the

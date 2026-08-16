@@ -22,7 +22,7 @@
 
 import { readFileSync, existsSync } from "node:fs";
 
-const PAGES = ["index.html", "faq.html", "menu-food.html", "menu-drinks.html", "menu-wine.html"];
+const PAGES = ["index.html", "menu-food.html", "menu-drinks.html", "menu-wine.html"];
 
 let failures = 0;
 const fail = (msg, detail) => {

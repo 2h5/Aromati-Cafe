@@ -26,7 +26,7 @@ import { boot, settle, seedEnv, seedRows, serve, reporter } from "./page-boot.mj
 
 const { state, fail, pass, check } = reporter();
 
-const PAGES = ["index.html", "faq.html", "menu-food.html", "menu-drinks.html", "menu-wine.html"];
+const PAGES = ["index.html", "menu-food.html", "menu-drinks.html", "menu-wine.html"];
 
 /* ── what a visitor can see ───────────────────────────────────────────────
    Named the way the checklist rows are worded, so a failure reads as the thing

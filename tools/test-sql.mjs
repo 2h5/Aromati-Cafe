@@ -108,9 +108,8 @@ for (const f of files) {
     menu_item_options: 0,
     menu_builder_options: 12,
     /* 62 until 2026-08-06, when the hero's "Café ✦ Wine Bar" line stopped
-       being copy: the brand lockup on the hero says it in the artwork, so the
-       field had nothing left to edit and came out of data/seed-copy.js. */
-    site_copy: 61
+       being copy. Four more page-specific fields left with the retired page. */
+    site_copy: 57
   };
   const wrong = [];
   for (const [table, n] of Object.entries(expected)) {

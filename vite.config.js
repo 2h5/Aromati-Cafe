@@ -35,7 +35,7 @@ import { defineConfig } from "vite";
    it has to be *deployed*, or the owner cannot edit anything. Leaving it out
    here is a build that works perfectly and ships no editor. It also drags in
    vendor/supabase.js, which the copy step below then has to place. */
-const PAGES = ["index.html", "faq.html", "menu-food.html", "menu-drinks.html",
+const PAGES = ["index.html", "menu-food.html", "menu-drinks.html",
                "menu-wine.html", "admin.html"];
 
 /* Every local script the pages reference, read off the pages themselves rather

@@ -275,7 +275,7 @@ console.log("\nno closures means no list at all");
 console.log("\nthe footer and the mobile menu carry it on every page");
 {
   const rows = seedRows({ exceptions: { "2026-08-08": shut("Staff party") } });
-  for (const p of ["index.html", "menu-food.html", "menu-wine.html", "faq.html"]) {
+  for (const p of ["index.html", "menu-food.html", "menu-wine.html"]) {
     const rig = boot(p, { fetcher: serve(rows), now: WED });
     await settle();
     check(`${p} — the footer names it`,

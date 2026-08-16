@@ -191,20 +191,6 @@ photograph** button under each one.
   appears if the picture ever fails to load. A few images are background texture
   and the editor says so; those need nothing.
 
-### FAQ
-
-This tab is empty on purpose, and there is a question waiting for you.
-
-The FAQ page on the site today is **placeholder text**. Those nine questions
-came off your OpenTable listing and read as though a computer wrote them —
-nobody has checked a single answer against how the café actually runs. The page
-says so, in a box above the questions.
-
-So: do you want an FAQ page at all? If yes, write the real questions and answers
-and add them here — anything you add goes live as soon as you save. If no, say
-so and the page comes off the site. Nothing was moved across in the meantime,
-because it would only have to be thrown away.
-
 ---
 
 ## If something looks wrong

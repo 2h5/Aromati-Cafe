@@ -5,8 +5,7 @@
    ═══════════════════════════════════════════════════════ */
 
 :root{
-  /* lets 0 → auto interpolate, which is what animates the FAQ accordion open.
-     Ignored by engines that don't support it; they just toggle instantly. */
+  /* Allows intrinsic-size transitions where a component opts into them. */
   interpolate-size:allow-keywords;
 
   --oxblood:      #4a1517;
@@ -1701,10 +1700,8 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
 }
 
 /* ═══════════ INNER PAGES ═══════════
-   menu-food.html · menu-drinks.html · menu-wine.html · faq.html. Every page that
-   is not the one-pager opens the same way: a .mhead masthead over a dark body.
-   The menu pages then carry a .carte board; faq.html carries an accordion.
-   .page-doc is the plain variant — masthead and nav treatment, no board. */
+   menu-food.html · menu-drinks.html · menu-wine.html. Every page that is not
+   the one-pager opens the same way: a .mhead masthead over a dark body. */
 .page-menu, .page-doc{ background:var(--oxblood); }
 /* An inner page is arrived at by a click from a sibling, so the bar is already
    in place: it does not animate in at all here. Any entrance — even a fade —
@@ -1863,13 +1860,6 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
 /* ═══════════ THE PRINTED MENU ═══════════
    Everything below re-skins the board on the three menu pages to Aromati's
    real printed carte: blush paper, burgundy rules, vermilion display caps.
-
-   ── why it is an override block and not an edit to the rules above ──
-   .mboard, .carte and .course are shared with faq.html, which is still the
-   dark page it always was. Every selector here is therefore prefixed with
-   .page-menu — the class that menu-food, menu-drinks and menu-wine carry and
-   faq.html (.page-doc) does not. Nothing above this comment changed, so the
-   dark treatment is still exactly one class away if a page ever wants it.
 
    ── where the numbers come from ──
    The three inks are sampled off the supplied PDFs rather than eyeballed:
@@ -2322,83 +2312,6 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
      the old rule shrank the fixed-size art by hand to get that. */
 }
 
-/* ═══════════ FAQ ═══════════
-   faq.html. Native <details>, so the accordion is keyboard- and
-   screen-reader-correct and still works with JavaScript off — there is no JS
-   behind this at all. The open/close is animated through ::details-content
-   where the browser supports it, and is an instant toggle where it doesn't,
-   which is perfectly usable rather than broken. */
-.faqs{
-  max-width:var(--maxw); margin-inline:auto; padding:0 var(--pad);
-}
-.faqs__inner{ max-width:860px; }
-.faq{ border-bottom:1px solid var(--hairline-lt); }
-.faq:first-of-type{ border-top:1px solid var(--hairline-lt); }
-.faq summary{
-  display:flex; align-items:flex-start; justify-content:space-between;
-  gap:clamp(20px,3vw,40px);
-  padding:clamp(20px,2.4vw,28px) 0;
-  cursor:pointer; list-style:none;
-}
-/* the UA triangle, removed in both dialects */
-.faq summary::-webkit-details-marker{ display:none; }
-.faq summary::marker{ content:""; }
-.faq summary:focus-visible{ outline:2px solid var(--gold); outline-offset:4px; border-radius:4px; }
-.faq__q{
-  font-family:var(--serif); font-weight:400;
-  font-size:clamp(17px,1.6vw,22px); line-height:1.35; letter-spacing:-.005em;
-  transition:color .35s var(--ease);
-}
-.faq summary:hover .faq__q{ color:var(--gold); }
-.faq__chev{
-  flex:0 0 auto; margin-top:.45em;
-  width:8px; height:8px;
-  border-right:1.5px solid var(--gold); border-bottom:1.5px solid var(--gold);
-  transform:rotate(45deg);
-  transition:transform .45s var(--ease-exp);
-}
-.faq[open] .faq__chev{ transform:translateY(3px) rotate(-135deg); }
-.faq__a{
-  padding-bottom:clamp(22px,2.6vw,30px); max-width:68ch;
-  font-size:clamp(14.5px,1.1vw,16.5px); font-weight:300; line-height:1.8;
-  color:rgba(244,237,225,.72);
-}
-.faq::details-content{
-  block-size:0; overflow:hidden;
-  transition:block-size .5s var(--ease-exp), content-visibility .5s allow-discrete;
-}
-.faq[open]::details-content{ block-size:auto; }
-
-/* ── the demo notice ──
-   Placeholder copy has to announce itself. This sits above the questions and is
-   meant to be impossible to mistake for finished content. */
-.notice{
-  position:relative;
-  margin:0 0 clamp(34px,4.5vw,56px);
-  padding:clamp(22px,2.8vw,32px) clamp(22px,2.8vw,34px);
-  border:1px solid rgba(201,163,92,.42); border-radius:14px;
-  background:
-    linear-gradient(180deg, rgba(201,163,92,.11), rgba(201,163,92,.04));
-}
-.notice__label{
-  display:inline-flex; align-items:center; gap:9px;
-  font-size:10px; letter-spacing:.3em; text-transform:uppercase; font-weight:700;
-  color:var(--gold);
-  margin-bottom:14px;
-}
-.notice__label::before{
-  content:""; width:6px; height:6px; border-radius:99px; background:var(--gold);
-}
-.notice h2{
-  font-size:clamp(21px,2.1vw,28px); line-height:1.25; margin-bottom:12px;
-}
-.notice p{
-  font-size:clamp(14px,1.05vw,15.5px); font-weight:300; line-height:1.75;
-  color:rgba(244,237,225,.74); max-width:70ch;
-}
-.notice p + p{ margin-top:11px; }
-.notice strong{ font-weight:600; color:var(--cream); }
-
 /* ═══════════ HOME TEASERS ═══════════ */
 
 /* ── a taste of the kitchen ──
@@ -2619,11 +2532,12 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
 /* ═══════════ FOOTER ═══════════ */
 .footer{ background:#180809; color:var(--cream); overflow:hidden; }
 .footer__cols{
-  display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:clamp(24px,3.4vw,52px);
+  display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:clamp(36px,6vw,96px);
   justify-items:center; text-align:center;
-  padding:clamp(46px,6vw,80px) var(--pad);
+  width:min(1120px,100%); margin-inline:auto;
+  padding:clamp(48px,6vw,76px) var(--pad);
 }
-.footer--menu .footer__cols{ grid-template-columns:repeat(5,minmax(0,1fr)); }
+.footer--menu .footer__cols{ grid-template-columns:repeat(4,minmax(0,1fr)); width:min(1320px,100%); }
 .footer__cols > div{ display:flex; flex-direction:column; align-items:center; }
 .footer__cols h4{
   font-family:var(--sans); font-size:10.5px; letter-spacing:.3em; text-transform:uppercase;
@@ -2755,8 +2669,8 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
   .mhead__title{ max-width:none; }
   .build{ grid-template-columns:1fr; }
   .build__ticket{ position:static; }
-  .footer__cols{ grid-template-columns:repeat(3,1fr); row-gap:38px; }
-  .footer--menu .footer__cols{ grid-template-columns:repeat(3,1fr); }
+  .footer__cols{ gap:38px; }
+  .footer--menu .footer__cols{ grid-template-columns:repeat(2,minmax(0,1fr)); }
 }
 @media (max-width: 760px){
   .nav__links, .nav__cta{ display:none; }
@@ -2826,7 +2740,7 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
   .mswitch a{ padding:11px 20px; }
   .mi__desc{ padding-right:0; }
   .carte__foot{ flex-direction:column; align-items:flex-start; }
-  .footer__cols{ grid-template-columns:1fr 1fr; row-gap:34px; }
+  .footer__cols{ grid-template-columns:1fr; row-gap:34px; }
   .footer--menu .footer__cols{ grid-template-columns:1fr 1fr; }
   .visit__rows{ grid-template-columns:1fr; }
   .visit__row{ grid-column:1/-1; }

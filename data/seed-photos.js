@@ -54,8 +54,6 @@ var SEED_PHOTOS = {
 
   "visit.storefront": { src: "assets/web/storefront-exterior.jpg", alt: "The Aromati storefront on East 34th Street", width: 1456, height: 1080 },
 
-  "faq.masthead": { src: "assets/web/dining-corner.jpg", decorative: true, width: 1023, height: 1537 },
-
   "menuFood.masthead": { src: "assets/web/adjaruli.jpg", decorative: true, width: 1747, height: 900 },
 
   "menuDrinks.masthead": { src: "assets/web/latte-art-framed.webp", decorative: true, width: 1083, height: 542 },

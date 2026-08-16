@@ -105,7 +105,7 @@ console.log("\nevery data-copy on the real pages has a value");
     readFileSync("data/seed-copy.js", "utf8") + ";SEED_COPY");
 
   const orphans = [];
-  for (const page of ["index.html", "faq.html", "menu-food.html", "menu-drinks.html", "menu-wine.html"]) {
+  for (const page of ["index.html", "menu-food.html", "menu-drinks.html", "menu-wine.html"]) {
     const doc = new JSDOM(readFileSync(page, "utf8")).window.document;
     for (const n of doc.querySelectorAll("[data-copy]")) {
       const k = n.getAttribute("data-copy");

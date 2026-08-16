@@ -1,13 +1,12 @@
 # Aromati Café & Wine Bar
 
 Marketing site for Aromati Café & Wine Bar — 103 E 34th Street, Murray Hill,
-New York. Five pages, plus an editor the owner uses to change what is on them.
+New York. Four pages, plus an editor the owner uses to change what is on them.
 
 **Status, 2026-08-04: the CMS is built and usable.** Hours, contact details, the
 whole menu across three pages, the section copy and the photographs all come
 from a Supabase project and are edited at `/admin.html`. The next work is
-testing the editor and its browser behavior. The FAQ panel exists, but the FAQ
-page is still placeholder copy — see *The FAQ page* below.
+testing the editor and its browser behavior.
 
 The remaining known visual issue is separate from the CMS: the Wine 04 photo is
 visible on affected iOS portrait sizes but does not currently move with the
@@ -67,15 +66,14 @@ See *Backing up* below.
 | `menu-food.html` | Food — 25 items, 7 courses |
 | `menu-drinks.html` | Drinks — 28 items, 4 courses |
 | `menu-wine.html` | Wine and cocktails — 31 items, 6 courses |
-| `faq.html` | Placeholder questions, see below |
 | `admin.html` / `admin.js` / `admin.css` | The editor. The only page that loads the Supabase SDK |
-| `styles.css` | All styling for all five public pages |
+| `styles.css` | All styling for all four public pages |
 | `script.js` | One IIFE: smooth scroll, nav, reveals, parallax, menu filtering, the open/closed pill |
 | `render.js` | Builds the menu boards, the hours, the copy, the contact details and the JSON-LD from data |
 | `data.js` | `network → localStorage → seed`, and nothing else — it never touches the DOM |
 | `config.js` | Which Supabase project, and the publishable key. Both are public by design |
 | `data/seed-*.js` | The site as it shipped: the offline floor and the disaster-recovery story |
-| `supabase/migrations/` | Ten migrations — schema, seed content, permissions, photographs, menu hiding, size guards, breakfast-builder choices and section hiding |
+| `supabase/migrations/` | Database schema, seed content, permissions, photographs and later feature migrations |
 | `supabase/POLICIES.md` | What the database allows, in plain words |
 | `tools/` | The extractors, the generators and the test suite. Never shipped |
 | `vendor/` | The Supabase SDK, vendored with its digest written down |
@@ -103,7 +101,6 @@ surprises. Pretty URLs are a hosting rewrite later, not a file move.
 | Taking an item off the menu | `menu_items.is_hidden` | Menus, on the item | — never seeded |
 | The crêpe's topping list | `menu_item_options` | — modelled, not exposed | `seed-menu.js` |
 | Photographs and their descriptions | `photos` + the `site-photos` bucket | Photos | `seed-photos.js` |
-| FAQ questions | `faq_entries` (empty) | FAQ | — |
 
 **Hours are printed in five places and they must move together**: the live
 open/closed pill (`script.js`), the Visit table, the footer prose, the
@@ -171,7 +168,7 @@ ticket behavior stable while letting the owner add, hide or remove choices.
 
 ## The editor
 
-`admin.html` — six panels: Words, Hours, Contact, Menus, Photos, FAQ.
+`admin.html` — five panels: Words, Hours, Contact, Menus and Photos.
 
 Signing in loads everything the owner can edit into memory once. Every panel
 edits that copy. Nothing reaches the database until **Save changes**, and
@@ -364,27 +361,6 @@ If the project were lost, the site would fall back to the photographs it shipped
 with — a correct site, but not the site the owner had. Download the bucket
 periodically, or accept that. Nothing else here needs a backup that git is not
 already providing.
-
----
-
-## The FAQ page
-
-`faq.html` is a **demo**. Its nine questions came from Aromati's OpenTable
-listing, where they read as automatically generated, and nothing in them has
-been verified against how the café actually runs. The page says so, loudly, in a
-`.notice` block above the questions — **that block is the point, and it must not
-be quietly deleted while the borrowed copy stays.**
-
-The questions have deliberately **not** been moved into the database.
-`faq_entries` exists and is empty, and the editor's FAQ panel opens with the
-same notice. Building the panel commits to nothing; transcribing placeholder
-copy would commit to the wrong thing twice.
-
-It is linked only from the footers, so it is easy to pull: delete `faq.html` and
-the five footer links. The accordion is native `<details>`/`<summary>` with no
-JavaScript at all. There is deliberately **no `FAQPage` JSON-LD** — structured
-data would publish unverified copy to search engines as the restaurant's own
-answers. Add it once the real questions are written and approved.
 
 ---
 

@@ -50,7 +50,7 @@ if (!CHROME) {
   process.exit(0);
 }
 
-const PAGES = ["index.html", "faq.html", "menu-food.html", "menu-drinks.html", "menu-wine.html"];
+const PAGES = ["index.html", "menu-food.html", "menu-drinks.html", "menu-wine.html"];
 
 /* What is watched, and why. The nav is on every page and fixed in place, so
    anything that moves there moves on every navigation. The wordmark and the

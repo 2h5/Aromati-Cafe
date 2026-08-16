@@ -71,7 +71,7 @@ if (!CHROME) {
   process.exit(0);
 }
 
-const PAGES = ["index.html", "faq.html", "menu-food.html", "menu-drinks.html", "menu-wine.html"];
+const PAGES = ["index.html", "menu-food.html", "menu-drinks.html", "menu-wine.html"];
 const WIDTHS = [1600, 1024, 390];
 
 /* Real words, not "aaaa…". Line breaking depends on where the spaces fall, so

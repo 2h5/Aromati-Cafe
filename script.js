@@ -87,8 +87,8 @@
   });
 
   /* ── opening entrance: nav + title + reveals, choreographed together ──
-     The home page opens on the hero; every inner page — the three menus and the
-     FAQ — opens on its .mhead masthead. Both play the same shape, but the inner
+     The home page opens on the hero; each menu page opens on its .mhead
+     masthead. Both play the same shape, but the inner
      pages skip the bar's drop-in, since arriving there is a click from a
      sibling page rather than opening the site. */
   var isInnerPage = document.body.classList.contains("page-menu") ||
@@ -97,8 +97,8 @@
   /* An inner page's opening sequence, in milliseconds, in one place. Read it
      top to bottom and you have the whole arrival: the eyebrow, the title
      lifting its words, the line under it, the switcher, then whatever the page
-     puts under the masthead — the filter tabs on a menu, the demo notice on the
-     FAQ — and last the courses already on screen. Nothing here is on the
+     puts under the masthead — the filter tabs — and last the courses already
+     on screen. Nothing here is on the
      observer's clock: every one of these is visible at load, so leaving any of
      it to the observer would fire it in the first frame and break the run. */
   var MENU_T = { eyebrow: 0, title: 110, lede: 250, switcher: 380, order: 450,

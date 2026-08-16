@@ -21,8 +21,7 @@ import { JSDOM } from "jsdom";
 
 const BASE = process.env.PHASE1_BASE || "53b3d5e";   // last commit before the conversion
 const PAGES = [
-  "index.html", "faq.html",
-  "menu-food.html", "menu-drinks.html", "menu-wine.html"
+  "index.html", "menu-food.html", "menu-drinks.html", "menu-wine.html"
 ];
 
 /* Compared whole-page, not board-only: the hours and contact renderers write
@@ -46,8 +45,6 @@ const INTENDED = [
 
   { page: "index.html", was: "Georgian kitchen, all day", now: "Georgian kitchen",
     why: "menu summary shortened on request, 2026-08-12" },
-  { page: "faq.html", was: "Georgian kitchen, all day", now: "Georgian kitchen",
-    why: "menu summary shortened on request, 2026-08-12" },
   { page: "menu-food.html", was: "Georgian kitchen, all day", now: "Georgian kitchen",
     why: "menu summary shortened on request, 2026-08-12" },
   { page: "menu-drinks.html", was: "Georgian kitchen, all day", now: "Georgian kitchen",
@@ -70,8 +67,6 @@ const INTENDED = [
      stopped displaying it. */
   { page: "index.html", was: "info@aromatiNY.com", now: "info@aromatinyc.com",
     why: "the café's real address, 2026-08-01 (50d9002)" },
-  { page: "faq.html", was: "info@aromatiNY.com", now: "info@aromatinyc.com",
-    why: "the café's real address, 2026-08-01 (50d9002)" },
   { page: "menu-food.html", was: "info@aromatiNY.com", now: "info@aromatinyc.com",
     why: "the café's real address, 2026-08-01 (50d9002)" },
   { page: "menu-drinks.html", was: "info@aromatiNY.com", now: "info@aromatinyc.com",
@@ -91,7 +86,6 @@ const REMOVED = [
      their own copy of the drawer, so they kept the numbers — and once the CSS
      that positioned them was gone with the home page's, they rendered as a bare
      line of digits above each word. Same removal, three days late. */
-  { page: "faq.html",         sel: ".mmenu__links .mml__n", why: "as index.html, 2026-08-07" },
   { page: "menu-food.html",   sel: ".mmenu__links .mml__n", why: "as index.html, 2026-08-07" },
   { page: "menu-drinks.html", sel: ".mmenu__links .mml__n", why: "as index.html, 2026-08-07" },
   { page: "menu-wine.html",   sel: ".mmenu__links .mml__n", why: "as index.html, 2026-08-07" },
@@ -103,7 +97,6 @@ const REMOVED = [
      One entry per page, deliberately: an allowance that applied everywhere
      would keep forgiving this on a page that had quietly lost its bar. */
   { page: "index.html",       sel: ".nav__brand", why: "brand set as the lockup, 2026-08-06" },
-  { page: "faq.html",         sel: ".nav__brand", why: "brand set as the lockup, 2026-08-06" },
   { page: "menu-food.html",   sel: ".nav__brand", why: "brand set as the lockup, 2026-08-06" },
   { page: "menu-drinks.html", sel: ".nav__brand", why: "brand set as the lockup, 2026-08-06" },
   { page: "menu-wine.html",   sel: ".nav__brand", why: "brand set as the lockup, 2026-08-06" },
@@ -114,10 +107,18 @@ const REMOVED = [
   { page: "index.html", sel: ".hero__sub",   why: "the lockup carries this line, 2026-08-06" },
 
   { page: "index.html",       sel: ".studio-credit", why: "portfolio credit removed on request, 2026-08-12" },
-  { page: "faq.html",         sel: ".studio-credit", why: "portfolio credit removed on request, 2026-08-12" },
   { page: "menu-food.html",   sel: ".studio-credit", why: "portfolio credit removed on request, 2026-08-12" },
   { page: "menu-drinks.html", sel: ".studio-credit", why: "portfolio credit removed on request, 2026-08-12" },
-  { page: "menu-wine.html",   sel: ".studio-credit", why: "portfolio credit removed on request, 2026-08-12" }
+  { page: "menu-wine.html",   sel: ".studio-credit", why: "portfolio credit removed on request, 2026-08-12" },
+
+  { page: "index.html",       sel: ".footer__cols > div:nth-child(4)", structure: true,
+    why: "Good to Know footer column removed with the declined FAQ, 2026-08-15" },
+  { page: "menu-food.html",   sel: ".footer__cols > div:nth-child(5)", structure: true,
+    why: "Good to Know footer column removed with the declined FAQ, 2026-08-15" },
+  { page: "menu-drinks.html", sel: ".footer__cols > div:nth-child(5)", structure: true,
+    why: "Good to Know footer column removed with the declined FAQ, 2026-08-15" },
+  { page: "menu-wine.html",   sel: ".footer__cols > div:nth-child(5)", structure: true,
+    why: "Good to Know footer column removed with the declined FAQ, 2026-08-15" }
 ];
 
 /* Content added since the baseline, named by selector rather than by the words
@@ -290,13 +291,16 @@ for (const page of PAGES) {
     igLinks: root.querySelectorAll('a[href*="instagram.com"]').length
   });
 
-  /* Shape is counted on both sides with the reseeded subtrees removed, and
-     nothing else removed — ADDED and REMOVED are text allowances and are cut
-     from one side only, so applying them here would invent a difference. */
+  /* Shape is counted on both sides with the reseeded subtrees removed. Most
+     REMOVED entries are text-only allowances; entries marked structure are
+     intentional subtree deletions and therefore leave the baseline too. */
   const shapeBefore = before.cloneNode(true);
   const shapeAfter = after.cloneNode(true);
   dropReseeded(shapeBefore, page);
   dropReseeded(shapeAfter, page);
+  for (const remove of REMOVED.filter((r) => r.page === page && r.structure)) {
+    for (const n of shapeBefore.querySelectorAll(remove.sel)) n.parentNode.removeChild(n);
+  }
 
   const sa = shape(shapeBefore), sb = shape(shapeAfter);
   const shapeDiffs = Object.keys(sa).filter((k) => sa[k] !== sb[k]);

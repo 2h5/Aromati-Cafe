@@ -10,7 +10,7 @@
 
 import { readFileSync, writeFileSync } from "node:fs";
 
-const PAGES = ["index.html", "faq.html", "menu-food.html", "menu-drinks.html", "menu-wine.html"];
+const PAGES = ["index.html", "menu-food.html", "menu-drinks.html", "menu-wine.html"];
 
 /* The whole set, in the order it has to load. config.js first because data.js
    reads it; the seeds next because render.js reads them; data.js before
