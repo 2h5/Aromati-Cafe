@@ -404,6 +404,13 @@ var AROMATI_DATA = (function () {
       if (typeof row.slot !== "string" || !row.slot) return;
       var photo = out[row.slot] || (out[row.slot] = { alt: "", url: null });
       if (typeof row.alt === "string" && row.alt) photo.alt = row.alt;
+      /* The words over the photograph, where the page has them — today only
+         the Kitchen strip. Same rule as the description: an empty column is
+         not an instruction to erase the sentence in the markup. The bake
+         (tools/bake-photos.mjs) writes them into the page; this layer only
+         carries them so the editor and check-live-project see the live
+         wording. */
+      if (typeof row.caption === "string" && row.caption) photo.caption = row.caption;
       if (typeof row.storage_path === "string" && row.storage_path &&
           !alreadyInMarkup(row.slot, row.storage_path)) {
         photo.url = publicUrl(row.storage_path);
@@ -561,7 +568,7 @@ var AROMATI_DATA = (function () {
          what the site would render rather than its own opinion of the table's
          shape. Deleting it costs no round trip and loses that check.
          PHOTOGRAPHS.md §8. */
-      get("photos?select=slot,storage_path,alt"),
+      get("photos?select=slot,storage_path,alt,caption"),
       get("hours_exceptions?select=on_date,is_closed,opens_at,closes_at,note&order=on_date"),
       /* This table was added after the first CMS schema. It is deliberately
          optional while an older deployment is being migrated: a 404 must not

@@ -170,6 +170,19 @@ for (const [file, slots] of PAGES) {
       );
     }
 
+    /* The Kitchen strip carries a short line of text over each plate, in a
+       <figcaption> that is text and nothing else. That is the only shape read
+       here: a figcaption with markup inside it — the story photographs' kicker
+       spans, the café cards' copy-managed strong/span — is not a caption, it is
+       layout, and splicing a sentence into it at build time would break both.
+       Pure text is also what keeps the bake's rewrite honest: it can replace
+       the text without having to understand what surrounds it. */
+    const fig = img.closest("figure");
+    const capEl = fig ? fig.querySelector("figcaption") : null;
+    const caption = capEl && capEl.childElementCount === 0
+      ? capEl.textContent.trim() || null
+      : null;
+
     const was = photos.get(slot);
     if (was && was.src !== src) {
       throw new Error(
@@ -177,15 +190,22 @@ for (const [file, slots] of PAGES) {
         `files (${was.src} and ${src}). They are one slot; make them agree.`
       );
     }
+    if (was && caption && was.caption && caption !== was.caption) {
+      throw new Error(
+        `${file}: ${slot} is drawn twice and the two captions disagree ` +
+        `("${was.caption}" and "${caption}"). They are one slot; make them agree.`
+      );
+    }
     if (was) {
       was.decorative = was.decorative && decorative;
       if (!was.alt && alt) was.alt = alt;
+      if (!was.caption && caption) was.caption = caption;
       return;
     }
 
     const size = dimensions(src) || {};
     photos.set(slot, {
-      label, src, alt, decorative,
+      label, src, alt, decorative, caption,
       width: size.width || null, height: size.height || null
     });
   });
@@ -228,6 +248,7 @@ const body = groups.map(({ rows }) =>
     const parts = [`src: ${q(p.src)}`];
     if (p.decorative) parts.push("decorative: true");
     else parts.push(`alt: ${q(p.alt)}`);
+    if (p.caption) parts.push(`caption: ${q(p.caption)}`);
     if (p.width) parts.push(`width: ${p.width}, height: ${p.height}`);
     return `  ${q(slot)}: { ${parts.join(", ")} }`;
   }).join(",\n")
@@ -251,6 +272,12 @@ const header = `/* Photographs — one entry per slot in the markup.
    behind a scrim, aria-hidden, and deliberately announced as nothing. The
    editor does not ask for a description for these and render.js does not
    write one.
+
+   \`caption\` is the short line of text shown over the photograph, where the
+   page displays one — today only the Kitchen strip's plates. Like \`src\` it is
+   here to be compared: the words already live in the markup, the database
+   stores the owner's version, and tools/bake-photos.mjs writes the current one
+   into the built page.
 
    Dimensions are the built-in file's own, read off the file. The site does not
    use them for layout; the editor uses them to notice when a replacement is a

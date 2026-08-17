@@ -207,7 +207,7 @@ var AROMATI_ADMIN = (function () {
        it is described are the owner's; the slot name, the label and whether it
        is decoration are the page's, and only_photo_may_change() puts them back
        if anything here ever tries. */
-    photos:          ["storage_path", "source_path", "alt", "width", "height"]
+    photos:          ["storage_path", "source_path", "alt", "caption", "width", "height"]
   };
 
   /* Where the owner may add and remove rows at all. site_settings, site_copy,
@@ -3019,6 +3019,23 @@ var AROMATI_ADMIN = (function () {
       }).wrap);
     }
 
+    /* The words over the photograph, where the page displays them — today
+       only the Kitchen strip's plates, which is why the seed is asked: a slot
+       with no caption in the markup gets no box here, rather than an
+       invitation to type words that would appear nowhere. */
+    var seedCap = builtIn(row.slot);
+    if (!row.is_decorative && seedCap && seedCap.caption) {
+      side.appendChild(makeField({
+        table: "photos", row: row, col: "caption",
+        cardId: cardId, tab: "photos",
+        label: "The words on the photograph", type: "text",
+        value: row.caption || "",
+        help: "Shown over the photo in the Kitchen strip. Keep it naming " +
+              "the dish in the picture.",
+        onInput: function (v) { row.caption = v; view.redraw(); }
+      }).wrap);
+    }
+
     wrap.appendChild(side);
     describeState();
     return wrap;
@@ -4450,7 +4467,7 @@ var AROMATI_ADMIN = (function () {
                             hint: "Short description", is_hidden: "Hidden from the site",
                             sort_order: "Position" },
     photos:          { storage_path: "Photograph", source_path: "Unframed original",
-                       alt: "Description", width: "Width", height: "Height" }
+                       alt: "Description", caption: "Words on the photograph", width: "Width", height: "Height" }
   };
 
   var VALUE_MAX = 64;
@@ -5226,7 +5243,7 @@ var AROMATI_ADMIN = (function () {
     menu_items: "id,course_id,name,tag,description,price,prices,price_all_sizes,no_price,is_hidden,options_dom_id,sort_order",
     menu_item_pours: "id,item_id,label,price,sort_order",
     menu_builder_options: "id,group_key,label,price,hint,sub_key,is_hidden,sort_order",
-    photos: "id,slot,label,storage_path,source_path,alt,width,height,is_decorative,sort_order"
+    photos: "id,slot,label,storage_path,source_path,alt,caption,width,height,is_decorative,sort_order"
   };
 
   /* hours_exceptions has no sort_order — a holiday's place in the list is its

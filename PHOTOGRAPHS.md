@@ -184,6 +184,12 @@ Short, because there is little left to break.
 2. **Alt text must be baked with the `src`.** The database holds both. If the
    bake writes only one of them, the other silently stops reaching the site the
    moment the runtime swap is removed. See §0.
+2a. **Captions bake by the same rule.** The Kitchen strip's figcaptions live in
+   `photos.caption` (added 17 Aug 2026) and are written into both reel groups
+   at build time, whether or not the picture itself changed. Only a pure-text
+   figcaption is a caption — one with markup inside it (a kicker span, a
+   copy-managed strong) is layout, and neither the extractor nor the bake will
+   touch it.
 3. **`publicUrl` must be spelled the same way in `bake-photos.mjs` and
    `data.js`.** The editor builds URLs from the same rule.
 4. **`.nvmrc` must stay.** Pages picks a very old default Node otherwise, and

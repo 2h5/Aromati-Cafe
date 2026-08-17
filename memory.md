@@ -523,4 +523,5 @@ Migrations: `supabase/migrations/20260801000000_init_cms.sql`,
 `supabase/migrations/20260812000100_breakfast_builder.sql` and
 `supabase/migrations/20260812000200_menu_course_hidden.sql`,
 `supabase/migrations/20260812000300_smooth_admin_validation_copy.sql` and
-`supabase/migrations/20260815000000_remove_retired_page.sql`.
+`supabase/migrations/20260815000000_remove_retired_page.sql` and
+`supabase/migrations/20260817000000_photo_captions.sql`.

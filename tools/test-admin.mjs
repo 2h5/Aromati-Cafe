@@ -2254,7 +2254,46 @@ console.log("\nthe columns a photograph slot does not own");
         ["slot", "label", "is_decorative", "sort_order"].filter((c) => c in payload), []);
   check("only the picture and the words about it",
         Object.keys(payload).sort(),
-        ["alt", "height", "source_path", "storage_path", "width"]);
+        ["alt", "caption", "height", "source_path", "storage_path", "width"]);
+}
+
+console.log("\nthe words on the photograph");
+{
+  /* The Kitchen strip's plates carry a caption; the hero does not. The box
+     exists only where the page has words to put in it, and it opens showing
+     what the page says today. */
+  const data = fixture();
+  data.photos.push({ id: "ph3", slot: "kitchen.plate1",
+    label: "The Kitchen strip — 1st photograph",
+    storage_path: null, source_path: null,
+    alt: "Adjaruli khachapuri — cheese boat with egg yolk and butter",
+    caption: "Adjaruli Khachapuri",
+    width: 1100, height: 566, is_decorative: false, sort_order: 30 });
+  const seedPhotos = Object.assign({}, SEED_PHOTOS, {
+    "kitchen.plate1": { src: "assets/web/adjaruli.webp",
+      alt: "Adjaruli khachapuri — cheese boat with egg yolk and butter",
+      caption: "Adjaruli Khachapuri", width: 1100, height: 566 }
+  });
+  const r = await boot({ data: data, seedPhotos: seedPhotos });
+  await r.signIn();
+  r.tab("Photos");
+
+  const plate = r.photo("The Kitchen strip — 1st photograph");
+  const box = [...plate.querySelectorAll(".field")]
+    .find((f) => f.textContent.includes("The words on the photograph"));
+  check("a plate has a box for the words over it", !!box, true);
+  check("and it opens showing the words on the page",
+        box && (box.querySelector(".field__input") || {}).value, "Adjaruli Khachapuri");
+
+  const hero = r.photo("The photograph behind the opening headline");
+  check("a photograph with no words gets no box",
+        hero.textContent.includes("The words on the photograph"), false);
+
+  /* And a rewording saves like any other change. */
+  r.type(box.querySelector(".field__input"), "The Cheese Boat");
+  await r.save();
+  check("the new words are what gets sent",
+        r.writes().length ? r.writes()[0].payload.caption : null, "The Cheese Boat");
 }
 
 

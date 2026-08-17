@@ -125,14 +125,25 @@ const publicUrl = (p) =>
 
 let rows;
 try {
-  rows = await rest("photos?select=slot,storage_path,alt");
+  rows = await rest("photos?select=slot,storage_path,alt,caption");
 } catch (err) {
   skip(`the database did not answer — ${err.message}`);
 }
 
 const uploaded = rows.filter((r) => r && r.slot && r.storage_path);
-if (!uploaded.length) {
-  console.log("  no slot has an uploaded photograph — nothing to bake");
+
+/* The words over a photograph bake exactly like the picture: the database is
+   asked at build time and the answer is written into the page. A slot with no
+   upload can still have a caption to bake, so "nothing to do" means neither. */
+const captioned = new Map();
+for (const r of rows) {
+  if (r && r.slot && typeof r.caption === "string" && r.caption.trim()) {
+    captioned.set(r.slot, r.caption);
+  }
+}
+
+if (!uploaded.length && !captioned.size) {
+  console.log("  no slot has an uploaded photograph or a caption — nothing to bake");
   console.log("\n  dist/ ships the photographs in git, which is the current set.\n");
   process.exit(0);
 }
@@ -172,7 +183,7 @@ for (const row of uploaded) {
   }
 }
 
-if (!baked.size) skip(`not one photograph could be fetched — ${failed.join(", ")}`);
+if (uploaded.length && !baked.size) skip(`not one photograph could be fetched — ${failed.join(", ")}`);
 
 /* The owner types the description, and here it is written into markup rather
    than handed to setAttribute, which is the one place in this project where
@@ -219,7 +230,8 @@ function attr(text) {
 function rewritePage(html, page) {
   let count = 0;
   let described = 0;
-  const out = html.replace(
+  let captions = 0;
+  let out = html.replace(
     /<img\b[^>]*>/g,
     (tag) => {
       const slot = (tag.match(/\bdata-photo="([^"]+)"/) || [])[1];
@@ -235,10 +247,26 @@ function rewritePage(html, page) {
       return out;
     }
   );
-  if (count) {
-    say(`${page.padEnd(17)} ${count} photograph${count === 1 ? "" : "s"}` +
-        (described ? `, ${described} description${described === 1 ? "" : "s"}` : ""));
+
+  /* The words over the plate, written beside the picture. The reel draws
+     each slot twice — once for people and once aria-hidden so the strip can
+     scroll forever — and the words are part of what is *seen*, so both
+     copies get them; only the description is withheld from the repeat. The
+     figcaption matched is text only: one with markup inside it (a kicker
+     span, a copy-managed strong) is layout, the extractor never made a
+     caption out of it, and there is nothing here to destroy. */
+  for (const [slot, caption] of captioned) {
+    const esc = slot.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const re = new RegExp(
+      `(<img\\b[^>]*data-photo="${esc}"[^>]*>\\s*<figcaption>)[^<]*(</figcaption>)`, "g");
+    out = out.replace(re, (_m, open, close) => { captions++; return open + attr(caption) + close; });
   }
+
+  const bits = [];
+  if (count) bits.push(`${count} photograph${count === 1 ? "" : "s"}`);
+  if (described) bits.push(`${described} description${described === 1 ? "" : "s"}`);
+  if (captions) bits.push(`${captions} caption${captions === 1 ? "" : "s"}`);
+  if (bits.length) say(`${page.padEnd(17)} ${bits.join(", ")}`);
   return out;
 }
 

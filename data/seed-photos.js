@@ -17,6 +17,12 @@
    editor does not ask for a description for these and render.js does not
    write one.
 
+   `caption` is the short line of text shown over the photograph, where the
+   page displays one — today only the Kitchen strip's plates. Like `src` it is
+   here to be compared: the words already live in the markup, the database
+   stores the owner's version, and tools/bake-photos.mjs writes the current one
+   into the built page.
+
    Dimensions are the built-in file's own, read off the file. The site does not
    use them for layout; the editor uses them to notice when a replacement is a
    very different shape from what it replaces. */
@@ -27,15 +33,15 @@ var SEED_PHOTOS = {
   "story.a": { src: "assets/web/dining-corner-framed.webp", alt: "Burgundy wall, organic mirror and cane chairs inside Aromati", width: 1023, height: 682 },
   "story.b": { src: "assets/web/golden-hour-framed.webp", alt: "Golden hour light across the window tables at Aromati", width: 1088, height: 680 },
 
-  "kitchen.plate1": { src: "assets/web/adjaruli.webp", alt: "Adjaruli khachapuri — cheese boat with egg yolk and butter", width: 1100, height: 566 },
-  "kitchen.plate2": { src: "assets/web/khinkali-framed.webp", alt: "Khinkali — Georgian soup dumplings", width: 688, height: 550 },
-  "kitchen.plate3": { src: "assets/web/imeruli.webp", alt: "Imeruli khachapuri — round cheese-filled bread", width: 1100, height: 578 },
-  "kitchen.plate4": { src: "assets/web/badrijani.webp", alt: "Eggplant rolls with walnut paste and pomegranate", width: 1100, height: 576 },
-  "kitchen.plate5": { src: "assets/web/pkhali-board.webp", alt: "Assorted pkhali with warm cornbread", width: 1100, height: 546 },
-  "kitchen.plate6": { src: "assets/web/shoti-ajika.webp", alt: "Shoti’s puri, canoe-shaped Georgian bread with ajika", width: 1100, height: 566 },
-  "kitchen.plate7": { src: "assets/web/tolma.webp", alt: "Tolma — grape leaves with garlic sour cream", width: 1100, height: 560 },
-  "kitchen.plate8": { src: "assets/web/georgian-salad.webp", alt: "The Georgian salad with walnut dressing", width: 1100, height: 574 },
-  "kitchen.plate9": { src: "assets/web/honey-cake.webp", alt: "Layered honey cake with pistachio", width: 1100, height: 570 },
+  "kitchen.plate1": { src: "assets/web/adjaruli.webp", alt: "Adjaruli khachapuri — cheese boat with egg yolk and butter", caption: "Adjaruli Khachapuri", width: 1100, height: 566 },
+  "kitchen.plate2": { src: "assets/web/khinkali-framed.webp", alt: "Khinkali — Georgian soup dumplings", caption: "Khinkali", width: 688, height: 550 },
+  "kitchen.plate3": { src: "assets/web/imeruli.webp", alt: "Imeruli khachapuri — round cheese-filled bread", caption: "Imeruli Khachapuri", width: 1100, height: 578 },
+  "kitchen.plate4": { src: "assets/web/badrijani.webp", alt: "Eggplant rolls with walnut paste and pomegranate", caption: "Eggplant Rolls", width: 1100, height: 576 },
+  "kitchen.plate5": { src: "assets/web/pkhali-board.webp", alt: "Assorted pkhali with warm cornbread", caption: "Assorted Pkhali", width: 1100, height: 546 },
+  "kitchen.plate6": { src: "assets/web/shoti-ajika.webp", alt: "Shoti’s puri, canoe-shaped Georgian bread with ajika", caption: "Shoti’s Puri & Ajika", width: 1100, height: 566 },
+  "kitchen.plate7": { src: "assets/web/tolma.webp", alt: "Tolma — grape leaves with garlic sour cream", caption: "Tolma", width: 1100, height: 560 },
+  "kitchen.plate8": { src: "assets/web/georgian-salad.webp", alt: "The Georgian salad with walnut dressing", caption: "The Georgian Salad", width: 1100, height: 574 },
+  "kitchen.plate9": { src: "assets/web/honey-cake.webp", alt: "Layered honey cake with pistachio", caption: "Honey Cake", width: 1100, height: 570 },
 
   "cafe.card1": { src: "assets/web/tiramisu-latte.jpg", alt: "Tiramisu latte in a branded Aromati cup", width: 1088, height: 1446 },
   "cafe.card2": { src: "assets/web/maple-latte-framed.webp", alt: "Maple syrup iced latte with cold foam", width: 878, height: 1200 },

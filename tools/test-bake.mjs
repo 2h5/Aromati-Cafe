@@ -317,6 +317,61 @@ console.log("\nthe editor is not rewritten\n");
         pages.includes("admin.html"), false);
 }
 
+
+console.log("\nthe words over the plate bake without a photograph changing\n");
+{
+  /* A caption is a change worth publishing on its own: the owner rewords
+     "Imeruli Khachapuri" and no picture moves. The bake must still run, still
+     leave every src alone, and still touch both copies of the slot — the one
+     announced and the aria-hidden repeat — because the words are seen, not
+     heard. */
+  stageDist();
+  const r = run({ rows: [{ slot: "kitchen.plate3", caption: "Round Cheese Bread" }] });
+  const html = read("index.html");
+
+  check("the tool succeeds", r.code, 0);
+  check("both copies of the plate carry the new words",
+        (html.match(/<figcaption>Round Cheese Bread<\/figcaption>/g) || []).length, 2);
+  check("the old words are gone", html.includes("Imeruli Khachapuri"), false);
+  check("and the photograph itself is untouched",
+        html.includes('data-photo="kitchen.plate3" src="assets/web/imeruli.webp"'), true);
+  check("nothing is stamped — no picture moved",
+        read("data/seed-photos.js").includes("baked:"), false);
+  check("and it says so", /2 captions\b/.test(r.out), true);
+}
+
+console.log("\na caption is text the owner typed, not markup\n");
+{
+  /* Same injection as the description case, one element over. A caption
+     containing a < closes the figcaption and everything after it is parsed as
+     markup — owner-typed text entering a page through a build step has to be
+     quoted by the build step. */
+  stageDist();
+  const nasty = 'Sweet & <script>alert(1)</script> "delicious"';
+  const r = run({ rows: [{ slot: "kitchen.plate9", caption: nasty }] });
+  const html = read("index.html");
+
+  check("the tool succeeds", r.code, 0);
+  check("the caption is escaped", html.includes("Sweet &amp; &lt;script&gt;"), true);
+  check("no runnable script reached the page", /<script>alert\(1\)<\/script>/.test(html), false);
+}
+
+console.log("\na figcaption with markup inside it is not a caption\n");
+{
+  /* The story photographs' captions are kicker spans and the café cards' are
+     copy-managed — layout, not text. A caption written for one of those slots
+     has no pure-text figcaption to land in and must change nothing rather
+     than shred the markup it found. */
+  stageDist();
+  const r = run({ rows: [{ slot: "story.a", caption: "Words that go nowhere" }] });
+  const html = read("index.html");
+
+  check("the tool succeeds", r.code, 0);
+  check("the kicker markup survives intact",
+        html.includes('<figcaption><span class="cap__k">Upstairs</span> Burgundy, cane &amp; oak</figcaption>'), true);
+  check("and the words appear nowhere", html.includes("Words that go nowhere"), false);
+}
+
 rmSync(WORK, { recursive: true, force: true });
 
 console.log(failures
