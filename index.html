@@ -497,23 +497,15 @@
 
       <div class="reservation__slot" id="opentableWidgetSlot">
         <!-- OPENTABLE WIDGET START
-             Replace the .reservation__placeholder element below with the exact
-             iframe widget code supplied by OpenTable. Choose the Wide theme so
-             the live booking controls use this modal's full available width.
+             Live OpenTable embed (restaurant ID 1475119). script.js renders
+             the iframe itself — swapping between OpenTable's Wide (840×350)
+             and Standard (224×301) themes as the viewport crosses 840px,
+             which OpenTable's own loader only decides once at page load. The
+             mural URL, palette (color=8 custom theme, site gold #c9a35c) and
+             transparent card all live in script.js, in the "book a table"
+             module. Retune the widget there — no new code from OpenTable is
+             ever needed.
              OPENTABLE WIDGET END -->
-        <div class="reservation__placeholder">
-          <span class="reservation__placeholder-mark" aria-hidden="true">OT</span>
-          <div class="reservation__placeholder-copy">
-            <span class="reservation__placeholder-kicker">OpenTable calendar</span>
-            <strong>Online reservations are coming soon.</strong>
-            <p>Guests will soon be able to choose their party, date and time without leaving this page.</p>
-          </div>
-          <div class="reservation__placeholder-call">
-            <span>Need a table now?</span>
-            <a class="reservation__phone" href="tel:+13322073847"><span>+1 (332) 207-3847</span></a>
-            <small>We’ll be happy to help.</small>
-          </div>
-        </div>
       </div>
 
       <div class="reservation__foot" aria-label="Restaurant details">

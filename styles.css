@@ -813,7 +813,7 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
 .hero__eyebrow{
   display:inline-flex; align-items:center;
   font-size:11px; letter-spacing:.34em; text-transform:uppercase; font-weight:700;
-  margin-bottom:clamp(14px,2vh,26px); color:var(--parchment);
+  margin-bottom:clamp(14px,2vh,26px); color:var(--gold);
 }
 .hero__title{
   /* The illustrated lockup is a block of artwork, not a text line. Keeping
@@ -2607,8 +2607,10 @@ html.reservation-open .nav{ right:var(--reservation-scrollbar,0px); }
 .reservation__dialog{
   position:relative; z-index:1;
   display:flex; flex-direction:column;
-  width:min(1040px,100%); height:min(720px,calc(100svh - clamp(24px,6vw,72px)));
-  min-height:min(560px,calc(100svh - 24px)); overflow:hidden;
+  width:min(960px,100%); max-height:calc(100svh - clamp(24px,6vw,72px));
+  /* overflow stays visible: the reservation widget's dropdowns deliberately
+     paint past the card (and past this box) while they are open. */
+  overflow:visible;
   border:1px solid rgba(244,237,225,.24); border-radius:24px;
   background:
     radial-gradient(circle at 8% 0%, rgba(203,161,88,.15), transparent 31%),
@@ -2658,16 +2660,24 @@ html.reservation-open .nav{ right:var(--reservation-scrollbar,0px); }
 .reservation__close:focus-visible,
 .reservation__phone:focus-visible{ outline:2px solid var(--gold); outline-offset:3px; }
 .reservation__slot{
-  display:grid; place-items:center; flex:1 1 auto; min-height:0; overflow:auto;
-  padding:clamp(28px,4vw,54px) clamp(24px,5vw,64px); text-align:center;
+  display:grid; place-items:center; flex:0 0 auto; min-height:0; overflow:visible;
+  padding:clamp(18px,2.6vw,30px) clamp(14px,3vw,40px); text-align:center;
   overscroll-behavior:contain;
 }
-/* OpenTable's recommended embed renders a fixed-size iframe. These rules keep
-   the generated Wide version centered and stop it overflowing a narrow phone.
-   The provider still controls the layout inside the cross-origin iframe. */
-.reservation__slot > iframe,
-.reservation__slot > div:not(.reservation__placeholder){ display:block; max-width:100%; margin-inline:auto; }
-.reservation__slot > iframe{ border:0; }
+/* The site renders OpenTable's frame itself (see script.js, "book a table").
+   The Wide frame is 840×350 but its card is only ~150px tall — the rest is
+   reserved for the date/time dropdowns. The wrapper reserves just the card's
+   height (script.js sizes it) and everything stays overflow:visible, so the
+   modal hugs the widget yet an open dropdown still paints over the footer,
+   which holds no interactive elements. The frame is scaled, never clipped,
+   when the slot is narrower than the fixed frame. */
+.reservation__slot > div:not(.reservation__placeholder){
+  display:block; margin-inline:auto; overflow:visible;
+}
+.reservation__slot iframe{
+  display:block; border:0; margin-inline:auto;
+  transform:scale(var(--ot-scale,1)); transform-origin:top center;
+}
 .reservation__placeholder{
   display:grid; grid-template-columns:auto minmax(0,1fr) minmax(220px,.62fr);
   align-items:center; gap:clamp(22px,3.4vw,46px); width:100%; text-align:left;
@@ -2708,12 +2718,12 @@ html.reservation-open .nav{ right:var(--reservation-scrollbar,0px); }
 }
 @media (max-width:760px){
   .reservation{ padding:10px; }
-  .reservation__dialog{ height:calc(100svh - 20px); min-height:0; border-radius:18px; }
+  .reservation__dialog{ max-height:calc(100svh - 20px); border-radius:18px; }
   .reservation__head{ padding:22px 20px 18px; }
   .reservation__head h3{ font-size:34px; }
   .reservation__head p{ font-size:13px; }
   .reservation__close{ width:40px; height:40px; }
-  .reservation__slot{ place-items:start center; padding:28px 20px; }
+  .reservation__slot{ padding:16px 14px; }
   .reservation__placeholder{
     grid-template-columns:1fr; justify-items:center; gap:20px; text-align:center;
   }

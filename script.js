@@ -1205,6 +1205,72 @@
     var lastTrigger = triggers[0];
     var restoreFocus = false;
 
+    /* OpenTable's official loader picks the Wide (840×350) or Standard
+       (224×301) theme once, at page load, and never again — a resized window
+       kept whatever it started with. So the site renders the frame itself:
+       the mural URL below is exactly what the loader generates (verified
+       2026-08-17), with color=8 (OpenTable's custom theme) carrying the site
+       palette. primaryColor is an 8-digit hex with a 00 alpha, which makes
+       the widget's own card transparent so the fields sit directly on this
+       modal. The frame is rebuilt only when the 840px breakpoint is crossed,
+       and scaled down when the slot is narrower than the fixed frame. The
+       provider still owns everything inside it. */
+    var slot = document.getElementById("opentableWidgetSlot");
+    var OT_MURAL = "https://www.opentable.com/widget/reservation/mural?restaurantIds=1475119&type=standard&colorThemeId=8&isIframe=true&domain=com&lang=en-US&isNewTab=true&otSource=Restaurant%20website&primaryColor=2b0c0e00&primaryFontColor=c9a35c&buttonColor=c9a35c&buttonFontColor=1d1310&isDarkMode=false&font=BrandonText&logoPid=0&backgroundPid=0&demo=false&otLogo=standard&loadAllWidgets=false";
+    var OT_THEMES = {
+      wide: { width: 840, height: 350, crop: 168 },
+      standard: { width: 224, height: 301, crop: 301 }
+    };
+    var otMedia = window.matchMedia("(min-width: 840px)");
+    var otTheme = null;
+
+    function fitOpenTableWidget() {
+      if (!slot || panel.hidden) return;
+      var frame = slot.querySelector("iframe");
+      if (!frame) return;
+      var theme = OT_THEMES[otTheme];
+      if (!theme) return;
+      var style = window.getComputedStyle(slot);
+      var available = slot.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+      var scale = Math.min(1, available / theme.width);
+      frame.style.setProperty("--ot-scale", String(scale));
+      var wrap = frame.parentNode;
+      if (wrap && wrap !== slot) {
+        wrap.style.width = Math.round(theme.width * scale) + "px";
+        /* The Wide frame reserves its full 350px for the date/time dropdowns,
+           but its card is only ~150px tall. Reserve just the card's height so
+           the modal hugs the widget; the frame keeps its real height and its
+           wrapper stays overflow:visible, so an open dropdown still paints
+           over the (non-interactive) footer below. */
+        wrap.style.height = Math.round(theme.crop * scale) + "px";
+      }
+    }
+
+    function renderOpenTableWidget() {
+      if (!slot) return;
+      var want = otMedia.matches ? "wide" : "standard";
+      if (want === otTheme) { fitOpenTableWidget(); return; }
+      otTheme = want;
+      var theme = OT_THEMES[want];
+      slot.textContent = "";
+      var wrap = document.createElement("div");
+      var frame = document.createElement("iframe");
+      frame.src = OT_MURAL + "&theme=" + want;
+      frame.width = theme.width;
+      frame.height = theme.height;
+      frame.setAttribute("frameborder", "0");
+      frame.setAttribute("scrolling", "no");
+      frame.title = "OpenTable make reservation widget";
+      wrap.appendChild(frame);
+      slot.appendChild(wrap);
+      fitOpenTableWidget();
+    }
+
+    renderOpenTableWidget();
+    if (otMedia.addEventListener) otMedia.addEventListener("change", renderOpenTableWidget);
+    else if (otMedia.addListener) otMedia.addListener(renderOpenTableWidget);
+    window.addEventListener("resize", fitOpenTableWidget);
+
     /* The mobile trigger lives inside a drawer that closes before this modal
        paints. Keep the fixed masthead out of the reservation surface for the
        whole motion, then restore it after the panel has fully retracted. */
@@ -1281,6 +1347,7 @@
           requestAnimationFrame(function () {
             if (id !== motionId) return;
             panel.classList.add("is-open");
+            fitOpenTableWidget();
             dialog.focus({ preventScroll: true });
           });
         });

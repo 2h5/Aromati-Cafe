@@ -11,13 +11,12 @@ so you should not need to keep this open.
 
 ## Signing in
 
-Add `/admin.html` to the end of the website address, and sign in with the email
+Add `/admin` to the end of the website address, and sign in with the email
 address and password you were given.
 
-There is exactly one account and it is yours. Nobody can create another one —
-signing up is switched off — so please keep the password to yourself. If you
-ever want it changed, or a second person needs access, ask first; giving out the
-one password is not the way to do it.
+Only authorized accounts can sign in. New accounts cannot be created from the
+site, so please keep your password to yourself. If someone else needs access,
+ask first; accounts are added separately rather than made through the editor.
 
 The editor page is not linked from anywhere on the website. Visitors will not
 find it, and search engines are asked to leave it alone.
@@ -55,7 +54,7 @@ something saved when it did not.
 
 ---
 
-## The six tabs
+## The five tabs
 
 ### Words
 
@@ -213,9 +212,9 @@ shows unsaved changes, they were never sent.
 
 - The fixed **Build Your Own Breakfast** layout and interaction. Its base,
   bagel varieties and add-ons are editable in the Menus panel.
-- The **crêpe toppings** list.
-- **Reserve a Table** — it is a placeholder button and says so when pressed.
-  Wiring it to a real booking system is a separate job whenever you want it.
+- **Reserve a Table** — it opens the live OpenTable booking widget
+  (restaurant ID 1475119). The booking flow itself is managed at OpenTable,
+  not here.
 - The **layout, colours, fonts and animations**.
 - The **studio credit** in the footer.
 
