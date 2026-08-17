@@ -72,6 +72,10 @@
     <a href="index.html#visit">Visit</a>
   </nav>
   <div class="nav__end">
+    <button class="nav__cta nav__reserve" id="navReserve" type="button"
+            data-reservation-trigger aria-expanded="false" aria-controls="reservationPanel">
+      <span>Reserve</span>
+    </button>
     <a class="nav__ig" href="https://www.instagram.com/aromatinyc" target="_blank" rel="noopener" aria-label="Aromati on Instagram — @aromatinyc">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5.2"/><circle cx="12" cy="12" r="4.1"/><circle cx="17.3" cy="6.7" r="1.15" fill="currentColor" stroke="none"/></svg>
     </a>
@@ -251,6 +255,42 @@
       </div>
     </div>
   </section>
+
+  <!-- Reservation handoff — the same modal the homepage's Reserve button
+       opens. script.js owns the interaction and renders the OpenTable frame
+       inside #opentableWidgetSlot; see the "book a table" module. -->
+  <div class="reservation" id="reservationPanel" role="dialog" aria-modal="true" data-lenis-prevent
+       aria-labelledby="reservationTitle" aria-describedby="reservationIntro"
+       aria-hidden="true" inert hidden>
+    <div class="reservation__backdrop" data-reservation-dismiss aria-hidden="true"></div>
+    <div class="reservation__dialog" role="document" tabindex="-1">
+      <div class="reservation__head">
+        <div>
+          <span class="reservation__eyebrow">Reservations</span>
+          <h3 id="reservationTitle">Find your table.</h3>
+          <p id="reservationIntro">Reservations at Aromati Café &amp; Wine Bar.</p>
+        </div>
+        <button class="reservation__close" id="reservationClose" type="button" aria-label="Close reservations">
+          <span aria-hidden="true">×</span>
+        </button>
+      </div>
+
+      <div class="reservation__slot" id="opentableWidgetSlot">
+        <!-- OPENTABLE WIDGET START
+             Live OpenTable embed (restaurant ID 1475119). script.js renders
+             the iframe itself — swapping between OpenTable's Wide (840×350)
+             and Standard (224×301) themes as the viewport crosses 840px.
+             The mural URL, palette (color=8 custom theme, site gold #c9a35c)
+             and transparent card all live in the "book a table" module.
+             OPENTABLE WIDGET END -->
+      </div>
+
+      <div class="reservation__foot" aria-label="Restaurant details">
+        <span>103 E 34th Street, New York</span>
+        <span>Daily from 7:00 am</span>
+      </div>
+    </div>
+  </div>
 
   <!-- ══════════ FOOTER ══════════ -->
   <footer class="footer footer--menu">

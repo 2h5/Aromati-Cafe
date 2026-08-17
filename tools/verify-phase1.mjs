@@ -140,7 +140,18 @@ const ADDED = [
   { page: "menu-wine.html",    sel: "[data-order-group]", why: "delivery links, 2026-08-01" },
   { page: "index.html",        sel: "#reservationPanel", why: "OpenTable-ready reservation modal, 2026-08-16" },
   { page: "index.html",        sel: "#navReserve", why: "desktop reservation trigger, 2026-08-16" },
-  { page: "index.html",        sel: "#mobileReserve", why: "mobile-menu reservation trigger, 2026-08-16" }
+  { page: "index.html",        sel: "#mobileReserve", why: "mobile-menu reservation trigger, 2026-08-16" },
+
+  /* The Reserve button and its modal joined the three menu pages on desktop,
+     2026-08-17 — same markup and behavior as the homepage. One entry per page,
+     per the rule above: an allowance that applied everywhere would keep
+     forgiving a page that quietly lost the block. */
+  { page: "menu-food.html",    sel: "#navReserve", why: "desktop reservation trigger on menu pages, 2026-08-17" },
+  { page: "menu-drinks.html",  sel: "#navReserve", why: "desktop reservation trigger on menu pages, 2026-08-17" },
+  { page: "menu-wine.html",    sel: "#navReserve", why: "desktop reservation trigger on menu pages, 2026-08-17" },
+  { page: "menu-food.html",    sel: "#reservationPanel", why: "reservation modal on menu pages, 2026-08-17" },
+  { page: "menu-drinks.html",  sel: "#reservationPanel", why: "reservation modal on menu pages, 2026-08-17" },
+  { page: "menu-wine.html",    sel: "#reservationPanel", why: "reservation modal on menu pages, 2026-08-17" }
 ];
 
 /* Content the owner has since replaced outright. The subtree is cut from BOTH

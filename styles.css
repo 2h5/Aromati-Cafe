@@ -427,8 +427,15 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
   /* A bare <button> takes the UA's ButtonText, not the nav's cream, so without a
      colour of its own this pill rendered black — invisible against the hero
      until the bar turned cream on scroll. It is also the nav's one real
-     destination, so it carries the gold rather than just inheriting. */
+     destination, so it carries the gold rather than just inheriting. The
+     homepage-hero override lives just below. */
   color:var(--gold); border-color:rgba(201,163,92,.55);
+}
+/* The homepage hero's artwork washes the gold out, so there — and only
+   there — the pill carries the scrolled bar's wine text, without the cream
+   fill. The menu pages keep gold until their bar appears. */
+body:not(.page-menu) .navdrop__btn{
+  color:var(--wine); border-color:rgba(107,31,35,.45);
 }
 /* gold on the cream scrolled bar is too faint to read — the wine carries it */
 .nav.scrolled .navdrop__btn{ color:var(--wine); border-color:rgba(122,26,36,.45); }
@@ -814,6 +821,10 @@ button:where(.btn){ background:none; border:0; font-family:inherit; color:inheri
   display:inline-flex; align-items:center;
   font-size:11px; letter-spacing:.34em; text-transform:uppercase; font-weight:700;
   margin-bottom:clamp(14px,2vh,26px); color:var(--gold);
+  /* The hero's line art drifts behind this line at wider viewports. Tight
+     parchment shadows knock the strokes back around each letter, so the gold
+     stays readable without giving the text a visible chip or halo. */
+  text-shadow:0 0 3px var(--parchment), 0 0 8px var(--parchment), 0 0 16px var(--parchment), 0 0 26px var(--parchment);
 }
 .hero__title{
   /* The illustrated lockup is a block of artwork, not a text line. Keeping
