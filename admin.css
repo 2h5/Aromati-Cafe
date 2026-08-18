@@ -959,6 +959,17 @@ button{ font-family: inherit; }
 }
 .note strong{ color: var(--ink); font-weight: 600; }
 
+/* The base .btn is borderless on purpose, which reads fine on a white card
+   and disappears on a tinted note. A button inside a note gets a border and
+   a fill so it looks like what it is. */
+.note .btn{
+  margin-left: 6px;
+  background: var(--card);
+  border-color: var(--gold);
+  color: var(--ink);
+}
+.note .btn:hover{ background: var(--gold); border-color: var(--gold); color: #fff; }
+
 .static{
   padding: 14px 16px; margin-top: 12px;
   border: 1px dashed var(--line-input); border-radius: 10px;
@@ -1359,6 +1370,11 @@ button{ font-family: inherit; }
    position, not display:none — a display:none input is not focusable, and
    this one has to be reachable from the keyboard. */
 .photo__pick{
+  /* relative, so the hidden input inside is measured from this button and not
+     from a distant ancestor — otherwise, when the system file dialog closes and
+     focus returns to the input, the browser scrolls the whole window to a
+     phantom position and the page appears to collapse. */
+  position: relative;
   display: inline-block; margin-top: 12px; cursor: pointer;
   padding: 8px 16px; border: 1px solid var(--line-input); border-radius: 999px;
   font-size: 13px; background: var(--card);

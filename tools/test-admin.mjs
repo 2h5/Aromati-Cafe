@@ -2285,6 +2285,12 @@ console.log("\nthe words on the photograph");
   check("and it opens showing the words on the page",
         box && (box.querySelector(".field__input") || {}).value, "Adjaruli Khachapuri");
 
+  /* The visible words come first: the caption is what the owner can see on
+     the site, the description is what a screen reader hears. The box order
+     says so. */
+  const labels = [...plate.querySelectorAll(".field__label")].map((n) => n.textContent);
+  check("the words box sits above the description box",
+        labels.indexOf("The words on the photograph") < labels.indexOf("What is in the photograph"), true);
   const hero = r.photo("The photograph behind the opening headline");
   check("a photograph with no words gets no box",
         hero.textContent.includes("The words on the photograph"), false);
@@ -2295,6 +2301,59 @@ console.log("\nthe words on the photograph");
   check("the new words are what gets sent",
         r.writes().length ? r.writes()[0].payload.caption : null, "The Cheese Boat");
 }
+console.log("\nthe café cards point at where their words live");
+{
+  /* The card names and descriptions are site copy, not photograph data, and
+     the photograph panel is where an owner goes looking for them. The note at
+     the top of the Café group says so, and its button is the directions. */
+  const data = fixture();
+  data.photos.push({ id: "ph3", slot: "cafe.card1", label: "The Café — 1st card",
+    storage_path: null, source_path: null,
+    alt: "Tiramisu latte in a branded Aromati cup",
+    width: 1088, height: 1446, is_decorative: false, sort_order: 30 });
+  data.site_copy.push({ id: "c9", key: "cafe.card1.title", page: "index",
+    section: "The Café", label: "Card 1 — drink", help: null,
+    value: "Tiramisu Latte", max_length: null, sort_order: 20 });
+  const seedPhotos = Object.assign({}, SEED_PHOTOS, {
+    "cafe.card1": { src: "assets/web/tiramisu-latte.jpg",
+      alt: "Tiramisu latte in a branded Aromati cup", width: 1088, height: 1446 }
+  });
+  const r = await boot({ data: data, seedPhotos: seedPhotos });
+  await r.signIn();
+  r.tab("Photos");
+
+  r.photo("The Café — 1st card");   // opens the Café group in the editor
+  const note = [...r.window.document.querySelectorAll("#panels .note")]
+    .find((n) => n.textContent.includes("live in Words"));
+  check("the Café group says where the card words are", !!note, true);
+
+  const go = note && note.querySelector("button");
+  check("and offers the jump rather than directions",
+        go && go.textContent, "Open Words → The Café");
+
+  go.click();
+  const active = [...r.window.document.querySelectorAll(".tab")]
+    .find((b) => b.getAttribute("aria-selected") === "true");
+  check("the button lands in the Words area",
+        active && active.textContent.trim().startsWith("Words"), true);
+  check("on the Café section, with the card word right there",
+        r.fieldShowing("Tiramisu Latte") !== null, true);
+}
+
+console.log("\nthe hidden file input cannot scroll the window");
+{
+  /* Choosing a photograph hands focus to a 1px input hidden inside the label.
+     When the system dialog closes, the browser scrolls that input back into
+     view. If the input were measured from a distant ancestor instead of the
+     label, its position would ignore the panel's scroll — on the fourth card
+     down and past it, the "reveal" scrolls the window itself, and the whole
+     editor appears to collapse into a strip at the top of the screen. The
+     label being the containing block is what keeps that scroll local. */
+  const pick = ADMIN_CSS.match(/\.photo__pick\s*\{([^}]*)\}/);
+  check("the choose button is the input's containing block",
+        pick ? /position:\s*relative/.test(pick[1]) : false, true);
+}
+
 
 
 /* ═══ the change list ═══════════════════════════════════════════════════════

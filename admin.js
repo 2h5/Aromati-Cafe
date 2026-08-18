@@ -1436,6 +1436,28 @@ var AROMATI_ADMIN = (function () {
     });
   }
 
+  /* The four café cards carry two pieces of owner copy each — the drink
+     name and the line under it — and those are words, not photographs. They
+     live with the rest of the site wording, so the Photographs area says so
+     at the top of the Café group rather than letting the owner hunt for them
+     here, and it offers the jump instead of directions. */
+  function cafeWordsNote() {
+    return makeNote(function (node) {
+      node.appendChild(el("strong", null, "The words on these cards live in Words. "));
+      node.appendChild(document.createTextNode(
+        "The drink names and the lines under them are in the Words area, " +
+        "under Home page → The Café. "));
+      var go = el("button", "btn btn--small", "Open Words → The Café");
+      go.type = "button";
+      on(go, "click", function () {
+        openTab("copy");
+        selectSection("copy", "copy:index:The Café");
+        renderAll("tab");
+      });
+      node.appendChild(go);
+    });
+  }
+
   function copyNote() {
     return makeNote(function (node) {
       node.appendChild(el("strong", null, "How your typing is read. "));
@@ -2864,6 +2886,7 @@ var AROMATI_ADMIN = (function () {
           " block. Choose a new image below, adjust its framing, and save when " +
           "it looks right.",
         render: function (host) {
+          if (prefix === "cafe") host.appendChild(cafeWordsNote());
           var card = makeCard(null);
           group.forEach(function (row) { card.body.appendChild(renderPhoto(row, id)); });
           host.appendChild(card.wrap);
@@ -3008,6 +3031,25 @@ var AROMATI_ADMIN = (function () {
           "This is the background image behind " + backgroundFor + "."));
       }
     } else {
+      /* The words over the photograph come first where the page displays
+         them — today only the Kitchen strip's plates — because that is the
+         text the owner can see on the site, and the visible thing is what
+         they came here to change. The seed is asked rather than the row: a
+         slot with no caption in the markup gets no box here, rather than an
+         invitation to type words that would appear nowhere. */
+      var seedCap = builtIn(row.slot);
+      if (seedCap && seedCap.caption) {
+        side.appendChild(makeField({
+          table: "photos", row: row, col: "caption",
+          cardId: cardId, tab: "photos",
+          label: "The words on the photograph", type: "text",
+          value: row.caption || "",
+          help: "Shown over the photo in the Kitchen strip. Keep it naming " +
+                "the dish in the picture.",
+          onInput: function (v) { row.caption = v; view.redraw(); }
+        }).wrap);
+      }
+
       side.appendChild(makeField({
         table: "photos", row: row, col: "alt",
         cardId: cardId, tab: "photos",
@@ -3016,23 +3058,6 @@ var AROMATI_ADMIN = (function () {
         help: "A short sentence. It is read aloud in place of the picture, and it " +
               "is what appears if the image ever fails to load.",
         onInput: function (v) { row.alt = v; view.redraw(); }
-      }).wrap);
-    }
-
-    /* The words over the photograph, where the page displays them — today
-       only the Kitchen strip's plates, which is why the seed is asked: a slot
-       with no caption in the markup gets no box here, rather than an
-       invitation to type words that would appear nowhere. */
-    var seedCap = builtIn(row.slot);
-    if (!row.is_decorative && seedCap && seedCap.caption) {
-      side.appendChild(makeField({
-        table: "photos", row: row, col: "caption",
-        cardId: cardId, tab: "photos",
-        label: "The words on the photograph", type: "text",
-        value: row.caption || "",
-        help: "Shown over the photo in the Kitchen strip. Keep it naming " +
-              "the dish in the picture.",
-        onInput: function (v) { row.caption = v; view.redraw(); }
       }).wrap);
     }
 
