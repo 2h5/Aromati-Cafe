@@ -12,14 +12,12 @@ The remaining known visual issue is separate from the CMS: the Wine 04 photo is
 visible on affected iOS portrait sizes but does not currently move with the
 page. The hero and kitchen reel issues are closed.
 
-Three other files matter as much as this one:
+Two other files matter as much as this one:
 
 - **`memory.md`** — the current technical status, rules that must not regress,
   open decisions and the checks to run before release.
 - **`client-notes.md`** — the same site described for the owner, in the owner's
   language. Nothing technical in it.
-- **`HANDOFF-ios.md`** — the iOS investigation: what was fixed, what is still
-  open, and what to check on a real device rather than in emulation.
 
 ---
 

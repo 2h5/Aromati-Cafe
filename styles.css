@@ -2781,6 +2781,13 @@ html.reservation-open .nav{ right:var(--reservation-scrollbar,0px); }
   font-size:11px; letter-spacing:.16em; text-transform:uppercase; opacity:.65;
 }
 .footer__toast{ font-family:var(--serif); font-style:italic; text-transform:none; letter-spacing:.04em; font-size:14px; color:var(--gold); opacity:.9; }
+/* Below 760px the floating .to-top puck is the way back up, so the footer link
+   would sit under it doing the same job twice. Desktop keeps the link. Hidden
+   rather than removed: the link keeps its slot in the space-between row, so the
+   toast does not drift into the corner the puck covers. */
+@media (max-width: 760px){
+  .footer__top{ visibility:hidden; }
+}
 
 /* ═══════════ BACK TO TOP ═══════════
    The glass puck from the Uptown build, retoned to this palette: cream glass
