@@ -132,6 +132,9 @@ if (!policy) {
       /* An <a href> is a navigation, not a subresource — the delivery links
          are exactly this and no directive covers them. */
       if (/<a\b[^>]*$/i.test(context)) continue;
+      /* rel="canonical" is a hint to crawlers, not a subresource — the
+         browser never fetches it, so no directive governs it. */
+      if (/rel=["']?canonical/i.test(context)) continue;
       if (allowed.has(origin)) continue;
       offenders.push(`${f} → ${origin}`);
     }

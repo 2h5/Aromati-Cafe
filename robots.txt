@@ -14,3 +14,7 @@
 User-agent: *
 Allow: /
 Disallow: /admin.html
+
+# The origin here is written by tools/apply-site-url.mjs from site.config.mjs
+# — when the domain changes, change it there, not here.
+Sitemap: https://aromati-cafe.pages.dev/sitemap.xml

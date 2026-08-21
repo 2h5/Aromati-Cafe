@@ -69,7 +69,7 @@ function classicScripts(root) {
    (see PHOTOGRAPHS.md), so there is no Function to confine and no invocation
    to pay for. The build log line to expect now is "No functions dir at
    /functions found. Skipping." */
-const ROOT_FILES = ["_headers", "robots.txt"];
+const ROOT_FILES = ["_headers", "robots.txt", "sitemap.xml", "favicon.ico", "apple-touch-icon.png", "og-cover.jpg"];
 
 /* 3. The built-in photographs, at the path the *editor* asks for them by.
 
