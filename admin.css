@@ -1703,7 +1703,6 @@ body.is-framing{ overflow: hidden; }
 .logfilter{
   display: flex; flex-wrap: wrap; align-items: end; gap: 12px 16px;
   margin: 16px 0 24px;
-  max-width: 1180px;
 }
 .logfilter__field{ display: grid; gap: 5px; }
 .logfilter__label{
@@ -1729,9 +1728,8 @@ body.is-framing{ overflow: hidden; }
 }
 
 .logcols{
-  display: grid; grid-template-columns: minmax(0, 1fr) 320px;
+  display: grid; grid-template-columns: minmax(0, 1fr) 360px;
   gap: 18px;
-  max-width: 1180px;
   min-height: 0;
 }
 .logcol{
@@ -1751,6 +1749,12 @@ body.is-framing{ overflow: hidden; }
   min-height: 0;
   overflow-y: auto;
   padding-right: 4px;
+}
+/* On a wide screen the changes list flows as many cards abreast as fit
+   rather than leaving half the page empty; the sessions rail stays one
+   column at its fixed width. */
+.loglist--main{
+  grid-template-columns: repeat(auto-fill, minmax(430px, 1fr));
 }
 .loglist--sessions .logrow{ padding: 10px 14px; }
 .loglist--sessions .logrow__head{ margin-bottom: 2px; }
@@ -1804,4 +1808,5 @@ body.is-framing{ overflow: hidden; }
   .logcols{ grid-template-columns: minmax(0, 1fr); }
   .logcol{ display: block; }
   .loglist{ overflow: visible; padding-right: 0; }
+  .loglist--main{ grid-template-columns: none; }
 }
