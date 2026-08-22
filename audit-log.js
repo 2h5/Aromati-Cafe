@@ -76,6 +76,12 @@
 
   var entries = [];   // everything the last load brought back, unfiltered
 
+  /* The actions whose badge is red — the rows "Needs attention" keeps. One
+     word today; the list exists so the next kind of row that deserves a red
+     badge joins it here, in one place. */
+  var ATTENTION = ["unsaved"];
+  var attentionOnly = false;
+
   /* ═══════════════════════════════════════════════
      the list
      ═══════════════════════════════════════════════ */
@@ -163,16 +169,22 @@
        a busy day of opens should never push an actual change out of sight. */
     var changes = shown.filter(function (e) { return e.action !== "login"; });
     var sessions = shown.filter(function (e) { return e.action === "login"; });
-    renderList("loglist", changes, filtered
-      ? "No changes match those filters."
-      : "Nothing yet. Saves, discards and publishes appear here as they happen.");
-    renderList("sessionlist", sessions, filtered
-      ? "No sessions match those filters."
-      : "No sessions yet.");
-    byId("logCount").textContent =
-      changes.length + (changes.length === 1 ? " change" : " changes") + " · " +
-      sessions.length + (sessions.length === 1 ? " session" : " sessions") +
-      (filtered ? " shown" : "");
+    if (attentionOnly) {
+      changes = changes.filter(function (e) { return ATTENTION.indexOf(e.action) !== -1; });
+      sessions = [];
+    }
+    renderList("loglist", changes, attentionOnly
+      ? "Nothing needs attention."
+      : filtered
+        ? "No changes match those filters."
+        : "Nothing yet. Saves, discards and publishes appear here as they happen.");
+    renderList("sessionlist", sessions, attentionOnly
+      ? "Sessions are never marked as needing attention."
+      : filtered
+        ? "No sessions match those filters."
+        : "No sessions yet.");
+    byId("changeCount").textContent = "(" + changes.length + ")";
+    byId("sessionCount").textContent = "(" + sessions.length + ")";
   }
 
   function refreshActorOptions() {
@@ -326,6 +338,14 @@
     });
     on(byId("dayFilter"), "change", function () {
       if (byId("dayFilter").value) byId("dateFilter").value = "";
+      applyFilters();
+    });
+
+    on(byId("attentionBtn"), "click", function () {
+      attentionOnly = !attentionOnly;
+      var btn = byId("attentionBtn");
+      btn.classList.toggle("is-on", attentionOnly);
+      btn.setAttribute("aria-pressed", attentionOnly ? "true" : "false");
       applyFilters();
     });
   }

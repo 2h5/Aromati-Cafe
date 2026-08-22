@@ -1713,9 +1713,16 @@ body.is-framing{ overflow: hidden; }
   color: var(--ink); font: inherit; font-size: 13.5px;
 }
 .logfilter__input:focus{ outline: 2px solid var(--maroon-600); outline-offset: 1px; }
-.logfilter__count{
-  margin-left: auto; padding-bottom: 8px;
-  color: var(--ink-faint); font-size: 12.5px;
+.logfilter__attention{
+  margin-left: auto;
+  padding: 7px 14px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 999px;
+  color: var(--ink-soft); font: inherit; font-size: 13px; font-weight: 600;
+  cursor: pointer;
+}
+.logfilter__attention:hover{ border-color: var(--danger); color: var(--danger); }
+.logfilter__attention.is-on{
+  background: var(--danger-bg); border-color: var(--danger); color: var(--danger);
 }
 
 .logcols{
@@ -1728,6 +1735,7 @@ body.is-framing{ overflow: hidden; }
   color: var(--ink-faint);
   font-size: 11.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
 }
+.logcol__count{ color: var(--ink-soft); font-weight: 400; }
 
 .loglist{
   display: grid; gap: 10px;

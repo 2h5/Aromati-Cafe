@@ -102,7 +102,8 @@
           <span class="logfilter__label">On a day</span>
           <input class="logfilter__input" type="date" id="dayFilter">
         </label>
-        <span class="logfilter__count" id="logCount"></span>
+        <button class="logfilter__attention" type="button" id="attentionBtn"
+                aria-pressed="false">Needs attention</button>
       </div>
 
       <!-- Sessions (sign-ins and editor opens) get their own column: the door
@@ -110,11 +111,11 @@
            an actual change out of sight. -->
       <div class="logcols">
         <section class="logcol">
-          <h2 class="logcol__title">Changes</h2>
+          <h2 class="logcol__title">Changes <span class="logcol__count" id="changeCount"></span></h2>
           <div class="loglist" id="loglist"></div>
         </section>
         <aside class="logcol logcol--sessions">
-          <h2 class="logcol__title">Sessions</h2>
+          <h2 class="logcol__title">Sessions <span class="logcol__count" id="sessionCount"></span></h2>
           <div class="loglist loglist--sessions" id="sessionlist"></div>
         </aside>
       </div>
