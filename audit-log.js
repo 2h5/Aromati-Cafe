@@ -62,6 +62,20 @@
 
   var ACTION_LABELS = { login: "Session", save: "Save", publish: "Publish", unsaved: "Unsaved" };
 
+  /* The accounts the allowlist holds. The dropdown starts from these rather
+     than from the rows, so "did this person ever do anything?" can be asked
+     and answered with an empty list — a dropdown built from the rows could
+     only ask about people who had already done something. A row from any
+     other account is still added to the list, because hiding it would be the
+     one thing this page exists to prevent. */
+  var KNOWN_ACTORS = [
+    "info@aromatinyc.com",
+    "aragvelipalazzolo@gmail.com",
+    "lachedon@gmail.com"
+  ];
+
+  var entries = [];   // everything the last load brought back, unfiltered
+
   /* ═══════════════════════════════════════════════
      the list
      ═══════════════════════════════════════════════ */
@@ -98,15 +112,77 @@
     return row;
   }
 
-  function render(entries) {
+  function render(shown, filtered) {
     var list = byId("loglist");
     clear(list);
-    if (!entries.length) {
-      list.appendChild(el("p", "loglist__empty",
-        "Nothing yet. Sign-ins, saves and publishes appear here as they happen."));
+    if (!shown.length) {
+      list.appendChild(el("p", "loglist__empty", filtered
+        ? "Nothing matches those filters."
+        : "Nothing yet. Sign-ins, saves, discards and publishes appear here as they happen."));
       return;
     }
-    entries.forEach(function (entry) { list.appendChild(renderEntry(entry)); });
+    shown.forEach(function (entry) { list.appendChild(renderEntry(entry)); });
+  }
+
+  /* "When" is answered in the café's day, not the reader's: today in New
+     York, yesterday in New York. en-CA is the locale that spells a date as
+     YYYY-MM-DD, the one spelling a comparison can be made in. */
+  function etDay(iso) {
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return "";
+    try {
+      return d.toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+    } catch (err) {
+      return d.toISOString().slice(0, 10);
+    }
+  }
+
+  /* A day picked by hand beats a category — "on the 14th" is a narrower
+     question than "this week", and asking it should not require un-asking
+     the other first. Choosing either control clears the other. */
+  function applyFilters() {
+    var actor = byId("actorFilter").value;
+    var span = byId("dateFilter").value;
+    var day = byId("dayFilter").value;
+    var now = Date.now();
+    var today = etDay(new Date(now).toISOString());
+    var yesterday = etDay(new Date(now - 86400000).toISOString());
+    var DAY_MS = 86400000;
+
+    var filtered = Boolean(actor || span || day);
+    var shown = entries.filter(function (entry) {
+      if (actor && entry.actor_email !== actor) return false;
+      if (day) return etDay(entry.created_at) === day;
+      var age = now - new Date(entry.created_at).getTime();
+      if (span === "today") return etDay(entry.created_at) === today;
+      if (span === "yesterday") return etDay(entry.created_at) === yesterday;
+      if (span === "week") return age <= 7 * DAY_MS;
+      if (span === "month") return age <= 30 * DAY_MS;
+      return true;
+    });
+
+    render(shown, filtered);
+    byId("logCount").textContent = shown.length === entries.length
+      ? entries.length + (entries.length === 1 ? " entry" : " entries")
+      : shown.length + " of " + entries.length + " entries";
+  }
+
+  function refreshActorOptions() {
+    var select = byId("actorFilter");
+    var kept = select.value;
+    var seen = KNOWN_ACTORS.slice();
+    clear(select);
+    select.appendChild(el("option", "", "Everyone")).value = "";
+    seen.forEach(function (email) {
+      select.appendChild(el("option", "", email)).value = email;
+    });
+    entries.forEach(function (entry) {
+      var email = entry.actor_email;
+      if (!email || seen.indexOf(email) !== -1) return;
+      seen.push(email);
+      select.appendChild(el("option", "", email)).value = email;
+    });
+    select.value = kept;
   }
 
   function logMessage(text) {
@@ -129,7 +205,9 @@
           return;
         }
         logMessage("");
-        render(res.data || []);
+        entries = res.data || [];
+        refreshActorOptions();
+        applyFilters();
       }, function (err) {
         btn.disabled = false;
         logMessage("The history would not load: " + ((err && err.message) || err));
@@ -232,6 +310,16 @@
       sb.auth.signOut().then(function () { window.location.reload(); });
     });
     on(byId("refreshBtn"), "click", load);
+
+    on(byId("actorFilter"), "change", applyFilters);
+    on(byId("dateFilter"), "change", function () {
+      if (byId("dateFilter").value) byId("dayFilter").value = "";
+      applyFilters();
+    });
+    on(byId("dayFilter"), "change", function () {
+      if (byId("dayFilter").value) byId("dateFilter").value = "";
+      applyFilters();
+    });
   }
 
   /* ═══════════════════════════════════════════════

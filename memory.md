@@ -165,7 +165,11 @@ two accounts could each change anything and nothing recorded which one had.
   because RLS answers a refused select with zero rows, indistinguishable from
   an empty log; the editor account gets a sentence pointing it back to
   /admin, not a blank page. The address is unlisted, not secret — the policy
-  is the lock, the same division of labour as the editor itself.
+  is the lock, the same division of labour as the editor itself. The list can
+  be narrowed by account (the dropdown starts from the three allowlisted
+  emails, so "did this person ever do anything?" can be answered with an
+  empty list) and by when — today, yesterday, the last 7 or 30 days, or one
+  picked day, all reckoned in the café's time zone.
 - `tools/test-rls.mjs` runs the log through four actors (owner, editor,
   stranger, logged-out), `tools/test-admin.mjs` asserts sign-ins, saves,
   discards and unsaved exits are recorded, and `tools/check-csp.mjs` holds the page to the editor's own

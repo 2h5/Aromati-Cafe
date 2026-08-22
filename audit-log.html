@@ -77,10 +77,34 @@
   <main class="logmain">
     <div class="logmain__scroll">
       <h1 class="logmain__title">History</h1>
-      <p class="logmain__sub">Who signed in, who saved what, who asked for a
-        rebuild. Newest first. Only this account can read it, and nobody can
-        edit or erase a line, which is what makes it a history rather than a
-        note board.</p>
+
+      <!-- Narrowing, not searching the database: the whole log (up to the
+           most recent 200 rows) is loaded once and these controls only decide
+           which of it is shown, so an answer never depends on the network. -->
+      <div class="logfilter">
+        <label class="logfilter__field">
+          <span class="logfilter__label">Who</span>
+          <select class="logfilter__input" id="actorFilter">
+            <option value="">Everyone</option>
+          </select>
+        </label>
+        <label class="logfilter__field">
+          <span class="logfilter__label">When</span>
+          <select class="logfilter__input" id="dateFilter">
+            <option value="">Any time</option>
+            <option value="today">Today</option>
+            <option value="yesterday">Yesterday</option>
+            <option value="week">The last 7 days</option>
+            <option value="month">The last 30 days</option>
+          </select>
+        </label>
+        <label class="logfilter__field">
+          <span class="logfilter__label">On a day</span>
+          <input class="logfilter__input" type="date" id="dayFilter">
+        </label>
+        <span class="logfilter__count" id="logCount"></span>
+      </div>
+
       <div class="loglist" id="loglist"></div>
     </div>
   </main>
