@@ -1729,6 +1729,7 @@ body.is-framing{ overflow: hidden; }
   font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
 }
 .logrow--publish .logrow__badge{ background: var(--tint-warm); }
+.logrow--unsaved .logrow__badge{ background: var(--danger-bg); color: var(--danger); }
 .logrow__actor{ color: var(--ink-soft); font-size: 12.5px; }
 .logrow__summary{
   margin: 0; color: var(--ink); font-size: 14.5px; line-height: 1.5;

@@ -142,7 +142,13 @@ two accounts could each change anything and nothing recorded which one had.
 - Every time the editor opens — a form sign-in and a saved session arriving
   back get different sentences so the two read apart — every save (including
   a save refused halfway, with what it wrote), and every publish writes one
-  row.
+  row. So does the other thing "did anyone touch anything?" is really about:
+  work that never landed. Throwing changes away writes a row saying how much
+  was thrown, and the tab closing with changes still in it writes one from
+  `pagehide` as a keepalive POST — the client library's promises die with the
+  page, so admin.js §7b sends that one bare. What is deliberately not
+  recorded is keystrokes; a row appears when the typing becomes a fact, not
+  while it is still a thought.
   admin.js §7b does it fire-and-forget: a log write that fails goes to the
   console and must never fail the action it describes.
 - Any allowlisted account can add rows, and only about itself — the insert
@@ -161,8 +167,8 @@ two accounts could each change anything and nothing recorded which one had.
   /admin, not a blank page. The address is unlisted, not secret — the policy
   is the lock, the same division of labour as the editor itself.
 - `tools/test-rls.mjs` runs the log through four actors (owner, editor,
-  stranger, logged-out), `tools/test-admin.mjs` asserts a sign-in and a save
-  are recorded, and `tools/check-csp.mjs` holds the page to the editor's own
+  stranger, logged-out), `tools/test-admin.mjs` asserts sign-ins, saves,
+  discards and unsaved exits are recorded, and `tools/check-csp.mjs` holds the page to the editor's own
   header rules.
 
 ## CMS map
@@ -406,7 +412,7 @@ visual behavior — check navigation, long headings, menu filtering, mobile
 layout and photo placement, and confirm the site still opens with its
 fallback data when the network is off.
 
-### The twenty-nine harnesses
+### The thirty harnesses
 
 `npm test` currently covers: `check:fonts`, `test:fonts`, `check:csp`,
 `check:vendor`, `test:pages`, `test:hours`, `test:copy`, `test:ordering`,
@@ -414,7 +420,7 @@ fallback data when the network is off.
 `test:rls`, `test:dbguards`, `test:live`, `test:policies`, `check:policies`,
 `check:seed`, `check:photosql`, `check:memory`, `check:layout`,
 `test:replay`, `test:resilience`, `test:hourslive`, `test:hoursexceptions`,
-`test:menushapes`, `test:menuhidden` and `test:hostile`.
+`test:menushapes`, `test:menuhidden`, `test:hostile` and `check:seo`.
 
 The Phase 1 snapshot check is `tools/verify-phase1.mjs` and uses baseline
 `53b3d5e`. Do not silently change that baseline when changing the renderer.
@@ -424,7 +430,7 @@ The Phase 1 snapshot check is `tools/verify-phase1.mjs` and uses baseline
 These names are kept here so the project checks can detect missing or renamed
 support files without requiring a long explanation for each one.
 
-Tools: `tools/add-content-hooks.mjs`, `tools/check-csp.mjs`,
+Tools: `tools/add-content-hooks.mjs`, `tools/apply-site-url.mjs`, `tools/check-csp.mjs`,
 `tools/check-deployed-headers.mjs`, `tools/check-fonts.mjs`,
 `tools/check-live-project.mjs`,
 `tools/check-memory.mjs`, `tools/check-policies.mjs`, `tools/check-vendor.mjs`,
@@ -457,4 +463,5 @@ Migrations: `supabase/migrations/20260801000000_init_cms.sql`,
 `supabase/migrations/20260812000300_smooth_admin_validation_copy.sql`,
 `supabase/migrations/20260815000000_remove_retired_page.sql`,
 `supabase/migrations/20260817000000_photo_captions.sql` and
-`supabase/migrations/20260822000000_audit_log.sql`.
+`supabase/migrations/20260822000000_audit_log.sql` and
+`supabase/migrations/20260822000100_audit_unsaved.sql`.

@@ -60,7 +60,7 @@
     }
   }
 
-  var ACTION_LABELS = { login: "Session", save: "Save", publish: "Publish" };
+  var ACTION_LABELS = { login: "Session", save: "Save", publish: "Publish", unsaved: "Unsaved" };
 
   /* ═══════════════════════════════════════════════
      the list

@@ -220,6 +220,7 @@ var AROMATI_ADMIN = (function () {
 
   var sb = null;              // the Supabase client
   var account = null;         // the signed-in user
+  var sessionToken = null;    // access token, for the pagehide audit POST
   var baseline = {};          // table → { id: row }
   var draft = {};             // table → [row], in display order
   var removed = {};           // table → [id] of rows the owner deleted
@@ -4653,6 +4654,37 @@ var AROMATI_ADMIN = (function () {
     }
   }
 
+  /* A save-in-progress log goes through the SDK like everything else. A
+     "left with unsaved changes" log cannot: it fires from pagehide, and a
+     promise chain started while the page is unloading never resolves. A raw
+     fetch with keepalive is the one request the browser promises to finish
+     after the page is gone, so this one writes directly to PostgREST with
+     the session's own token — the same row shape, the same policies, the
+     same RLS deciding whether it lands. */
+  function logUnsavedNow(summary) {
+    if (!sessionToken || !window.fetch) return;
+    try {
+      window.fetch(AROMATI_CONFIG.url + "/rest/v1/audit_log", {
+        method: "POST",
+        keepalive: true,
+        headers: {
+          "apikey": AROMATI_CONFIG.anonKey,
+          "Authorization": "Bearer " + sessionToken,
+          "Content-Type": "application/json",
+          "Prefer": "return=minimal"
+        },
+        body: JSON.stringify({
+          action: "unsaved",
+          summary: summary,
+          detail: auditDetail(),
+          actor_email: (account && account.email) || null
+        })
+      });
+    } catch (err) {
+      /* The page is leaving; there is nobody left to tell. */
+    }
+  }
+
   /* The human-readable change list, folded flat for the log. Built from
      changeEntries() at the moment the save starts, because by the time it
      finishes the baseline has moved and the same question answers "nothing
@@ -5322,9 +5354,14 @@ var AROMATI_ADMIN = (function () {
   function discard() {
     if (changeCount() === 0) return;
     if (!window.confirm("Throw away every change you have made since the last save?")) return;
+    /* The change list is captured before the draft is rebuilt, because after
+       buildDraft() there is nothing left to count. */
+    var count = changeCount(), detail = auditDetail();
     buildDraft();
     showProblems([]);
     renderAll();
+    logAction("unsaved", "Discarded " + count + " unsaved " +
+      (count === 1 ? "change" : "changes") + "; nothing was written", detail);
   }
 
 
@@ -5489,6 +5526,7 @@ var AROMATI_ADMIN = (function () {
               gateMessage("That account exists, but it is not allowed to edit this site.");
             });
           }
+          sessionToken = res.data.session && res.data.session.access_token;
           return enter(res.data.user).then(function () {
             /* Through the form. A saved session arriving back gets its own
                row in boot() with a different sentence, so the two read apart
@@ -5566,6 +5604,16 @@ var AROMATI_ADMIN = (function () {
       return "";
     });
 
+    /* pagehide, not beforeunload: this row is not a warning to show the owner,
+       it is a fact to leave behind. keepalive keeps the POST alive while the
+       page itself is going away; the client library would not survive that. */
+    on(window, "pagehide", function () {
+      var count = changeCount();
+      if (count === 0) return;
+      logUnsavedNow("Left the editor with " + count + " unsaved " +
+        (count === 1 ? "change" : "changes") + "; nothing was written");
+    });
+
     sb.auth.getSession().then(function (res) {
       var session = res.data && res.data.session;
       if (!session) { show("gate"); return; }
@@ -5576,6 +5624,7 @@ var AROMATI_ADMIN = (function () {
             gateMessage("That session is not allowed to edit this site.");
           });
         }
+        sessionToken = session.access_token;
         return enter(session.user).then(function () {
           /* No form was filled in, but the door still opened — and "was
              anyone in here at all?" is the question this log exists for. A

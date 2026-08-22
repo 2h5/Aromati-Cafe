@@ -334,6 +334,24 @@ for (const [what, sql] of ALLOWLIST) {
   else fail("the second editor wrote a history row in the owner's name",
             "the insert policy checks actor = auth.uid() for exactly this");
 
+  /* The check constraint is the list of things that can be said. "unsaved"
+     joined it in 20260822000100_audit_unsaved.sql — and anything else stays
+     unsayable, because a log that accepts any word is a log that says
+     nothing. */
+  checks++;
+  const unsavedRow = await allowed(EDITOR_UID,
+    `insert into public.audit_log (action, summary)
+     values ('unsaved', 'Discarded 1 unsaved change; nothing was written')`);
+  if (unsavedRow) pass("can     the second editor record unsaved work");
+  else fail("the second editor could not record unsaved work",
+            "20260822000100_audit_unsaved.sql has not been run — the editor sends this word now");
+  checks++;
+  const teleported = await allowed(OWNER,
+    `insert into public.audit_log (action, summary) values ('teleport', 'Left the building')`);
+  if (!teleported) pass("cannot  the owner record an action the editor never sends");
+  else fail("the owner recorded an action outside the list",
+            "audit_log_action_check did not hold — the constraint is the vocabulary");
+
   /* can_view_audit() is how the /audit-log page tells "not your page" apart
      from "nothing yet" — RLS answers a refused SELECT with zero rows, same
      as an empty log. It must answer true for the owner, false for the

@@ -151,7 +151,14 @@ const ADDED = [
   { page: "menu-wine.html",    sel: "#navReserve", why: "desktop reservation trigger on menu pages, 2026-08-17" },
   { page: "menu-food.html",    sel: "#reservationPanel", why: "reservation modal on menu pages, 2026-08-17" },
   { page: "menu-drinks.html",  sel: "#reservationPanel", why: "reservation modal on menu pages, 2026-08-17" },
-  { page: "menu-wine.html",    sel: "#reservationPanel", why: "reservation modal on menu pages, 2026-08-17" }
+  { page: "menu-wine.html",    sel: "#reservationPanel", why: "reservation modal on menu pages, 2026-08-17" },
+
+  /* The mobile-menu Reserve button followed two days later — ebc36aa. Same
+     rule as every entry above: one per page, so a page that quietly loses the
+     button stops being forgiven. */
+  { page: "menu-food.html",    sel: "#mobileReserve", why: "mobile-menu reservation trigger on menu pages, 2026-08-19 (ebc36aa)" },
+  { page: "menu-drinks.html",  sel: "#mobileReserve", why: "mobile-menu reservation trigger on menu pages, 2026-08-19 (ebc36aa)" },
+  { page: "menu-wine.html",    sel: "#mobileReserve", why: "mobile-menu reservation trigger on menu pages, 2026-08-19 (ebc36aa)" }
 ];
 
 /* Content the owner has since replaced outright. The subtree is cut from BOTH

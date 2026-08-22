@@ -214,7 +214,7 @@ function fakeSupabase(data, log, opts) {
         if (opts.badPassword) {
           return Promise.resolve({ data: null, error: { message: "Invalid login credentials" } });
         }
-        return Promise.resolve({ data: { user: { email: creds.email } }, error: null });
+        return Promise.resolve({ data: { user: { email: creds.email }, session: { access_token: "test-token" } }, error: null });
       },
       signOut: () => { log.push({ what: "signOut" }); return Promise.resolve({ error: null }); }
     },
@@ -2814,6 +2814,48 @@ console.log("\nthe audit trail");
   await settle();
   check("opening the editor on a saved session is recorded",
         s.audit().map((a) => a.payload.summary), ["Opened the editor with a saved session"]);
+
+  /* Discarding is a save that never happened, and that is exactly the fact
+     the owner was asking for proof of — so the click that throws the work
+     away leaves a row saying how much was thrown. */
+  const d = await boot();
+  await d.signIn();
+  d.tab("Words");
+  d.type(d.fieldShowing("Georgian cooking for a Manhattan morning."),
+         "Georgian cooking, all morning.");
+  d.q("#discardBtn").click();
+  await settle();
+  const discarded = d.audit();
+  check("throwing work away is recorded", discarded.length, 2);
+  check("as unsaved work, not a save", discarded[1].payload.action, "unsaved");
+  check("saying how much was thrown away",
+        discarded[1].payload.summary, "Discarded 1 unsaved change; nothing was written");
+  check("with the change it threw away", discarded[1].payload.detail.length, 1);
+
+  /* The other way work disappears is the tab going away. A promise sent
+     through the client library dies with the page, so this row goes out as a
+     keepalive fetch the browser is asked to finish — the test records the
+     request itself rather than a resolution the real page never sees. */
+  const l = await boot({ session: { user: { email: "owner@aromatiNY.com" },
+                                     access_token: "test-token" } });
+  await settle();
+  const posted = [];
+  l.window.fetch = (url, options) => {
+    posted.push({ url: String(url), options });
+    return Promise.resolve({ ok: true });
+  };
+  l.tab("Words");
+  l.type(l.fieldShowing("Georgian cooking for a Manhattan morning."),
+         "Georgian cooking, all morning.");
+  l.window.dispatchEvent(new l.window.Event("pagehide"));
+  check("leaving the page with unsaved work sends one row", posted.length, 1);
+  check("to the audit table", posted[0].url.endsWith("/rest/v1/audit_log"), true);
+  check("as a request the browser finishes for the page", posted[0].options.keepalive, true);
+  const body = JSON.parse(posted[0].options.body);
+  check("saying what leaving meant", body.action, "unsaved");
+  check("and how much was still only typed", body.summary,
+        "Left the editor with 1 unsaved change; nothing was written");
+  check("naming who was typing", body.actor_email, "owner@aromatiNY.com");
 }
 
 console.log(failures

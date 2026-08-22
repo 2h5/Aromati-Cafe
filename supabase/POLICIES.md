@@ -104,8 +104,9 @@ access and no way to entrench.
 
 ### The audit log — writable by editors, readable by the owner alone
 
-`audit_log` (20260822000000) records who signed in, who saved what, and who
-asked for a rebuild. Its shape is unlike every table above, on purpose:
+`audit_log` (20260822000000, vocabulary widened by 20260822000100) records who
+signed in, who saved what, who asked for a rebuild, and who left or threw
+away work without saving. Its shape is unlike every table above, on purpose:
 
 - **Any allowlisted account can add a row, and only about itself.** The
   insert policy asks `is_owner()` and requires `actor = auth.uid()` — the
