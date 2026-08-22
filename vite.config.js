@@ -177,6 +177,24 @@ function copyClassicScripts() {
       }
     },
     configureServer(server) {
+      /* A bare page name — /audit-log rather than /audit-log.html — would
+         otherwise fall through to Vite's module pipeline, which guesses the
+         .js file of the same name and answers a request for a page with
+         JavaScript. The deployed site serves the page at both spellings; the
+         preview now does too. */
+      server.middlewares.use((req, res, next) => {
+        const pathname = (req.url || "").split("?", 1)[0];
+        if (!/^\/[a-z0-9-]+$/.test(pathname)) return next();
+        const page = pathname.slice(1) + ".html";
+        if (!PAGES.includes(page)) return next();
+        const file = resolve(root, page);
+        if (!existsSync(file)) return next();
+        res.statusCode = 200;
+        res.setHeader("Content-Type", "text/html");
+        res.setHeader("Cache-Control", "no-cache");
+        res.end(readFileSync(file));
+      });
+
       /* Vite normally transforms .js requests in dev. The vendored Supabase
          browser build is already a complete classic script, but it contains an
          optional dynamic telemetry import that is intentionally not installed.
