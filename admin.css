@@ -290,24 +290,29 @@ button{ font-family: inherit; }
 .publish-confirm__actions .btn{ width: 100%; padding: 8px 10px; }
 
 #publishBtn,
-#signOut{
+#signOut,
+#refreshBtn{
   position: relative; isolation: isolate; overflow: hidden;
   border-color: rgba(247,242,234,.4); color: var(--cream);
   transition: color 450ms var(--ease), border-color 450ms var(--ease);
 }
 #publishBtn::before,
-#signOut::before{
+#signOut::before,
+#refreshBtn::before{
   content: ""; position: absolute; inset: 0; z-index: 0;
   border-radius: inherit; background: var(--cream);
   transform: scaleX(0); transform-origin: right;
   transition: transform 550ms var(--ease);
 }
 #publishBtn span,
-#signOut span{ position: relative; z-index: 1; }
+#signOut span,
+#refreshBtn span{ position: relative; z-index: 1; }
 #publishBtn:hover:not(:disabled),
-#signOut:hover:not(:disabled){ color: var(--ink); border-color: var(--cream); }
+#signOut:hover:not(:disabled),
+#refreshBtn:hover:not(:disabled){ color: var(--ink); border-color: var(--cream); }
 #publishBtn:hover:not(:disabled)::before,
-#signOut:hover:not(:disabled)::before{ transform: scaleX(1); transform-origin: left; }
+#signOut:hover:not(:disabled)::before,
+#refreshBtn:hover:not(:disabled)::before{ transform: scaleX(1); transform-origin: left; }
 
 @keyframes admin-topbar-in{
   from{ opacity: 0; transform: translateY(-6px); }
@@ -1651,7 +1656,7 @@ body.is-framing{ overflow: hidden; }
      to undo here — this is only in case a class outlives its journey. */
   .is-settling{ transition: none; }
   .app--enter .topbar__link, .app--enter #signOut{ animation: none; }
-  .topbar__link-go, #signOut, #signOut::before,
+  .topbar__link-go, #signOut, #signOut::before, #refreshBtn, #refreshBtn::before,
   .topbar__help-btn, .topbar__help-tip, .publish-confirm{ transition: none; }
   .tab__dot, .tab__dot--leaving,
   .field--edited > .field__label::after, .field--edited-leaving > .field__label::after{
@@ -1668,4 +1673,78 @@ body.is-framing{ overflow: hidden; }
      turns over, because which way it points is information rather than
      decoration. */
   .changes, .savebar__caret{ transition: none; }
+}
+
+/* ═══════════════════════════════════════════════
+   the audit log (audit-log.html)
+   ═══════════════════════════════════════════════
+
+   The editor's shell with one pane instead of three: same topbar, same card,
+   and a single scrolling column of log entries. It lives here rather than in
+   its own file for the same reason the editor's styles are one file — the
+   gate, the topbar and the buttons are already here, and a second stylesheet
+   would duplicate all three to add five rules. */
+
+.logmain{ min-height: 0; display: grid; }
+.logmain__scroll{
+  overflow-y: auto;
+  padding: 40px max(20px, env(safe-area-inset-right)) 64px
+    max(20px, env(safe-area-inset-left));
+}
+.logmain__title{
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 28px; font-weight: 600;
+  color: var(--ink);
+}
+.logmain__sub{
+  margin: 8px 0 28px;
+  max-width: var(--measure);
+  color: var(--ink-soft);
+  font-size: 14px; line-height: 1.55;
+}
+
+.loglist{
+  display: grid; gap: 10px;
+  max-width: var(--measure);
+}
+.loglist__empty{
+  margin: 0; padding: 28px 24px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+  color: var(--ink-soft); font-size: 14px; line-height: 1.55;
+}
+
+.logrow{
+  padding: 14px 18px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+}
+.logrow__head{
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px;
+  margin-bottom: 4px;
+}
+.logrow__when{ color: var(--ink-faint); font-size: 12.5px; }
+.logrow__badge{
+  padding: 2px 8px; border-radius: 999px;
+  background: var(--tint); color: var(--maroon-600);
+  font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+}
+.logrow--publish .logrow__badge{ background: var(--tint-warm); }
+.logrow__actor{ color: var(--ink-soft); font-size: 12.5px; }
+.logrow__summary{
+  margin: 0; color: var(--ink); font-size: 14.5px; line-height: 1.5;
+}
+.logrow__detail{
+  margin: 10px 0 0; padding: 10px 0 0; list-style: none;
+  border-top: 1px solid var(--line);
+  display: grid; gap: 8px;
+}
+.logrow__detail-item{ display: grid; gap: 2px; }
+.logrow__detail-title{ color: var(--ink); font-size: 13px; font-weight: 600; }
+.logrow__detail-line{
+  padding-left: 14px;
+  color: var(--ink-soft); font-size: 13px; line-height: 1.45;
+}
+
+@media (max-width: 620px){
+  .logmain__scroll{ padding-top: 28px; }
 }

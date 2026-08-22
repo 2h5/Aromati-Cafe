@@ -64,7 +64,8 @@ See *Backing up* below.
 | `menu-food.html` | Food — 25 items, 7 courses |
 | `menu-drinks.html` | Drinks — 28 items, 4 courses |
 | `menu-wine.html` | Wine and cocktails — 31 items, 6 courses |
-| `admin.html` / `admin.js` / `admin.css` | The editor. The only page that loads the Supabase SDK |
+| `admin.html` / `admin.js` / `admin.css` | The editor. One of the two pages that load the Supabase SDK |
+| `audit-log.html` / `audit-log.js` | The owner-only history: sign-ins, saves and publishes. The other SDK page |
 | `styles.css` | All styling for all four public pages |
 | `script.js` | One IIFE: smooth scroll, nav, reveals, parallax, menu filtering, the open/closed pill |
 | `render.js` | Builds the menu boards, the hours, the copy, the contact details and the JSON-LD from data |
@@ -228,9 +229,16 @@ Signing in loads everything the owner can edit into memory once. Every panel
 edits that copy. Nothing reaches the database until **Save changes**, and
 **Discard changes** puts it all back.
 
-- **One account.** Public signup is disabled in the dashboard, and the write
-  policies name a specific `auth.uid()` — not "any authenticated user". An
-  account that is not the allowlisted owner is signed straight back out.
+- **Two allowlisted accounts, and the difference between them is in the
+  database.** Public signup is disabled in the dashboard, and every write
+  policy asks `is_owner()` — is this account on the allowlist — not "any
+  authenticated user". An account that is not allowlisted is signed straight
+  back out.
+- **Who did what is recorded.** Every sign-in, save and publish writes one
+  row to `audit_log`, readable only by the owner account at `/audit-log` —
+  the second editor's actions are recorded, but the editor cannot read the
+  record. Nobody through the API can edit or delete a row. See "The audit
+  trail" in `memory.md` and `supabase/POLICIES.md`.
 - **A save is a sequence of REST calls, not a transaction.** If the ninth of
   fourteen is refused, the first eight really happened. Each call that succeeds
   is folded into the baseline as it lands, and the database's own wording is

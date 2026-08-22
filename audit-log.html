@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Aromati | History</title>
+
+<!--
+  The audit log. One page, one reader: the owner.
+
+  Reachable at /audit-log the way the editor is reachable at /admin — the
+  address is unlisted, not secret. What makes it private is the database:
+  the select policy on audit_log (20260822000000_audit_log.sql) names the
+  owner account and no other, so the second editor — who can sign in and edit
+  the whole site — gets an empty page here. can_view_audit() is what tells
+  that empty page apart from an empty log, because RLS answers both the same
+  way and only one of them should say so in words.
+
+  Same rules as the editor, for the same reasons: the vendored SDK and no
+  other origin (script-src 'self' is enforced on this path in _headers), and
+  no inline script or style attribute anywhere below — tools/check-csp.mjs
+  fails the build if one appears. Every log entry is owner-typed text and is
+  rendered with createElement + textContent, never innerHTML.
+-->
+
+<link rel="stylesheet" href="admin.css">
+</head>
+
+<body>
+
+<noscript>
+  <p class="noscript">The history page needs JavaScript, but the public site does not.
+  If you are reading this on the live site, everything a visitor sees is still
+  working.</p>
+</noscript>
+
+<!-- ── the gate ─────────────────────────────────────────────────────────── -->
+<div class="gate" id="gate" hidden>
+  <form class="gate__card" id="signInForm" autocomplete="on">
+    <h1 class="gate__title">Aromati</h1>
+    <p class="gate__sub">Sign in to see the history.</p>
+
+    <label class="field">
+      <span class="field__label">Email</span>
+      <input class="field__input" type="email" id="email" name="email"
+             autocomplete="username" required>
+    </label>
+
+    <label class="field">
+      <span class="field__label">Password</span>
+      <input class="field__input" type="password" id="password" name="password"
+             autocomplete="current-password" required>
+    </label>
+
+    <button class="btn btn--primary btn--wide" type="submit" id="signInBtn">Sign in</button>
+
+    <p class="msg" id="gateMsg" role="alert" hidden></p>
+  </form>
+</div>
+
+<!-- ── the log ──────────────────────────────────────────────────────────── -->
+<div class="app app--log" id="app" hidden>
+
+  <header class="topbar">
+    <span class="topbar__brand">
+      <img src="assets/logos/aromati-lockup.svg" alt="Aromati café wine bar">
+    </span>
+    <span class="topbar__who" id="who"></span>
+    <span class="topbar__spacer"></span>
+    <span class="topbar__msg" id="logMsg" role="status" hidden></span>
+    <a class="topbar__link" href="admin.html"><span>The editor</span><span class="topbar__link-go" aria-hidden="true">↗</span></a>
+    <button class="btn btn--quiet" type="button" id="refreshBtn"><span>Refresh</span></button>
+    <button class="btn btn--quiet" type="button" id="signOut"><span>Sign out</span></button>
+  </header>
+
+  <main class="logmain">
+    <div class="logmain__scroll">
+      <h1 class="logmain__title">History</h1>
+      <p class="logmain__sub">Who signed in, who saved what, who asked for a
+        rebuild. Newest first. Only this account can read it, and nobody can
+        edit or erase a line, which is what makes it a history rather than a
+        note board.</p>
+      <div class="loglist" id="loglist"></div>
+    </div>
+  </main>
+
+</div>
+
+<!-- ── before either of those ───────────────────────────────────────────── -->
+<div class="boot" id="boot">
+  <p class="boot__text" id="bootText">Opening the history…</p>
+</div>
+
+<script src="config.js"></script>
+<script src="vendor/supabase.js"></script>
+<script src="audit-log.js"></script>
+
+</body>
+</html>

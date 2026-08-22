@@ -114,3 +114,22 @@
 # Phase 6 previews an upload from a blob URL before it exists on the server and
 # shows the stored photo afterwards. Stated here rather than added in a hurry
 # later, when the symptom will be a blank thumbnail and no obvious cause.
+
+# The audit log. Same posture as the editor — this page also holds a session
+# token, and it shows who changed what — minus the two permissions the editor
+# needs and this page does not: blob: for upload previews and the storage
+# origin for stored photographs. No photos are shown here.
+#
+# BOTH PATHS, for the reason the editor's note above gives: Cloudflare Pages
+# serves the file at /audit-log and 308s /audit-log.html to it, so a rule
+# written only against the name on disk matches the redirect and never the
+# page.
+/audit-log.html
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https://yofoiqgknsqzsuwtlqvh.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'
+  X-Robots-Tag: noindex, nofollow
+  Referrer-Policy: no-referrer
+
+/audit-log
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https://yofoiqgknsqzsuwtlqvh.supabase.co; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'
+  X-Robots-Tag: noindex, nofollow
+  Referrer-Policy: no-referrer

@@ -177,25 +177,28 @@ if (!policy) {
   } else pass("the inlined faces are loadable under font-src");
 }
 
-/* ── 6. the admin page is not indexable ───────────────────────────────────── */
+/* ── 6. the owner-only pages are not indexable ──────────────────────────── */
 {
   const robots = existsSync("robots.txt") ? readFileSync("robots.txt", "utf8") : "";
-  if (!/Disallow:\s*\/admin\.html/i.test(robots)) {
-    fail("robots.txt does not exclude admin.html",
-         "not a security control — auth and RLS are — but a client's login form " +
-         "in search results invites attention for no benefit");
-  } else pass("robots.txt keeps the editor out of search results");
+  for (const page of ["admin.html", "audit-log.html"]) {
+    const excluded = new RegExp("Disallow:\\s*/" + page.replace(".", "\\."), "i").test(robots);
+    if (!excluded) {
+      fail(`robots.txt does not exclude ${page}`,
+           "not a security control — auth and RLS are — but a client's login form " +
+           "in search results invites attention for no benefit");
+    } else pass(`robots.txt keeps ${page} out of search results`);
+  }
 }
 
-/* ── 7. the editor, against its own policy ────────────────────────────────
-   admin.html has a stricter rule of its own in _headers, so checking it
-   against the site-wide policy above would be checking the wrong thing. It is
-   also the page where a mistake costs the most: it is the one holding the
-   owner's session token. */
-{
-  const adminPolicy = (() => {
+/* ── 7. the owner-only pages, against their own policy ────────────────────
+   admin.html and audit-log.html each have a stricter rule of their own in
+   _headers, so checking them against the site-wide policy above would be
+   checking the wrong thing. They are also the pages where a mistake costs
+   the most: both hold a session token. */
+for (const protectedPage of ["admin.html", "audit-log.html"]) {
+  const pagePolicy = (() => {
     const live = headers.split("\n").filter((l) => !/^\s*#/.test(l));
-    const at = live.findIndex((l) => /^\/admin\.html\s*$/.test(l.trim()));
+    const at = live.findIndex((l) => l.trim() === "/" + protectedPage);
     if (at < 0) return null;
     const line = live.slice(at + 1, at + 8).find((l) => /Content-Security-Policy:/i.test(l));
     if (!line) return null;
@@ -207,13 +210,13 @@ if (!policy) {
     return out;
   })();
 
-  if (!existsSync("admin.html")) {
-    pass("no admin.html yet — nothing to check it against");
-  } else if (!adminPolicy) {
-    fail("_headers has no rule for /admin.html",
+  if (!existsSync(protectedPage)) {
+    pass(`no ${protectedPage} yet — nothing to check it against`);
+  } else if (!pagePolicy) {
+    fail(`_headers has no rule for /${protectedPage}`,
          "it would fall back to the site-wide policy, which is not the one written for it");
   } else {
-    const html = readFileSync("admin.html", "utf8");
+    const html = readFileSync(protectedPage, "utf8");
 
     /* The vendored SDK is the whole reason vendor/ exists. A CDN tag here is
        the single change that would undo it, so it is checked from this side as
@@ -221,29 +224,29 @@ if (!policy) {
     const external = [...html.matchAll(/<(?:script|link)[^>]*\b(?:src|href)=["']((?:https?:)?\/\/[^"']+)["']/gi)]
       .map((m) => m[1]);
     if (external.length) {
-      fail("the editor loads something from another origin", external.join("\n") +
+      fail(`${protectedPage} loads something from another origin`, external.join("\n") +
            "\nscript-src 'self' would block it, and the page would not open at all");
-    } else pass("the editor loads only its own origin");
+    } else pass(`${protectedPage} loads only its own origin`);
 
     const inlineJs = [...html.matchAll(/<script([^>]*)>([\s\S]*?)<\/script>/gi)]
       .filter(([, attrs, body]) => !/\bsrc=/i.test(attrs) && body.trim());
     const inlineCss = [...html.matchAll(/\sstyle=["'][^"']*["']/gi)]
       .concat([...html.matchAll(/\son[a-z]+=["'][^"']*["']/gi)]);
     if (inlineJs.length || inlineCss.length) {
-      fail("the editor has inline script, style or an event handler",
+      fail(`${protectedPage} has inline script, style or an event handler`,
            [...inlineJs.map((m) => `inline <script${m[1]}>`),
             ...inlineCss.map((m) => m[0].trim().slice(0, 50))].join("\n") +
-           "\nthe editor is built entirely in admin.js for exactly this reason");
-    } else pass("the editor has no inline script, style attribute or handler");
+           "\nthese pages are built entirely in their own .js for exactly this reason");
+    } else pass(`${protectedPage} has no inline script, style attribute or handler`);
 
     if (!/<meta[^>]+name=["']robots["'][^>]+noindex/i.test(html)) {
-      fail("admin.html has no <meta name=\"robots\" content=\"noindex\">",
+      fail(`${protectedPage} has no <meta name="robots" content="noindex">`,
            "robots.txt asks; the meta tag is the half crawlers honour more reliably");
-    } else pass("the editor asks not to be indexed, on the page as well as in robots.txt");
+    } else pass(`${protectedPage} asks not to be indexed, on the page as well as in robots.txt`);
 
-    if ((adminPolicy["frame-ancestors"] || []).join(" ") !== "'none'") {
-      fail("the editor may be framed", "frame-ancestors on /admin.html should be 'none'");
-    } else pass("the editor cannot be put in a frame by anyone");
+    if ((pagePolicy["frame-ancestors"] || []).join(" ") !== "'none'") {
+      fail(`${protectedPage} may be framed`, `frame-ancestors on /${protectedPage} should be 'none'`);
+    } else pass(`${protectedPage} cannot be put in a frame by anyone`);
   }
 }
 

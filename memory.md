@@ -5,7 +5,7 @@ This file is the technical handoff for whoever maintains the site next.
 owner-facing guide. `PHOTOGRAPHS.md` is the full account of the photograph
 pipeline and must be read before touching it.
 
-Last updated: 2026-08-20.
+Last updated: 2026-08-22.
 
 ## Current state
 
@@ -19,7 +19,9 @@ Further work is maintenance and fixes, not new features.
 - Supabase provides the editable content and the owner-facing editor.
 - The site renders from its local fallback data if the network or database is
   unavailable.
-- There is one shared owner login.
+- Two accounts can edit (the owner and a second editor, both allowlisted).
+  Sign-ins, saves and publishes are recorded in an audit log that only the
+  owner account can read, served at /audit-log — see "The audit trail" below.
 - The Wine 04 photo stays static on iOS portrait sizes. That is the accepted
   behavior, not an open bug.
 
@@ -114,6 +116,7 @@ Further work is maintenance and fixes, not new features.
 - `index.html`, `menu-food.html`, `menu-drinks.html` and `menu-wine.html` are
   the public pages.
 - `admin.html`, `admin.js` and `admin.css` are the editor.
+- `audit-log.html` and `audit-log.js` are the owner-only history page.
 - `render.js` builds public menus, copy, hours, contact details and JSON-LD.
 - `data.js` loads network data, cached data or seed data. It does not own the
   page markup.
@@ -129,6 +132,36 @@ Further work is maintenance and fixes, not new features.
 - `tools/` contains extractors, generators and checks. Nothing in it ships to
   visitors.
 - `_headers` and `robots.txt` must be included in the Cloudflare upload.
+
+## The audit trail
+
+Added 2026-08-22. `supabase/migrations/20260822000000_audit_log.sql` creates
+`audit_log`, and it closes the gap the second editor's own migration flagged:
+two accounts could each change anything and nothing recorded which one had.
+
+- Every sign-in through the editor's form, every save (including a save
+  refused halfway, with what it wrote), and every publish writes one row.
+  admin.js §7b does it fire-and-forget: a log write that fails goes to the
+  console and must never fail the action it describes.
+- Any allowlisted account can add rows, and only about itself — the insert
+  policy checks `actor = auth.uid()`, so the editor cannot write a row in the
+  owner's name.
+- Only the owner account can read the log. The select policy names the one
+  UUID rather than asking `admin_users`, because a row there means "may edit"
+  and reading the history is deliberately a narrower permission. The editor's
+  actions are recorded; the editor cannot see the record.
+- Nobody through the API can update or delete a row, the owner included —
+  there are no policies or grants for it. The SQL editor is the only escape
+  hatch, same as the allowlist.
+- `audit-log.html` at /audit-log is the reader. It asks `can_view_audit()`
+  because RLS answers a refused select with zero rows, indistinguishable from
+  an empty log; the editor account gets a sentence pointing it back to
+  /admin, not a blank page. The address is unlisted, not secret — the policy
+  is the lock, the same division of labour as the editor itself.
+- `tools/test-rls.mjs` runs the log through four actors (owner, editor,
+  stranger, logged-out), `tools/test-admin.mjs` asserts a sign-in and a save
+  are recorded, and `tools/check-csp.mjs` holds the page to the editor's own
+  header rules.
 
 ## CMS map
 
@@ -420,5 +453,6 @@ Migrations: `supabase/migrations/20260801000000_init_cms.sql`,
 `supabase/migrations/20260812000100_breakfast_builder.sql`,
 `supabase/migrations/20260812000200_menu_course_hidden.sql`,
 `supabase/migrations/20260812000300_smooth_admin_validation_copy.sql`,
-`supabase/migrations/20260815000000_remove_retired_page.sql` and
-`supabase/migrations/20260817000000_photo_captions.sql`.
+`supabase/migrations/20260815000000_remove_retired_page.sql`,
+`supabase/migrations/20260817000000_photo_captions.sql` and
+`supabase/migrations/20260822000000_audit_log.sql`.

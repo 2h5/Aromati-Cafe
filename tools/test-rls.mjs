@@ -19,7 +19,7 @@
 
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { freshDatabase, applyFile, OWNER_UID } from "./supabase-shim.mjs";
+import { freshDatabase, applyFile, OWNER_UID, EDITOR_UID } from "./supabase-shim.mjs";
 
 /* tools/test-db-guards.mjs points this at a mutated copy to prove the checks
    below can fail. Nothing else sets it. */
@@ -274,6 +274,83 @@ for (const [what, sql] of ALLOWLIST) {
   if (stored !== payload) fail("markup typed into a copy field did not round-trip verbatim",
                                `stored: ${stored}`);
   else pass("stores    a script tag as the literal text it is");
+}
+
+/* The audit log (20260822000000_audit_log.sql) is a different shape from
+   every table above, and it gets a fourth actor to prove it: the second
+   editor. Any allowlisted account can add a row about itself, only the owner
+   can read the rows, and nobody through the API can change or remove one —
+   including the owner, because a log the owner can rewrite is a note board. */
+{
+  /* Non-empty before anybody reads it: a refused SELECT and an empty table
+     are both zero rows, and only one of them proves a policy is holding.
+     Seeded outside as() — as() rolls back, which is exactly right for the
+     cases and exactly wrong for the fixture. */
+  await db.exec(
+    `insert into public.audit_log (actor, action, summary)
+     values ('${OWNER}', 'save', 'Seeded so the reads below mean something')`);
+
+  const NOBODY = { owner: false, editor: false, stranger: false, visitor: false };
+  const FOUR = [
+    ["the owner",            OWNER,      "owner"],
+    ["the second editor",    EDITOR_UID, "editor"],
+    ["a signed-in stranger", STRANGER,   "stranger"],
+    ["a logged-out visitor", null,       "visitor"]
+  ];
+
+  const AUDIT = [
+    ["read the history",
+     `select 1 from public.audit_log limit 1`,
+     { owner: true, editor: false, stranger: false, visitor: false }],
+    ["record their own action",
+     `insert into public.audit_log (action, summary) values ('login', 'Signed in')`,
+     { owner: true, editor: true, stranger: false, visitor: false }],
+    ["rewrite a history row",
+     `update public.audit_log set summary = 'Rewritten'`,
+     NOBODY],
+    ["erase the history",
+     `delete from public.audit_log`,
+     NOBODY]
+  ];
+
+  for (const [what, sql, may] of AUDIT) {
+    for (const [who, uid, kind] of FOUR) {
+      checks++;
+      const got = await allowed(uid, sql);
+      if (got === may[kind]) pass(`${may[kind] ? "can    " : "cannot "} ${who} ${what}`);
+      else fail(`${who} ${got ? "can" : "cannot"} ${what}`,
+                "20260822000000_audit_log.sql is not holding the shape POLICIES.md describes");
+    }
+  }
+
+  /* The editor may record actions, but only as themselves: a row naming the
+     owner written from the editor's session fails the with check half of the
+     insert policy. */
+  checks++;
+  const forged = await allowed(EDITOR_UID,
+    `insert into public.audit_log (actor, action, summary)
+     values ('${OWNER}', 'save', 'Not the editor')`);
+  if (!forged) pass("cannot  the second editor write a history row in the owner's name");
+  else fail("the second editor wrote a history row in the owner's name",
+            "the insert policy checks actor = auth.uid() for exactly this");
+
+  /* can_view_audit() is how the /audit-log page tells "not your page" apart
+     from "nothing yet" — RLS answers a refused SELECT with zero rows, same
+     as an empty log. It must answer true for the owner, false for the
+     editor, and be uncallable logged out: the same grant shape as
+     is_owner(), and worth asserting for the same reason. */
+  checks++;
+  const ownerAnswer = await as(OWNER, async () =>
+    (await db.query("select public.can_view_audit()")).rows[0].can_view_audit);
+  const editorAnswer = await as(EDITOR_UID, async () =>
+    (await db.query("select public.can_view_audit()")).rows[0].can_view_audit);
+  const anonCanCall = await as(null, async () => {
+    try { await db.query("select public.can_view_audit()"); return true; } catch { return false; }
+  });
+  if (ownerAnswer === true && editorAnswer === false && !anonCanCall)
+    pass("can_view_audit() answers the owner, refuses the editor, and is uncallable logged out");
+  else fail("can_view_audit() does not tell the three apart",
+            `owner: ${ownerAnswer}, editor: ${editorAnswer}, anon could call it: ${anonCanCall}`);
 }
 
 console.log(failures

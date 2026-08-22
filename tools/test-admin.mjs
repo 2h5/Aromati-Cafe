@@ -558,11 +558,16 @@ async function boot(opts) {
     problems() { return [...doc.querySelectorAll(".problems__link")].map((n) => n.textContent); },
     confirms() { return log.filter((l) => l.what === "confirm").map((l) => l.message); },
     changeCount() { return q("#saveCount").textContent; },
-    writes() { return log.filter((l) => ["insert", "update", "delete"].includes(l.what)); },
+    /* audit_log is excluded on purpose: the editor writes one row there per
+       sign-in, save and publish (admin.js §7b), and counting it would make
+       every "the save sent exactly N writes" assertion below read N+1. The
+       audit writes are asserted separately, in the audit trail section. */
+    writes() { return log.filter((l) => ["insert", "update", "delete"].includes(l.what) && l.table !== "audit_log"); },
+    audit() { return log.filter((l) => l.table === "audit_log" && l.what === "insert"); },
 
     /* Everything that left the page, in the order it left, which is the only
        way to ask whether the file went before the row that names it. */
-    sent() { return log.filter((l) => ["upload", "remove", "insert", "update", "delete"].includes(l.what)); },
+    sent() { return log.filter((l) => ["upload", "remove", "insert", "update", "delete"].includes(l.what) && l.table !== "audit_log"); },
     uploads() { return log.filter((l) => l.what === "upload"); },
     drawn() { return drawn; },
 
@@ -2775,6 +2780,32 @@ console.log("\nlong values are cut rather than wrapped four times");
         "a photograph you uploaded");
 }
 
+
+console.log("\nthe audit trail");
+{
+  /* One row per event in audit_log (admin.js §7b), written beside the save
+     rather than instead of it. The assertions above count what the save sent;
+     these count what the save was remembered as. */
+  const r = await boot();
+  await r.signIn();
+  check("signing in is recorded", r.audit().map((a) => a.payload.action), ["login"]);
+
+  r.tab("Words");
+  r.type(r.fieldShowing("Georgian cooking for a Manhattan morning."),
+         "Georgian cooking, all morning.");
+  await r.save();
+
+  const entries = r.audit();
+  check("the save is recorded too", entries.length, 2);
+  check("as what it was", entries[1].payload.action, "save");
+  check("saying how much landed", entries[1].payload.summary, "Saved 1 change");
+  check("naming who did it", entries[1].payload.actor_email, "owner@aromatiNY.com");
+  check("carrying the change itself", entries[1].payload.detail.length, 1);
+  check("in the right table", entries[1].payload.detail[0].table, "site_copy");
+  check("as a change, not an add", entries[1].payload.detail[0].kind, "changed");
+  check("with the new words in it",
+        entries[1].payload.detail[0].lines[0].includes("Georgian cooking, all morning."), true);
+}
 
 console.log(failures
   ? `\n${failures} failure(s) — the editor does not do what it says\n`

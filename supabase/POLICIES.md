@@ -1,8 +1,8 @@
 # What the database allows, in plain words
 
-This describes the numbered migrations in this folder — 12 public content and
-system tables, 40 policies, including the isolated `menu_builder_options`
-table. If a sentence here says something you did not intend, that is the
+This describes the numbered migrations in this folder — 13 public content and
+system tables, 42 policies, including the isolated `menu_builder_options`
+table and the owner-only `audit_log`. If a sentence here says something you did not intend, that is the
 finding — the SQL is wrong, not this summary.
 
 The migrations have been applied to the project identified by `config.js` and
@@ -99,6 +99,29 @@ Supabase dashboard's SQL editor.
 This is what stops an editor promoting a second account from inside the app. If
 the owner's login were ever phished, the attacker gets the owner's content
 access and no way to entrench.
+
+---
+
+### The audit log — writable by editors, readable by the owner alone
+
+`audit_log` (20260822000000) records who signed in, who saved what, and who
+asked for a rebuild. Its shape is unlike every table above, on purpose:
+
+- **Any allowlisted account can add a row, and only about itself.** The
+  insert policy asks `is_owner()` and requires `actor = auth.uid()` — the
+  second editor cannot write a row in the owner's name.
+- **Only the owner account can read it.** The select policy names the owner's
+  UUID literally rather than asking `admin_users`, because a row there means
+  "may edit", and reading the history is deliberately a narrower permission.
+  The editor's actions are recorded; the editor cannot see the record.
+- **Nobody through the API can update or delete**, the owner included — no
+  policies and no grants for either, so both fail closed. A log that can be
+  rewritten is a note board. The SQL editor is the only way in, same as the
+  allowlist.
+- `can_view_audit()` exists so the `/audit-log` page can tell "not your page"
+  apart from "nothing yet" — a refused SELECT and an empty log both return
+  zero rows, and only one of them should be said out loud. It is granted to
+  `authenticated` only, like `is_owner()`.
 
 ---
 

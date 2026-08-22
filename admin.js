@@ -4610,6 +4610,67 @@ var AROMATI_ADMIN = (function () {
     return out;
   }
 
+  /* ═══════════════════════════════════════════════
+     7b. the audit trail
+     ═══════════════════════════════════════════════
+
+     Who signed in, who saved what, who asked for a rebuild — one row per
+     event in the audit_log table, readable only by the owner account on the
+     /audit-log page. The policies are in 20260822000000_audit_log.sql; the
+     short version is that any allowlisted account can add a row about itself,
+     only the owner can read the rows, and nobody through the API can change
+     or remove one.
+
+     Fire and forget, on purpose. A save that landed is a save that landed;
+     the row describing it failing to write must not turn that into an error
+     the owner is asked to act on — so a refusal goes to the console and
+     nowhere else. The gap that leaves is accepted: the log is a record of
+     what the editor did, not a guarantee about the network. */
+
+  function logAction(action, summary, detail) {
+    if (!sb || !account) return;
+    try {
+      sb.from("audit_log").insert({
+        action: action,
+        summary: summary,
+        detail: detail || null,
+        /* The database fills actor from the session and refuses a row naming
+           anyone else; the email rides along because auth.users is not
+           readable through the API and a log of bare UUIDs is a log nobody
+           reads. */
+        actor_email: account.email || null
+      }).then(function (res) {
+        if (res && res.error && window.console) {
+          console.warn("audit: could not record the " + action + ": " + res.error.message);
+        }
+      }, function (err) {
+        if (window.console) console.warn("audit: could not record the " + action, err);
+      });
+    } catch (err) {
+      /* A client that never finished booting, a test double without the
+         table — anything but the page falling over. */
+      if (window.console) console.warn("audit: could not record the " + action, err);
+    }
+  }
+
+  /* The human-readable change list, folded flat for the log. Built from
+     changeEntries() at the moment the save starts, because by the time it
+     finishes the baseline has moved and the same question answers "nothing
+     changed" — these entries describe what was attempted, and the summary
+     says how much of it landed. Capped, because a menu re-sort is one line
+     per row and the log entry has to stay a row, not a scroll. */
+  function auditDetail() {
+    return changeEntries().slice(0, 50).map(function (e) {
+      return {
+        kind: e.kind, table: e.table, title: e.title, where: e.where,
+        lines: e.lines.map(function (l) {
+          return l.plain ? l.label + ": " + l.plain
+                         : l.label + ": " + l.was + " → " + l.now;
+        })
+      };
+    });
+  }
+
   /* Put an edited row back the way the database last confirmed it. Only the
      writable columns move, which is the same set the save would have sent —
      so this cannot restore something the editor was never allowed to change. */
@@ -4965,6 +5026,12 @@ var AROMATI_ADMIN = (function () {
 
     planned = steps.length;
 
+    /* Taken now, before the first write lands: finish() runs after each
+       landed step has been folded into the baseline, and asking then would
+       describe the save as nothing. The summary says how much landed; this
+       says what it was. */
+    var detail = auditDetail();
+
     function finish(error) {
       saving = false;
       byId("savebar").className = "savebar";
@@ -4974,6 +5041,14 @@ var AROMATI_ADMIN = (function () {
          `done` rather than on success is the difference between a label that
          reports and one that congratulates. */
       if (done > 0) savedSomething = true;
+      /* Recorded whether or not the batch completed — a save refused halfway
+         really did write what it wrote, and that is exactly the kind of event
+         a history exists to keep. */
+      if (done > 0) {
+        logAction("save", error
+          ? "Saved " + done + " of " + planned + " changes, then one was refused"
+          : done === 1 ? "Saved 1 change" : "Saved " + done + " changes", detail);
+      }
       renderAll();
 
       if (error) {
@@ -5216,6 +5291,7 @@ var AROMATI_ADMIN = (function () {
       /* "asked for", not "done". Nothing here can learn whether the build
          succeeded — see PHOTOGRAPHS.md §3, which lists that as a real cost of
          this design rather than an edge case. Do not promise more. */
+      logAction("publish", "Asked for a site rebuild");
       publishMessage("Publishing. The site updates in about a minute.", false);
     }, refused);
   }
@@ -5413,7 +5489,12 @@ var AROMATI_ADMIN = (function () {
               gateMessage("That account exists, but it is not allowed to edit this site.");
             });
           }
-          return enter(res.data.user);
+          return enter(res.data.user).then(function () {
+            /* A sign-in through the form, not a stored session resuming —
+               the boot path below is the same account arriving back, and a
+               row per page load is a log of noise. */
+            logAction("login", "Signed in to the editor");
+          });
         });
       }).catch(function (err) {
         btn.disabled = false;

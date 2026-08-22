@@ -1,0 +1,286 @@
+/* ═══════════════════════════════════════════════
+   AROMATI — the audit log viewer
+   ═══════════════════════════════════════════════
+
+   One page, one reader. The same gate as the editor, and then a second,
+   narrower question the editor never asks: not "may this account edit the
+   site" (is_owner()) but "is this the owner account" (can_view_audit()).
+   The second editor passes the first and fails the second, and is signed
+   back out with a sentence saying so — because RLS answers a refused SELECT
+   with zero rows, and a page that just showed nothing would read as a broken
+   feature rather than a locked door.
+
+   ── the one security rule, same as the editor ──
+   Every node below is built with createElement and filled with textContent.
+   Never innerHTML, never insertAdjacentHTML. The log's summaries and details
+   are owner-typed CMS text on the way back out — the whole reason the rule
+   exists on the way in.
+
+   ── what this page is not ──
+   It is not a control. It changes nothing, deletes nothing, and offers no
+   button that writes. The table accepts inserts from any allowlisted account
+   and reads for the owner alone; this page is only a window onto that. */
+
+(function () {
+  "use strict";
+
+  function el(tag, cls, text) {
+    var node = document.createElement(tag);
+    if (cls) node.className = cls;
+    if (text !== null && text !== undefined) node.textContent = String(text);
+    return node;
+  }
+
+  function clear(node) {
+    while (node.firstChild) node.removeChild(node.firstChild);
+  }
+
+  function byId(id) { return document.getElementById(id); }
+  function on(node, type, fn) { node.addEventListener(type, fn); }
+  function t(s) { return String(s == null ? "" : s).replace(/^\s+|\s+$/g, ""); }
+
+  var sb = null;
+  var account = null;
+
+  /* The café's clock, not the reader's. The site resolves "now" in
+     America/New_York (init_cms.sql, the note at the top), and a log entry
+     that says when something happened should say it in the zone the thing
+     happened in. Falls back to the browser's own zone if Intl is absent. */
+  function when(iso) {
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return String(iso || "");
+    try {
+      return d.toLocaleString("en-US", {
+        timeZone: "America/New_York",
+        weekday: "short", month: "short", day: "numeric",
+        hour: "numeric", minute: "2-digit"
+      }) + " ET";
+    } catch (err) {
+      return d.toLocaleString();
+    }
+  }
+
+  var ACTION_LABELS = { login: "Sign-in", save: "Save", publish: "Publish" };
+
+  /* ═══════════════════════════════════════════════
+     the list
+     ═══════════════════════════════════════════════ */
+
+  function renderEntry(entry) {
+    var row = el("div", "logrow logrow--" + entry.action);
+
+    var head = el("div", "logrow__head");
+    head.appendChild(el("span", "logrow__when", when(entry.created_at)));
+    head.appendChild(el("span", "logrow__badge", ACTION_LABELS[entry.action] || entry.action));
+    head.appendChild(el("span", "logrow__actor", entry.actor_email || "unknown account"));
+    row.appendChild(head);
+
+    row.appendChild(el("p", "logrow__summary", entry.summary));
+
+    /* detail is the folded-flat change list the editor captured at the moment
+       the save started — kind, title, and one line per field that moved. */
+    var detail = entry.detail;
+    if (detail && detail.length) {
+      var list = el("ul", "logrow__detail");
+      detail.forEach(function (d) {
+        var item = el("li", "logrow__detail-item");
+        var kind = d.kind === "added" ? "Added" : d.kind === "removed" ? "Removed" : "Changed";
+        item.appendChild(el("span", "logrow__detail-title",
+          kind + " " + (d.title || "a row") + (d.where ? " — " + d.where : "")));
+        (d.lines || []).forEach(function (line) {
+          item.appendChild(el("span", "logrow__detail-line", line));
+        });
+        list.appendChild(item);
+      });
+      row.appendChild(list);
+    }
+
+    return row;
+  }
+
+  function render(entries) {
+    var list = byId("loglist");
+    clear(list);
+    if (!entries.length) {
+      list.appendChild(el("p", "loglist__empty",
+        "Nothing yet. Sign-ins, saves and publishes appear here as they happen."));
+      return;
+    }
+    entries.forEach(function (entry) { list.appendChild(renderEntry(entry)); });
+  }
+
+  function logMessage(text) {
+    var node = byId("logMsg");
+    node.textContent = text || "";
+    node.hidden = !text;
+  }
+
+  function load() {
+    var btn = byId("refreshBtn");
+    btn.disabled = true;
+    return sb.from("audit_log")
+      .select("actor_email, action, summary, detail, created_at")
+      .order("created_at", { ascending: false })
+      .limit(200)
+      .then(function (res) {
+        btn.disabled = false;
+        if (res.error) {
+          logMessage("The history would not load: " + res.error.message);
+          return;
+        }
+        logMessage("");
+        render(res.data || []);
+      }, function (err) {
+        btn.disabled = false;
+        logMessage("The history would not load: " + ((err && err.message) || err));
+      });
+  }
+
+  /* ═══════════════════════════════════════════════
+     the gate
+     ═══════════════════════════════════════════════ */
+
+  function show(which) {
+    byId("boot").hidden = which !== "boot";
+    byId("gate").hidden = which !== "gate";
+    byId("app").hidden = which !== "app";
+  }
+
+  function bootMessage(text, bad) {
+    var boot = byId("boot");
+    boot.className = bad ? "boot boot--bad" : "boot";
+    byId("bootText").textContent = text;
+    show("boot");
+  }
+
+  function gateMessage(text) {
+    var node = byId("gateMsg");
+    node.textContent = text || "";
+    node.hidden = !text;
+  }
+
+  function rpc(name) {
+    return sb.rpc(name).then(function (res) {
+      if (res.error) throw new Error(res.error.message);
+      return res.data === true;
+    });
+  }
+
+  /* Two questions, asked in order and kept separate, because they mean
+     different things and the answers read differently:
+
+       is_owner()       may this account edit the site at all
+       can_view_audit() is it the one account that may read the history
+
+     An editor who passes the first and fails the second is not an error and
+     not an intruder — they are doing their job on the wrong page — so the
+     message says where they should be rather than what they did wrong. */
+  function admit(user) {
+    return rpc("is_owner").then(function (isOwner) {
+      if (!isOwner) {
+        return sb.auth.signOut().then(function () {
+          show("gate");
+          gateMessage("That account exists, but it is not allowed on this site.");
+        });
+      }
+      return rpc("can_view_audit").then(function (canView) {
+        if (!canView) {
+          return sb.auth.signOut().then(function () {
+            show("gate");
+            gateMessage("That account can edit the site, but the history is the " +
+                        "owner account's alone. The editor is at /admin.");
+          });
+        }
+        account = user;
+        byId("who").textContent = "Signed in as " + (user.email || "the owner");
+        show("app");
+        return load();
+      });
+    });
+  }
+
+  function wireGate() {
+    on(byId("signInForm"), "submit", function (e) {
+      e.preventDefault();
+      gateMessage("");
+      var btn = byId("signInBtn");
+      btn.disabled = true;
+
+      sb.auth.signInWithPassword({
+        email: t(byId("email").value),
+        password: byId("password").value
+      }).then(function (res) {
+        if (res.error) {
+          btn.disabled = false;
+          /* Same answer as the editor gives, for the same reason: which of
+             the two it was is not the signer-in's business to learn. */
+          gateMessage(res.error.message === "Invalid login credentials"
+            ? "That email and password do not match an account."
+            : res.error.message);
+          return;
+        }
+        return admit(res.data.user).then(function () {
+          btn.disabled = false;
+        });
+      }).catch(function (err) {
+        btn.disabled = false;
+        gateMessage("Could not reach the database: " + ((err && err.message) || err));
+      });
+    });
+
+    on(byId("signOut"), "click", function () {
+      sb.auth.signOut().then(function () { window.location.reload(); });
+    });
+    on(byId("refreshBtn"), "click", load);
+  }
+
+  /* ═══════════════════════════════════════════════
+     boot
+     ═══════════════════════════════════════════════ */
+
+  function boot() {
+    if (typeof AROMATI_CONFIG !== "object" || !AROMATI_CONFIG ||
+        !/^https:\/\//.test(String(AROMATI_CONFIG.url || "")) ||
+        String(AROMATI_CONFIG.anonKey || "").length <= 20) {
+      bootMessage("config.js has no project in it, so there is nothing to sign in to. " +
+                  "The public site still works because it falls back to content stored in " +
+                  "the repository. This page needs a project URL and a publishable key.", true);
+      return;
+    }
+
+    if (typeof supabase !== "object" || !supabase || typeof supabase.createClient !== "function") {
+      bootMessage("vendor/supabase.js did not load, so this page cannot sign in. " +
+                  "Check that the file is there and that the page is being served over " +
+                  "http rather than opened from disk.", true);
+      return;
+    }
+
+    if (window.location.protocol === "file:") {
+      bootMessage("This page has to be served over http, not opened from a file. " +
+                  "Signing in needs an origin. Run `npm run dev` and open the address " +
+                  "it prints, with /audit-log at the end.", true);
+      return;
+    }
+
+    sb = supabase.createClient(AROMATI_CONFIG.url, AROMATI_CONFIG.anonKey, {
+      auth: { persistSession: true, autoRefreshToken: true }
+    });
+
+    wireGate();
+
+    sb.auth.getSession().then(function (res) {
+      var session = res.data && res.data.session;
+      if (!session) { show("gate"); return; }
+      return admit(session.user);
+    }).catch(function (err) {
+      show("gate");
+      gateMessage("Could not reach the database: " + ((err && err.message) || err));
+    });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", boot);
+  } else {
+    boot();
+  }
+})();
