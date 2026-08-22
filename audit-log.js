@@ -112,16 +112,14 @@
     return row;
   }
 
-  function render(shown, filtered) {
-    var list = byId("loglist");
+  function renderList(id, rows, emptyText) {
+    var list = byId(id);
     clear(list);
-    if (!shown.length) {
-      list.appendChild(el("p", "loglist__empty", filtered
-        ? "Nothing matches those filters."
-        : "Nothing yet. Sign-ins, saves, discards and publishes appear here as they happen."));
+    if (!rows.length) {
+      list.appendChild(el("p", "loglist__empty", emptyText));
       return;
     }
-    shown.forEach(function (entry) { list.appendChild(renderEntry(entry)); });
+    rows.forEach(function (entry) { list.appendChild(renderEntry(entry)); });
   }
 
   /* "When" is answered in the café's day, not the reader's: today in New
@@ -161,10 +159,20 @@
       return true;
     });
 
-    render(shown, filtered);
-    byId("logCount").textContent = shown.length === entries.length
-      ? entries.length + (entries.length === 1 ? " entry" : " entries")
-      : shown.length + " of " + entries.length + " entries";
+    /* Sessions get their own column: the door opening is worth a record, but
+       a busy day of opens should never push an actual change out of sight. */
+    var changes = shown.filter(function (e) { return e.action !== "login"; });
+    var sessions = shown.filter(function (e) { return e.action === "login"; });
+    renderList("loglist", changes, filtered
+      ? "No changes match those filters."
+      : "Nothing yet. Saves, discards and publishes appear here as they happen.");
+    renderList("sessionlist", sessions, filtered
+      ? "No sessions match those filters."
+      : "No sessions yet.");
+    byId("logCount").textContent =
+      changes.length + (changes.length === 1 ? " change" : " changes") + " · " +
+      sessions.length + (sessions.length === 1 ? " session" : " sessions") +
+      (filtered ? " shown" : "");
   }
 
   function refreshActorOptions() {
@@ -197,7 +205,7 @@
     return sb.from("audit_log")
       .select("actor_email, action, summary, detail, created_at")
       .order("created_at", { ascending: false })
-      .limit(200)
+      .limit(1000)
       .then(function (res) {
         btn.disabled = false;
         if (res.error) {

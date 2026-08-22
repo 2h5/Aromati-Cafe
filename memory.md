@@ -169,7 +169,9 @@ two accounts could each change anything and nothing recorded which one had.
   be narrowed by account (the dropdown starts from the three allowlisted
   emails, so "did this person ever do anything?" can be answered with an
   empty list) and by when — today, yesterday, the last 7 or 30 days, or one
-  picked day, all reckoned in the café's time zone.
+  picked day, all reckoned in the café's time zone. Sign-ins and editor opens
+  get their own column beside the changes, so a busy day of opens never
+  buries a save. The page reads the most recent 1,000 rows.
 - `tools/test-rls.mjs` runs the log through four actors (owner, editor,
   stranger, logged-out), `tools/test-admin.mjs` asserts sign-ins, saves,
   discards and unsaved exits are recorded, and `tools/check-csp.mjs` holds the page to the editor's own

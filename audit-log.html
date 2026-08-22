@@ -79,7 +79,7 @@
       <h1 class="logmain__title">History</h1>
 
       <!-- Narrowing, not searching the database: the whole log (up to the
-           most recent 200 rows) is loaded once and these controls only decide
+           most recent 1,000 rows) is loaded once and these controls only decide
            which of it is shown, so an answer never depends on the network. -->
       <div class="logfilter">
         <label class="logfilter__field">
@@ -105,7 +105,19 @@
         <span class="logfilter__count" id="logCount"></span>
       </div>
 
-      <div class="loglist" id="loglist"></div>
+      <!-- Sessions (sign-ins and editor opens) get their own column: the door
+           opening is worth a record, but a busy day of opens should never push
+           an actual change out of sight. -->
+      <div class="logcols">
+        <section class="logcol">
+          <h2 class="logcol__title">Changes</h2>
+          <div class="loglist" id="loglist"></div>
+        </section>
+        <aside class="logcol logcol--sessions">
+          <h2 class="logcol__title">Sessions</h2>
+          <div class="loglist loglist--sessions" id="sessionlist"></div>
+        </aside>
+      </div>
     </div>
   </main>
 
