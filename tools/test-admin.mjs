@@ -2805,6 +2805,15 @@ console.log("\nthe audit trail");
   check("as a change, not an add", entries[1].payload.detail[0].kind, "changed");
   check("with the new words in it",
         entries[1].payload.detail[0].lines[0].includes("Georgian cooking, all morning."), true);
+
+  /* The door opening without the form: a saved session arriving back is
+     recorded too, with a different sentence — "were they in here at all?" is
+     the question this log exists for, and a refreshless session is still
+     someone in here. */
+  const s = await boot({ session: { user: { email: "owner@aromatiNY.com" } } });
+  await settle();
+  check("opening the editor on a saved session is recorded",
+        s.audit().map((a) => a.payload.summary), ["Opened the editor with a saved session"]);
 }
 
 console.log(failures

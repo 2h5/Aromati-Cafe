@@ -139,8 +139,10 @@ Added 2026-08-22. `supabase/migrations/20260822000000_audit_log.sql` creates
 `audit_log`, and it closes the gap the second editor's own migration flagged:
 two accounts could each change anything and nothing recorded which one had.
 
-- Every sign-in through the editor's form, every save (including a save
-  refused halfway, with what it wrote), and every publish writes one row.
+- Every time the editor opens — a form sign-in and a saved session arriving
+  back get different sentences so the two read apart — every save (including
+  a save refused halfway, with what it wrote), and every publish writes one
+  row.
   admin.js §7b does it fire-and-forget: a log write that fails goes to the
   console and must never fail the action it describes.
 - Any allowlisted account can add rows, and only about itself — the insert

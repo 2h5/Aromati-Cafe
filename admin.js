@@ -5490,9 +5490,9 @@ var AROMATI_ADMIN = (function () {
             });
           }
           return enter(res.data.user).then(function () {
-            /* A sign-in through the form, not a stored session resuming —
-               the boot path below is the same account arriving back, and a
-               row per page load is a log of noise. */
+            /* Through the form. A saved session arriving back gets its own
+               row in boot() with a different sentence, so the two read apart
+               in the history. */
             logAction("login", "Signed in to the editor");
           });
         });
@@ -5576,7 +5576,12 @@ var AROMATI_ADMIN = (function () {
             gateMessage("That session is not allowed to edit this site.");
           });
         }
-        return enter(session.user);
+        return enter(session.user).then(function () {
+          /* No form was filled in, but the door still opened — and "was
+             anyone in here at all?" is the question this log exists for. A
+             row per page load is the cost of answering it; accepted. */
+          logAction("login", "Opened the editor with a saved session");
+        });
       });
     }).catch(function (err) {
       show("gate");
