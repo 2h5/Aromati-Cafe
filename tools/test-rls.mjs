@@ -276,11 +276,13 @@ for (const [what, sql] of ALLOWLIST) {
   else pass("stores    a script tag as the literal text it is");
 }
 
-/* The audit log (20260822000000_audit_log.sql) is a different shape from
-   every table above, and it gets a fourth actor to prove it: the second
-   editor. Any allowlisted account can add a row about itself, only the owner
-   can read the rows, and nobody through the API can change or remove one —
-   including the owner, because a log the owner can rewrite is a note board. */
+/* The audit log (20260822000000_audit_log.sql, read side widened by
+   20260822000200_audit_shared_history.sql) is a different shape from every
+   table above, and it gets a fourth actor to prove it: the second editor.
+   Any allowlisted account can add a row about itself, any allowlisted
+   account can read the rows — admins are equal, and the history belongs to
+   all of them — and nobody through the API can change or remove one,
+   because a log that can be rewritten is a note board. */
 {
   /* Non-empty before anybody reads it: a refused SELECT and an empty table
      are both zero rows, and only one of them proves a policy is holding.
@@ -301,7 +303,7 @@ for (const [what, sql] of ALLOWLIST) {
   const AUDIT = [
     ["read the history",
      `select 1 from public.audit_log limit 1`,
-     { owner: true, editor: false, stranger: false, visitor: false }],
+     { owner: true, editor: true, stranger: false, visitor: false }],
     ["record their own action",
      `insert into public.audit_log (action, summary) values ('login', 'Signed in')`,
      { owner: true, editor: true, stranger: false, visitor: false }],
@@ -354,9 +356,10 @@ for (const [what, sql] of ALLOWLIST) {
 
   /* can_view_audit() is how the /audit-log page tells "not your page" apart
      from "nothing yet" — RLS answers a refused SELECT with zero rows, same
-     as an empty log. It must answer true for the owner, false for the
-     editor, and be uncallable logged out: the same grant shape as
-     is_owner(), and worth asserting for the same reason. */
+     as an empty log. Since 20260822000200 it is is_owner() under another
+     name: true for every allowlisted account, uncallable logged out. The
+     page no longer calls it — admit() asks is_owner() directly — but the
+     grant shape is worth asserting all the same. */
   checks++;
   const ownerAnswer = await as(OWNER, async () =>
     (await db.query("select public.can_view_audit()")).rows[0].can_view_audit);
@@ -365,9 +368,9 @@ for (const [what, sql] of ALLOWLIST) {
   const anonCanCall = await as(null, async () => {
     try { await db.query("select public.can_view_audit()"); return true; } catch { return false; }
   });
-  if (ownerAnswer === true && editorAnswer === false && !anonCanCall)
-    pass("can_view_audit() answers the owner, refuses the editor, and is uncallable logged out");
-  else fail("can_view_audit() does not tell the three apart",
+  if (ownerAnswer === true && editorAnswer === true && !anonCanCall)
+    pass("can_view_audit() answers every admin and is uncallable logged out");
+  else fail("can_view_audit() does not treat admins as equals",
             `owner: ${ownerAnswer}, editor: ${editorAnswer}, anon could call it: ${anonCanCall}`);
 }
 

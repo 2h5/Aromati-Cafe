@@ -2,7 +2,7 @@
 
 This describes the numbered migrations in this folder — 13 public content and
 system tables, 42 policies, including the isolated `menu_builder_options`
-table and the owner-only `audit_log`. If a sentence here says something you did not intend, that is the
+table and the shared-admin `audit_log`. If a sentence here says something you did not intend, that is the
 finding — the SQL is wrong, not this summary.
 
 The migrations have been applied to the project identified by `config.js` and
@@ -102,27 +102,27 @@ access and no way to entrench.
 
 ---
 
-### The audit log — writable by editors, readable by the owner alone
+### The audit log — writable and readable by every admin
 
-`audit_log` (20260822000000, vocabulary widened by 20260822000100) records who
-signed in, who saved what, who asked for a rebuild, and who left or threw
-away work without saving. Its shape is unlike every table above, on purpose:
+`audit_log` (20260822000000, vocabulary widened by 20260822000100, read side
+widened by 20260822000200) records who signed in, who saved what, who asked
+for a rebuild, and who left or threw away work without saving. Its shape is
+unlike every table above, on purpose:
 
 - **Any allowlisted account can add a row, and only about itself.** The
-  insert policy asks `is_owner()` and requires `actor = auth.uid()` — the
-  second editor cannot write a row in the owner's name.
-- **Only the owner account can read it.** The select policy names the owner's
-  UUID literally rather than asking `admin_users`, because a row there means
-  "may edit", and reading the history is deliberately a narrower permission.
-  The editor's actions are recorded; the editor cannot see the record.
-- **Nobody through the API can update or delete**, the owner included — no
+  insert policy asks `is_owner()` and requires `actor = auth.uid()` — one
+  admin cannot write a row in another's name.
+- **Any allowlisted account can read it.** The select policy asks
+  `is_owner()`, the same question the editor's writes ask — admins are
+  equal, and the history of what admins did belongs to all of them. An
+  account that leaves the allowlist loses the history the same day it loses
+  the editor.
+- **Nobody through the API can update or delete**, every admin included — no
   policies and no grants for either, so both fail closed. A log that can be
   rewritten is a note board. The SQL editor is the only way in, same as the
   allowlist.
-- `can_view_audit()` exists so the `/audit-log` page can tell "not your page"
-  apart from "nothing yet" — a refused SELECT and an empty log both return
-  zero rows, and only one of them should be said out loud. It is granted to
-  `authenticated` only, like `is_owner()`.
+- `can_view_audit()` remains as `is_owner()` under another name, granted to
+  `authenticated` only; the page itself asks `is_owner()` directly.
 
 ---
 

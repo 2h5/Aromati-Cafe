@@ -19,9 +19,9 @@ Further work is maintenance and fixes, not new features.
 - Supabase provides the editable content and the owner-facing editor.
 - The site renders from its local fallback data if the network or database is
   unavailable.
-- Two accounts can edit (the owner and a second editor, both allowlisted).
-  Sign-ins, saves and publishes are recorded in an audit log that only the
-  owner account can read, served at /audit-log — see "The audit trail" below.
+- Three admin accounts can edit, all allowlisted and all equal. Sign-ins,
+  saves and publishes are recorded in an audit log that every admin can read,
+  served at /audit-log — see "The audit trail" below.
 - The Wine 04 photo stays static on iOS portrait sizes. That is the accepted
   behavior, not an open bug.
 
@@ -154,18 +154,19 @@ two accounts could each change anything and nothing recorded which one had.
 - Any allowlisted account can add rows, and only about itself — the insert
   policy checks `actor = auth.uid()`, so the editor cannot write a row in the
   owner's name.
-- Only the owner account can read the log. The select policy names the one
-  UUID rather than asking `admin_users`, because a row there means "may edit"
-  and reading the history is deliberately a narrower permission. The editor's
-  actions are recorded; the editor cannot see the record.
-- Nobody through the API can update or delete a row, the owner included —
+- Any allowlisted account can read the log, too — admins are equal, per
+  `20260822000200_audit_shared_history.sql`. The select policy asks
+  `is_owner()`, the same question every write asks, so an account that leaves
+  the allowlist loses the history the day it loses the editor. The first
+  version of the table named one UUID as its only reader; the house turned
+  out to have three admins, and the rule became simpler.
+- Nobody through the API can update or delete a row, every admin included —
   there are no policies or grants for it. The SQL editor is the only escape
   hatch, same as the allowlist.
-- `audit-log.html` at /audit-log is the reader. It asks `can_view_audit()`
-  because RLS answers a refused select with zero rows, indistinguishable from
-  an empty log; the editor account gets a sentence pointing it back to
-  /admin, not a blank page. The address is unlisted, not secret — the policy
-  is the lock, the same division of labour as the editor itself. The list can
+- `audit-log.html` at /audit-log is the reader. It asks `is_owner()`, the
+  same question the editor asks; a stranger gets a sentence and a sign-out,
+  not a blank page. The address is unlisted, not secret — the policy is the
+  lock, the same division of labour as the editor itself. The list can
   be narrowed by account (the dropdown starts from the three allowlisted
   emails, so "did this person ever do anything?" can be answered with an
   empty list) and by when — today, yesterday, the last 7 or 30 days, or one
@@ -473,5 +474,6 @@ Migrations: `supabase/migrations/20260801000000_init_cms.sql`,
 `supabase/migrations/20260812000300_smooth_admin_validation_copy.sql`,
 `supabase/migrations/20260815000000_remove_retired_page.sql`,
 `supabase/migrations/20260817000000_photo_captions.sql` and
-`supabase/migrations/20260822000000_audit_log.sql` and
-`supabase/migrations/20260822000100_audit_unsaved.sql`.
+`supabase/migrations/20260822000000_audit_log.sql`,
+`supabase/migrations/20260822000100_audit_unsaved.sql` and
+`supabase/migrations/20260822000200_audit_shared_history.sql`.

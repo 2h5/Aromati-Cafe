@@ -2,13 +2,13 @@
    AROMATI — the audit log viewer
    ═══════════════════════════════════════════════
 
-   One page, one reader. The same gate as the editor, and then a second,
-   narrower question the editor never asks: not "may this account edit the
-   site" (is_owner()) but "is this the owner account" (can_view_audit()).
-   The second editor passes the first and fails the second, and is signed
-   back out with a sentence saying so — because RLS answers a refused SELECT
-   with zero rows, and a page that just showed nothing would read as a broken
-   feature rather than a locked door.
+   One page, every admin. The same gate as the editor and the same question
+   behind it — may this account edit the site (is_owner()) — because the
+   history of what admins did belongs to all of them equally
+   (20260822000200_audit_shared_history.sql). A stranger passes nothing and
+   is signed back out with a sentence saying so, because RLS answers a
+   refused SELECT with zero rows, and a page that just showed nothing would
+   read as a broken feature rather than a locked door.
 
    ── the one security rule, same as the editor ──
    Every node below is built with createElement and filled with textContent.
@@ -19,7 +19,7 @@
    ── what this page is not ──
    It is not a control. It changes nothing, deletes nothing, and offers no
    button that writes. The table accepts inserts from any allowlisted account
-   and reads for the owner alone; this page is only a window onto that. */
+   and reads for allowlisted accounts; this page is only a window onto that. */
 
 (function () {
   "use strict";
@@ -266,15 +266,9 @@
     });
   }
 
-  /* Two questions, asked in order and kept separate, because they mean
-     different things and the answers read differently:
-
-       is_owner()       may this account edit the site at all
-       can_view_audit() is it the one account that may read the history
-
-     An editor who passes the first and fails the second is not an error and
-     not an intruder — they are doing their job on the wrong page — so the
-     message says where they should be rather than what they did wrong. */
+  /* One question: may this account edit the site (is_owner()). Every
+     allowlisted account may also read the history — the log is shared by the
+     people it records, per 20260822000200_audit_shared_history.sql. */
   function admit(user) {
     return rpc("is_owner").then(function (isOwner) {
       if (!isOwner) {
@@ -283,19 +277,10 @@
           gateMessage("That account exists, but it is not allowed on this site.");
         });
       }
-      return rpc("can_view_audit").then(function (canView) {
-        if (!canView) {
-          return sb.auth.signOut().then(function () {
-            show("gate");
-            gateMessage("That account can edit the site, but the history is the " +
-                        "owner account's alone. The editor is at /admin.");
-          });
-        }
-        account = user;
-        byId("who").textContent = "Signed in as " + (user.email || "the owner");
-        show("app");
-        return load();
-      });
+      account = user;
+      byId("who").textContent = "Signed in as " + (user.email || "an admin");
+      show("app");
+      return load();
     });
   }
 

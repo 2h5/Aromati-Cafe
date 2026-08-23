@@ -7,15 +7,13 @@
 <title>Aromati | History</title>
 
 <!--
-  The audit log. One page, one reader: the owner.
+  The audit log. One page, every admin.
 
   Reachable at /audit-log the way the editor is reachable at /admin — the
   address is unlisted, not secret. What makes it private is the database:
-  the select policy on audit_log (20260822000000_audit_log.sql) names the
-  owner account and no other, so the second editor — who can sign in and edit
-  the whole site — gets an empty page here. can_view_audit() is what tells
-  that empty page apart from an empty log, because RLS answers both the same
-  way and only one of them should say so in words.
+  the select policy on audit_log asks is_owner(), so any allowlisted account
+  can read the history and everyone else gets nothing. The policy is the
+  lock; this page is only a window.
 
   Same rules as the editor, for the same reasons: the vendored SDK and no
   other origin (script-src 'self' is enforced on this path in _headers), and
