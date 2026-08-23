@@ -76,9 +76,9 @@
 
   var entries = [];   // everything the last load brought back, unfiltered
 
-  /* The actions whose badge is red — the rows "Needs attention" keeps. One
-     word today; the list exists so the next kind of row that deserves a red
-     badge joins it here, in one place. */
+  /* The actions whose badge is red — the rows "Unsaved changes" keeps. One
+     word today, and the button says so; the list exists so the next kind of
+     row that deserves a red badge joins it here, in one place. */
   var ATTENTION = ["unsaved"];
   var attentionOnly = false;
 
@@ -174,12 +174,12 @@
       sessions = [];
     }
     renderList("loglist", changes, attentionOnly
-      ? "Nothing needs attention."
+      ? "No unsaved work."
       : filtered
         ? "No changes match those filters."
         : "Nothing yet. Saves, discards and publishes appear here as they happen.");
     renderList("sessionlist", sessions, attentionOnly
-      ? "Sessions are never marked as needing attention."
+      ? "Sessions are never unsaved work."
       : filtered
         ? "No sessions match those filters."
         : "No sessions yet.");

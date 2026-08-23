@@ -174,9 +174,9 @@ two accounts could each change anything and nothing recorded which one had.
   get their own column beside the changes, so a busy day of opens never
   buries a save, and each column header carries its own count. On narrow
   screens the columns become tabs — one pane at a time, so reaching the
-  sessions never means scrolling past every change. A "Needs attention"
-  switch keeps only the red-badged rows — unsaved work today. The page reads
-  the most recent 1,000 rows.
+  sessions never means scrolling past every change. An "Unsaved changes"
+  switch keeps only the red-badged rows — unsaved work, the only red badge
+  today. The page reads the most recent 1,000 rows.
 - `tools/test-rls.mjs` runs the log through four actors (owner, editor,
   stranger, logged-out), `tools/test-admin.mjs` asserts sign-ins, saves,
   discards and unsaved exits are recorded, and `tools/check-csp.mjs` holds the page to the editor's own
