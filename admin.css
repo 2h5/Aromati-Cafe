@@ -1716,15 +1716,27 @@ body.is-framing{ overflow: hidden; }
 }
 .logfilter__input:focus{ outline: 2px solid var(--maroon-600); outline-offset: 1px; }
 .logfilter__attention{
-  margin-left: auto;
   padding: 7px 14px;
-  background: var(--card); border: 1px solid var(--line); border-radius: 999px;
-  color: var(--ink-soft); font: inherit; font-size: 13px; font-weight: 600;
+  background: var(--card); border: 1px solid var(--line); border-radius: 9px;
+  color: var(--ink-soft); font: inherit; font-size: 13.5px; font-weight: 600;
   cursor: pointer;
 }
 .logfilter__attention:hover{ border-color: var(--danger); color: var(--danger); }
 .logfilter__attention.is-on{
   background: var(--danger-bg); border-color: var(--danger); color: var(--danger);
+}
+
+/* Narrow screens only: one pane at a time. Wide screens keep both columns
+   in view and never see these. */
+.logtabs{ display: none; }
+.logtabs__tab{
+  padding: 7px 14px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 9px;
+  color: var(--ink-soft); font: inherit; font-size: 13.5px; font-weight: 600;
+  cursor: pointer;
+}
+.logtabs__tab.is-on{
+  background: var(--maroon-900); border-color: var(--maroon-900); color: var(--cream);
 }
 
 .logcols{
@@ -1801,12 +1813,18 @@ body.is-framing{ overflow: hidden; }
   .logmain__scroll{ padding-top: 28px; }
 }
 @media (max-width: 900px){
-  /* One column and one scrollbar again: independent scroll regions are a
-     wide-screen luxury, and a stacked phone layout should read top to
-     bottom. */
+  /* One column would stack sessions below every change — a scroll nobody
+     finishes. Tabs instead: the logtabs row appears, the column titles go
+     (the tabs carry the label and the count), and a class on the parent
+     says which pane is showing. The page scrolls as one again; there is
+     only ever one list in it. */
   .logmain__scroll{ display: block; overflow-y: auto; }
   .logcols{ grid-template-columns: minmax(0, 1fr); }
   .logcol{ display: block; }
   .loglist{ overflow: visible; padding-right: 0; }
   .loglist--main{ grid-template-columns: none; }
+  .logtabs{ display: flex; gap: 8px; margin: 0 0 14px; }
+  .logcol__title{ display: none; }
+  .logcols:not(.logcols--sessions) .logcol--sessions{ display: none; }
+  .logcols.logcols--sessions .logcol--main{ display: none; }
 }

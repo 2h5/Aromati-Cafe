@@ -106,11 +106,22 @@
                 aria-pressed="false">Needs attention</button>
       </div>
 
+      <!-- On narrow screens the two columns would stack, and a sessions list
+           at the bottom of a long changes list is a scroll nobody finishes.
+           Tabs instead: one pane at a time, one tap apart. Hidden on wide
+           screens, where both columns are already in view. -->
+      <div class="logtabs" role="tablist">
+        <button class="logtabs__tab is-on" type="button" id="tabChanges" role="tab"
+                aria-selected="true">Changes <span id="tabChangeCount"></span></button>
+        <button class="logtabs__tab" type="button" id="tabSessions" role="tab"
+                aria-selected="false">Sessions <span id="tabSessionCount"></span></button>
+      </div>
+
       <!-- Sessions (sign-ins and editor opens) get their own column: the door
            opening is worth a record, but a busy day of opens should never push
            an actual change out of sight. -->
       <div class="logcols">
-        <section class="logcol">
+        <section class="logcol logcol--main">
           <h2 class="logcol__title">Changes <span class="logcol__count" id="changeCount"></span></h2>
           <div class="loglist loglist--main" id="loglist"></div>
         </section>

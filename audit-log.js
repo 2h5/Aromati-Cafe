@@ -185,6 +185,8 @@
         : "No sessions yet.");
     byId("changeCount").textContent = "(" + changes.length + ")";
     byId("sessionCount").textContent = "(" + sessions.length + ")";
+    byId("tabChangeCount").textContent = "(" + changes.length + ")";
+    byId("tabSessionCount").textContent = "(" + sessions.length + ")";
   }
 
   function refreshActorOptions() {
@@ -297,6 +299,19 @@
     });
   }
 
+  /* One pane at a time on narrow screens (see the logtabs note in the
+     markup). The class lives on the columns' parent so CSS owns what shows;
+     the buttons only say which. */
+  function showPane(which) {
+    var cols = document.querySelector(".logcols");
+    var onChanges = which !== "sessions";
+    if (cols) cols.classList.toggle("logcols--sessions", !onChanges);
+    byId("tabChanges").classList.toggle("is-on", onChanges);
+    byId("tabSessions").classList.toggle("is-on", !onChanges);
+    byId("tabChanges").setAttribute("aria-selected", onChanges ? "true" : "false");
+    byId("tabSessions").setAttribute("aria-selected", onChanges ? "false" : "true");
+  }
+
   function wireGate() {
     on(byId("signInForm"), "submit", function (e) {
       e.preventDefault();
@@ -348,6 +363,9 @@
       btn.setAttribute("aria-pressed", attentionOnly ? "true" : "false");
       applyFilters();
     });
+
+    on(byId("tabChanges"), "click", function () { showPane("changes"); });
+    on(byId("tabSessions"), "click", function () { showPane("sessions"); });
   }
 
   /* ═══════════════════════════════════════════════
