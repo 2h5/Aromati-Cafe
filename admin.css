@@ -1658,6 +1658,8 @@ body.is-framing{ overflow: hidden; }
   .app--enter .topbar__link, .app--enter #signOut{ animation: none; }
   .topbar__link-go, #signOut, #signOut::before, #refreshBtn, #refreshBtn::before,
   .topbar__help-btn, .topbar__help-tip, .publish-confirm{ transition: none; }
+  .logcols--reveal:not(.logcols--sessions) .logcol--main,
+  .logcols--reveal.logcols--sessions .logcol--sessions{ animation: none; }
   .tab__dot, .tab__dot--leaving,
   .field--edited > .field__label::after, .field--edited-leaving > .field__label::after{
     animation: none;
@@ -1714,29 +1716,139 @@ body.is-framing{ overflow: hidden; }
   background: var(--card); border: 1px solid var(--line); border-radius: 9px;
   color: var(--ink); font: inherit; font-size: 13.5px;
 }
+.logfilter__date{
+  position: relative; display: flex; align-items: center;
+  min-width: 190px; height: 36px; padding: 7px 36px 7px 10px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 9px;
+  color: var(--ink-soft); font: inherit; font-size: 13.5px; cursor: pointer;
+}
+.logfilter__date:focus-within{
+  outline: 2px solid var(--maroon-600); outline-offset: 1px;
+}
+.logfilter__date .logfilter__input{
+  position: absolute; inset: 0; width: 100%; height: 100%; min-width: 0;
+  padding: 0; border: 0; background: transparent; opacity: 0; pointer-events: none;
+  font-size: 16px;
+}
+.logfilter__date .logfilter__input:focus{ outline: none; }
+.logfilter__date-value{ white-space: nowrap; pointer-events: none; }
+.logfilter__date.is-filled .logfilter__date-value{ color: var(--ink); }
+.logfilter__date-icon{
+  position: absolute; right: 13px; top: 50%;
+  width: 12px; height: 12px; transform: translateY(-45%);
+  border: 1.5px solid var(--ink); border-radius: 2px; pointer-events: none;
+}
+.logfilter__date-icon::before{
+  content: ""; position: absolute; left: -1px; right: -1px; top: 3px;
+  border-top: 1.5px solid var(--ink);
+}
+.logfilter__date-icon::after{
+  content: ""; position: absolute; top: -3px; left: 2px;
+  width: 6px; height: 4px;
+  border-left: 1.5px solid var(--ink); border-right: 1.5px solid var(--ink);
+}
+.logfilter__field--day{ position: relative; }
+.daypicker{
+  position: absolute; z-index: 30; top: calc(100% + 8px); right: 0;
+  width: min(304px, calc(100vw - 32px)); padding: 14px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+  box-shadow: 0 14px 32px rgba(42,26,21,.18);
+}
+.daypicker[hidden]{ display: none; }
+.daypicker__head{
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px;
+}
+.daypicker__month{ color: var(--ink); font-size: 14px; }
+.daypicker__nav{
+  appearance: none; width: 32px; height: 32px; padding: 0;
+  background: transparent; border: 1px solid var(--line); border-radius: 8px;
+  color: var(--ink); font: 400 24px/1 var(--sans); cursor: pointer;
+}
+.daypicker__nav:hover{ background: var(--tint); border-color: var(--gold); }
+.daypicker__weekdays,
+.daypicker__grid{
+  display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px;
+}
+.daypicker__weekdays{
+  margin-bottom: 4px; color: var(--ink-faint);
+  font-size: 10px; font-weight: 600; text-align: center; text-transform: uppercase;
+}
+.daypicker__empty,
+.daypicker__day{ min-width: 0; height: 34px; }
+.daypicker__day{
+  appearance: none; padding: 0;
+  background: transparent; border: 1px solid transparent; border-radius: 8px;
+  color: var(--ink); font: 400 13px/1 var(--sans); cursor: pointer;
+}
+.daypicker__day:hover{ background: var(--tint); border-color: var(--gold); }
+.daypicker__day.is-today{ border-color: var(--gold); }
+.daypicker__day.is-selected{
+  background: var(--maroon-900); border-color: var(--maroon-900); color: var(--cream);
+}
+.daypicker__day.is-selected.is-today{ border-color: var(--gold-soft); }
+.daypicker__actions{
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line);
+}
+.daypicker__actions-right{ display: flex; gap: 8px; }
+.daypicker__action{
+  appearance: none; padding: 7px 11px; border-radius: 8px;
+  font: 600 12px/1 var(--sans); cursor: pointer;
+}
+.daypicker__action--quiet{
+  background: transparent; border: 1px solid var(--line); color: var(--ink-soft);
+}
+.daypicker__action--quiet:hover{ border-color: var(--gold); color: var(--ink); }
+.daypicker__action--done{
+  background: var(--maroon-900); border: 1px solid var(--maroon-900); color: var(--cream);
+}
+.daypicker__action--done:disabled{ opacity: .42; cursor: not-allowed; }
 .logfilter__input:focus{ outline: 2px solid var(--maroon-600); outline-offset: 1px; }
 .logfilter__attention{
+  --filter-fill: var(--danger-bg);
+  position: relative; isolation: isolate; overflow: hidden;
   padding: 7px 14px;
   background: var(--card); border: 1px solid var(--line); border-radius: 9px;
   color: var(--ink-soft); font: inherit; font-size: 13.5px; font-weight: 600;
-  cursor: pointer;
+  cursor: pointer; transition: border-color 180ms ease, color 180ms ease;
 }
 .logfilter__attention:hover{ border-color: var(--danger); color: var(--danger); }
 .logfilter__attention.is-on{
-  background: var(--danger-bg); border-color: var(--danger); color: var(--danger);
+  border-color: var(--danger); color: var(--danger);
 }
 
 /* Narrow screens only: one pane at a time. Wide screens keep both columns
    in view and never see these. */
 .logtabs{ display: none; }
 .logtabs__tab{
+  --filter-fill: var(--maroon-900);
+  position: relative; isolation: isolate; overflow: hidden;
   padding: 7px 14px;
   background: var(--card); border: 1px solid var(--line); border-radius: 9px;
   color: var(--ink-soft); font: inherit; font-size: 13.5px; font-weight: 600;
-  cursor: pointer;
+  cursor: pointer; transition: border-color 180ms ease, color 180ms ease;
 }
 .logtabs__tab.is-on{
-  background: var(--maroon-900); border-color: var(--maroon-900); color: var(--cream);
+  border-color: var(--maroon-900); color: var(--cream);
+}
+.logfilter__attention::before,
+.logtabs__tab::before{
+  content: ""; position: absolute; inset: 0; z-index: 0;
+  background: var(--filter-fill); border-radius: inherit; pointer-events: none;
+  clip-path: circle(0 at var(--filter-x, 50%) var(--filter-y, 50%));
+  transition: clip-path 500ms ease-in-out;
+}
+.logfilter__attention.is-on::before,
+.logtabs__tab.is-on::before{
+  clip-path: circle(200% at var(--filter-x, 50%) var(--filter-y, 50%));
+}
+.logfilter__attention > span,
+.logtabs__tab > span{ position: relative; z-index: 1; }
+
+@media (prefers-reduced-motion: reduce){
+  .logfilter__attention, .logtabs__tab{ transition: none; }
+  .logfilter__attention::before, .logtabs__tab::before{ transition: none; }
 }
 
 .logcols{
@@ -1830,21 +1942,36 @@ body.is-framing{ overflow: hidden; }
 }
 
 @media (max-width: 620px){
-  .logmain__scroll{ padding-top: 28px; }
+  .logmain__scroll{ padding-top: 28px; padding-bottom: 0; }
 }
 @media (max-width: 900px){
-  /* One column would stack sessions below every change — a scroll nobody
-     finishes. Tabs instead: the logtabs row appears, the column titles go
-     (the tabs carry the label and the count), and a class on the parent
-     says which pane is showing. The page scrolls as one again; there is
-     only ever one list in it. */
-  .logmain__scroll{ display: block; overflow-y: auto; }
+  /* Keep the filters and tabs above one independently scrolling log pane. */
+  .logmain__scroll{
+    display: grid;
+    grid-template-rows: auto auto auto minmax(0, 1fr);
+    overflow: hidden;
+  }
   .logcols{ grid-template-columns: minmax(0, 1fr); }
-  .logcol{ display: block; }
-  .loglist{ overflow: visible; padding-right: 0; }
+  .logcol{ display: grid; grid-template-rows: auto minmax(0, 1fr); }
+  .loglist{ overflow-y: auto; padding-right: 4px; }
   .loglist--main{ grid-template-columns: none; }
   .logtabs{ display: flex; gap: 8px; margin: 0 0 14px; }
   .logcol__title{ display: none; }
   .logcols:not(.logcols--sessions) .logcol--sessions{ display: none; }
   .logcols.logcols--sessions .logcol--main{ display: none; }
+  .logcols--reveal:not(.logcols--sessions) .logcol--main,
+  .logcols--reveal.logcols--sessions .logcol--sessions{
+    animation: admin-pane-in 260ms var(--ease) both;
+  }
+}
+
+@media (max-width: 900px) and (hover: none) and (pointer: coarse){
+  .logmain__scroll,
+  .loglist{
+    scrollbar-width: none; -ms-overflow-style: none;
+  }
+  .logmain__scroll::-webkit-scrollbar,
+  .loglist::-webkit-scrollbar{
+    display: none; width: 0; height: 0;
+  }
 }

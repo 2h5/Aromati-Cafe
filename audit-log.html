@@ -3,24 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="format-detection" content="telephone=no, date=no, email=no, address=no">
 <meta name="robots" content="noindex, nofollow">
 <title>Aromati | History</title>
 
-<!--
-  The audit log. One page, every admin.
-
-  Reachable at /audit-log the way the editor is reachable at /admin — the
-  address is unlisted, not secret. What makes it private is the database:
-  the select policy on audit_log asks is_owner(), so any allowlisted account
-  can read the history and everyone else gets nothing. The policy is the
-  lock; this page is only a window.
-
-  Same rules as the editor, for the same reasons: the vendored SDK and no
-  other origin (script-src 'self' is enforced on this path in _headers), and
-  no inline script or style attribute anywhere below — tools/check-csp.mjs
-  fails the build if one appears. Every log entry is owner-typed text and is
-  rendered with createElement + textContent, never innerHTML.
--->
+<!-- Access is enforced by Supabase RLS; this page only renders returned rows. -->
 
 <link rel="stylesheet" href="admin.css">
 </head>
@@ -33,7 +20,7 @@
   working.</p>
 </noscript>
 
-<!-- ── the gate ─────────────────────────────────────────────────────────── -->
+<!-- Sign-in gate -->
 <div class="gate" id="gate" hidden>
   <form class="gate__card" id="signInForm" autocomplete="on">
     <h1 class="gate__title">Aromati</h1>
@@ -57,7 +44,7 @@
   </form>
 </div>
 
-<!-- ── the log ──────────────────────────────────────────────────────────── -->
+<!-- Audit log -->
 <div class="app app--log" id="app" hidden>
 
   <header class="topbar">
@@ -76,9 +63,7 @@
     <div class="logmain__scroll">
       <h1 class="logmain__title">History</h1>
 
-      <!-- Narrowing, not searching the database: the whole log (up to the
-           most recent 1,000 rows) is loaded once and these controls only decide
-           which of it is shown, so an answer never depends on the network. -->
+      <!-- Filters apply to the loaded rows; they do not query the database. -->
       <div class="logfilter">
         <label class="logfilter__field">
           <span class="logfilter__label">Who</span>
@@ -96,28 +81,47 @@
             <option value="month">The last 30 days</option>
           </select>
         </label>
-        <label class="logfilter__field">
-          <span class="logfilter__label">On a day</span>
-          <input class="logfilter__input" type="date" id="dayFilter">
-        </label>
+        <div class="logfilter__field logfilter__field--day">
+          <label class="logfilter__label" for="dayFilter">On a day</label>
+          <span class="logfilter__date" id="dayFilterWrap">
+            <input class="logfilter__input" type="date" id="dayFilter"
+                   aria-haspopup="dialog" aria-controls="dayPicker" aria-expanded="false">
+            <span class="logfilter__date-value" id="dayFilterText" aria-hidden="true">Select a date</span>
+            <span class="logfilter__date-icon" aria-hidden="true"></span>
+          </span>
+          <div class="daypicker" id="dayPicker" role="dialog" aria-label="Choose a date" hidden>
+            <div class="daypicker__head">
+              <button class="daypicker__nav" type="button" id="dayPickerPrev" aria-label="Previous month">‹</button>
+              <strong class="daypicker__month" id="dayPickerMonth"></strong>
+              <button class="daypicker__nav" type="button" id="dayPickerNext" aria-label="Next month">›</button>
+            </div>
+            <div class="daypicker__weekdays" aria-hidden="true">
+              <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span>
+              <span>Thu</span><span>Fri</span><span>Sat</span>
+            </div>
+            <div class="daypicker__grid" id="dayPickerGrid"></div>
+            <div class="daypicker__actions">
+              <button class="daypicker__action daypicker__action--quiet" type="button" id="dayPickerClear">Clear</button>
+              <span class="daypicker__actions-right">
+                <button class="daypicker__action daypicker__action--quiet" type="button" id="dayPickerCancel">Cancel</button>
+                <button class="daypicker__action daypicker__action--done" type="button" id="dayPickerDone" disabled>Done</button>
+              </span>
+            </div>
+          </div>
+        </div>
         <button class="logfilter__attention" type="button" id="attentionBtn"
-                aria-pressed="false">Unsaved changes</button>
+                aria-pressed="false"><span>Unsaved changes</span></button>
       </div>
 
-      <!-- On narrow screens the two columns would stack, and a sessions list
-           at the bottom of a long changes list is a scroll nobody finishes.
-           Tabs instead: one pane at a time, one tap apart. Hidden on wide
-           screens, where both columns are already in view. -->
+      <!-- On small screens, tabs switch between the two log columns. -->
       <div class="logtabs" role="tablist">
         <button class="logtabs__tab is-on" type="button" id="tabChanges" role="tab"
-                aria-selected="true">Changes <span id="tabChangeCount"></span></button>
+                aria-selected="true"><span>Changes</span> <span id="tabChangeCount"></span></button>
         <button class="logtabs__tab" type="button" id="tabSessions" role="tab"
-                aria-selected="false">Sessions <span id="tabSessionCount"></span></button>
+                aria-selected="false"><span>Sessions</span> <span id="tabSessionCount"></span></button>
       </div>
 
-      <!-- Sessions (sign-ins and editor opens) get their own column: the door
-           opening is worth a record, but a busy day of opens should never push
-           an actual change out of sight. -->
+      <!-- Session activity is kept separate from content changes. -->
       <div class="logcols">
         <section class="logcol logcol--main">
           <h2 class="logcol__title">Changes <span class="logcol__count" id="changeCount"></span></h2>
@@ -133,7 +137,7 @@
 
 </div>
 
-<!-- ── before either of those ───────────────────────────────────────────── -->
+<!-- Loading state -->
 <div class="boot" id="boot">
   <p class="boot__text" id="bootText">Opening the history…</p>
 </div>

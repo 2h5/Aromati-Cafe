@@ -81,6 +81,13 @@
      row that deserves a red badge joins it here, in one place. */
   var ATTENTION = ["unsaved"];
   var attentionOnly = false;
+  var dayValueOnFocus = "";
+  var dayChangedWhileOpen = false;
+  var dayPickerOpen = false;
+  var customDayPicker = false;
+  var dayDraftValue = "";
+  var dayViewYear = 0;
+  var dayViewMonth = 0;
 
   /* ═══════════════════════════════════════════════
      the list
@@ -213,6 +220,172 @@
     node.hidden = !text;
   }
 
+  function setDayValue(value) {
+    var input = byId("dayFilter");
+    input.value = value || "";
+    syncDayField();
+  }
+
+  function syncDayField() {
+    var input = byId("dayFilter");
+    var parts = input.value.split("-");
+    var display = parts.length === 3
+      ? parts[1] + "/" + parts[2] + "/" + parts[0]
+      : "Select a date";
+    byId("dayFilterWrap").classList.toggle("is-filled", Boolean(input.value));
+    byId("dayFilterText").textContent = display;
+  }
+
+  function padNumber(value) { return String(value).padStart(2, "0"); }
+
+  function dateValue(year, month, day) {
+    return year + "-" + padNumber(month + 1) + "-" + padNumber(day);
+  }
+
+  function dateParts(value) {
+    var parts = String(value || "").split("-");
+    if (parts.length !== 3) return null;
+    var year = Number(parts[0]);
+    var month = Number(parts[1]) - 1;
+    var day = Number(parts[2]);
+    if (!year || month < 0 || month > 11 || !day || day > 31) return null;
+    return { year: year, month: month, day: day };
+  }
+
+  function browserDay() {
+    var d = new Date();
+    return dateValue(d.getFullYear(), d.getMonth(), d.getDate());
+  }
+
+  function isIPhone() {
+    var ua = String(navigator.userAgent || "");
+    return /iPhone|iPod/i.test(ua) ||
+      (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1 && window.innerWidth < 700);
+  }
+
+  function pickerToday() {
+    return etDay(new Date().toISOString()) || browserDay();
+  }
+
+  function pickerDayLabel(value) {
+    var parts = dateParts(value);
+    if (!parts) return value;
+    return new Date(parts.year, parts.month, parts.day).toLocaleDateString("en-US", {
+      weekday: "long", month: "long", day: "numeric", year: "numeric"
+    });
+  }
+
+  function renderDayPicker() {
+    var month = new Date(dayViewYear, dayViewMonth, 1);
+    byId("dayPickerMonth").textContent = month.toLocaleDateString("en-US", {
+      month: "long", year: "numeric"
+    });
+
+    var grid = byId("dayPickerGrid");
+    clear(grid);
+    for (var blank = 0; blank < month.getDay(); blank += 1) {
+      grid.appendChild(el("span", "daypicker__empty"));
+    }
+
+    var daysInMonth = new Date(dayViewYear, dayViewMonth + 1, 0).getDate();
+    var today = pickerToday();
+    for (var day = 1; day <= daysInMonth; day += 1) {
+      var value = dateValue(dayViewYear, dayViewMonth, day);
+      var button = el("button", "daypicker__day", String(day));
+      button.type = "button";
+      button.setAttribute("aria-label", pickerDayLabel(value));
+      button.setAttribute("aria-pressed", dayDraftValue === value ? "true" : "false");
+      if (dayDraftValue === value) button.classList.add("is-selected");
+      if (today === value) button.classList.add("is-today");
+      (function (pickedValue) {
+        on(button, "click", function () {
+          dayDraftValue = pickedValue;
+          renderDayPicker();
+        });
+      }(value));
+      grid.appendChild(button);
+    }
+
+    byId("dayPickerDone").disabled = !dayDraftValue;
+    byId("dayPickerClear").disabled = !byId("dayFilter").value && !dayDraftValue;
+  }
+
+  function closeDayPicker() {
+    var picker = byId("dayPicker");
+    if (!picker) return;
+    picker.hidden = true;
+    dayPickerOpen = false;
+    byId("dayFilter").setAttribute("aria-expanded", "false");
+  }
+
+  function openDayPicker() {
+    var input = byId("dayFilter");
+    var current = dateParts(input.value);
+    var start = current || dateParts(pickerToday()) || dateParts(browserDay());
+    dayDraftValue = current ? input.value : "";
+    dayViewYear = start.year;
+    dayViewMonth = start.month;
+    dayPickerOpen = true;
+    byId("dayPicker").hidden = false;
+    input.setAttribute("aria-expanded", "true");
+    renderDayPicker();
+  }
+
+  function commitDayPicker(value) {
+    if (!value) return;
+    setDayValue(value);
+    byId("dateFilter").value = "";
+    closeDayPicker();
+    applyFilters();
+  }
+
+  function initCustomDayPicker() {
+    var input = byId("dayFilter");
+    input.type = "text";
+    input.readOnly = true;
+    input.setAttribute("inputmode", "none");
+    input.setAttribute("aria-readonly", "true");
+
+    on(input, "click", function (event) {
+      event.preventDefault();
+      openDayPicker();
+    });
+    on(input, "keydown", function (event) {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openDayPicker();
+      } else if (event.key === "Escape") {
+        closeDayPicker();
+      }
+    });
+    on(byId("dayPickerPrev"), "click", function () {
+      dayViewMonth -= 1;
+      if (dayViewMonth < 0) { dayViewMonth = 11; dayViewYear -= 1; }
+      renderDayPicker();
+    });
+    on(byId("dayPickerNext"), "click", function () {
+      dayViewMonth += 1;
+      if (dayViewMonth > 11) { dayViewMonth = 0; dayViewYear += 1; }
+      renderDayPicker();
+    });
+    on(byId("dayPickerDone"), "click", function () { commitDayPicker(dayDraftValue); });
+    on(byId("dayPickerCancel"), "click", closeDayPicker);
+    on(byId("dayPickerClear"), "click", function () {
+      setDayValue("");
+      closeDayPicker();
+      applyFilters();
+    });
+    on(document, "pointerdown", function (event) {
+      var picker = byId("dayPicker");
+      if (dayPickerOpen && !picker.contains(event.target) && event.target !== input) {
+        closeDayPicker();
+      }
+    });
+    on(document, "keydown", function (event) {
+      if (dayPickerOpen && event.key === "Escape") closeDayPicker();
+    });
+  }
+
   function load() {
     var btn = byId("refreshBtn");
     btn.disabled = true;
@@ -290,11 +463,34 @@
   function showPane(which) {
     var cols = document.querySelector(".logcols");
     var onChanges = which !== "sessions";
-    if (cols) cols.classList.toggle("logcols--sessions", !onChanges);
+    if (cols) {
+      var showSessions = !onChanges;
+      var paneChanged = cols.classList.contains("logcols--sessions") !== showSessions;
+      cols.classList.toggle("logcols--sessions", showSessions);
+      if (paneChanged) {
+        cols.classList.remove("logcols--reveal");
+        void cols.offsetWidth;
+        cols.classList.add("logcols--reveal");
+      }
+    }
     byId("tabChanges").classList.toggle("is-on", onChanges);
     byId("tabSessions").classList.toggle("is-on", !onChanges);
     byId("tabChanges").setAttribute("aria-selected", onChanges ? "true" : "false");
     byId("tabSessions").setAttribute("aria-selected", onChanges ? "false" : "true");
+  }
+
+  function setFilterOrigin(button, event) {
+    var rect = button.getBoundingClientRect();
+    var x = Number(event.clientX);
+    var y = Number(event.clientY);
+    if (!isFinite(x) || !isFinite(y) || (event.detail === 0 && !event.pointerType)) {
+      x = rect.left + rect.width / 2;
+      y = rect.top + rect.height / 2;
+    }
+    x = Math.max(0, Math.min(rect.width, x - rect.left));
+    y = Math.max(0, Math.min(rect.height, y - rect.top));
+    button.style.setProperty("--filter-x", x + "px");
+    button.style.setProperty("--filter-y", y + "px");
   }
 
   function wireGate() {
@@ -331,17 +527,64 @@
     });
     on(byId("refreshBtn"), "click", load);
 
-    on(byId("actorFilter"), "change", applyFilters);
-    on(byId("dateFilter"), "change", function () {
-      if (byId("dateFilter").value) byId("dayFilter").value = "";
-      applyFilters();
-    });
-    on(byId("dayFilter"), "change", function () {
-      if (byId("dayFilter").value) byId("dateFilter").value = "";
-      applyFilters();
+    customDayPicker = isIPhone();
+    if (customDayPicker) initCustomDayPicker();
+
+    on(byId("dayFilterWrap"), "click", function (event) {
+      var input = byId("dayFilter");
+      if (event.target === input) return;
+      event.preventDefault();
+      if (customDayPicker) {
+        openDayPicker();
+        return;
+      }
+      input.focus();
+      if (typeof input.showPicker === "function") {
+        try {
+          input.showPicker();
+          return;
+        } catch (err) { /* Fall through to the native click fallback. */ }
+      }
+      input.click();
     });
 
-    on(byId("attentionBtn"), "click", function () {
+    on(byId("actorFilter"), "change", applyFilters);
+    on(byId("dateFilter"), "change", function () {
+      if (customDayPicker) closeDayPicker();
+      if (byId("dateFilter").value) setDayValue("");
+      applyFilters();
+    });
+    if (!customDayPicker) {
+      function rememberDayOpen() {
+        if (dayPickerOpen) return;
+        dayPickerOpen = true;
+        dayValueOnFocus = byId("dayFilter").value;
+        dayChangedWhileOpen = false;
+      }
+      on(byId("dayFilter"), "pointerdown", rememberDayOpen);
+      on(byId("dayFilter"), "touchstart", rememberDayOpen);
+      on(byId("dayFilter"), "focus", rememberDayOpen);
+      on(byId("dayFilter"), "blur", function () { dayPickerOpen = false; });
+      on(byId("dayFilter"), "input", function () {
+        dayChangedWhileOpen = true;
+      });
+      on(byId("dayFilter"), "change", function () {
+        var input = byId("dayFilter");
+        var openedEmptyAndUntouched = !dayValueOnFocus && !dayChangedWhileOpen;
+        if (openedEmptyAndUntouched && input.value === browserDay()) {
+          setDayValue("");
+          dayPickerOpen = false;
+          return;
+        }
+        if (input.value) byId("dateFilter").value = "";
+        dayPickerOpen = false;
+        syncDayField();
+        applyFilters();
+      });
+    }
+
+    on(byId("attentionBtn"), "click", function (event) {
+      setFilterOrigin(this, event);
       attentionOnly = !attentionOnly;
       var btn = byId("attentionBtn");
       btn.classList.toggle("is-on", attentionOnly);
@@ -349,8 +592,15 @@
       applyFilters();
     });
 
-    on(byId("tabChanges"), "click", function () { showPane("changes"); });
-    on(byId("tabSessions"), "click", function () { showPane("sessions"); });
+    on(byId("tabChanges"), "click", function (event) {
+      setFilterOrigin(this, event);
+      showPane("changes");
+    });
+    on(byId("tabSessions"), "click", function (event) {
+      setFilterOrigin(this, event);
+      showPane("sessions");
+    });
+    setDayValue("");
   }
 
   /* ═══════════════════════════════════════════════
