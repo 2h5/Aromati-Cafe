@@ -1762,6 +1762,26 @@ body.is-framing{ overflow: hidden; }
   overflow-y: auto;
   padding-right: 4px;
 }
+.logmain__scroll,
+.loglist{
+  scrollbar-color: #b07a4a #f4ede1;
+  scrollbar-width: thin;
+}
+.logmain__scroll::-webkit-scrollbar,
+.loglist::-webkit-scrollbar{
+  width: 10px;
+  height: 10px;
+}
+.logmain__scroll::-webkit-scrollbar-track,
+.loglist::-webkit-scrollbar-track{
+  background: #f4ede1;
+}
+.logmain__scroll::-webkit-scrollbar-thumb,
+.loglist::-webkit-scrollbar-thumb{
+  background: #b07a4a;
+  border: 2px solid #f4ede1;
+  border-radius: 99px;
+}
 /* On a wide screen the changes list flows as many cards abreast as fit
    rather than leaving half the page empty; the sessions rail stays one
    column at its fixed width. */
