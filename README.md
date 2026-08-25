@@ -76,7 +76,7 @@ See *Backing up* below.
 | `supabase/POLICIES.md` | What the database allows, in plain words |
 | `tools/` | The extractors, the generators and the test suite. Never shipped |
 | `vendor/` | The Supabase SDK, vendored with its digest written down |
-| `assets/` | Photography, self-hosted Lenis, the studio mark |
+| `assets/` | Photography, self-hosted SmoothScroll, the studio mark |
 | `_headers` | The Content-Security-Policy and friends. Cloudflare Pages reads it |
 | `tools/bake-photos.mjs` | Writes the owner's current photographs and their descriptions into `dist/` after `vite build`. The only thing that puts a photograph on the site |
 | `supabase/functions/publish-site/` | What the editor's Publish button asks for a rebuild. Holds the deploy hook URL, which may never reach a browser |
@@ -124,15 +124,15 @@ site underneath never reflows:
   panel is removed. Escape and backdrop clicks close it, and focus returns to
   the initiating control.
 - **Scroll ownership:** opening the modal compensates for the document
-  scrollbar and pauses Lenis, so the page does not shift underneath it. The
-  modal slot is marked `data-lenis-prevent`; an eventual OpenTable iframe can
-  therefore scroll internally without handing wheel events to the page.
+  scrollbar and pauses SmoothScroll, so the page does not shift underneath it.
+  The modal lock leaves the eventual OpenTable iframe's own scrolling native.
 - **Mobile masthead:** at touch widths the fixed masthead slides away while the
   reservation layer is open and returns only after the close motion settles.
-  The mobile drawer's own scroll area is also Lenis-prevented, which keeps mouse
-  wheels on a narrow desktop viewport inside the drawer. During its close, the
-  drawer track is visually hidden while the document track returns, preventing
-  two side-by-side scrollbars; the drawer's scroll position is preserved.
+  The mobile drawer's own scroll area is detected as a nested scrollport, which
+  keeps mouse wheels on a narrow desktop viewport inside the drawer. During its
+  close, the drawer track is visually hidden while the document track returns,
+  preventing two side-by-side scrollbars; the drawer's scroll position is
+  preserved.
 - **Desktop navigation:** section links and the logo close an open reservation
   surface before their normal in-page jump. Reserve, Instagram and the Menus
   dropdown remain independent controls.
@@ -485,7 +485,8 @@ failure. The same rule applies to every image source.
   crêpe options row, Reserve a Table placeholder and studio credit strip remain
   out of scope.
 - **The nav differs by page.** On `index.html` the section links are hashes so
-  Lenis smooth-scrolls them; on the inner pages they are `index.html#story`.
+  SmoothScroll-compatible anchor glue smooth-scrolls them; on the inner pages
+  they are `index.html#story`.
 - **An inner page's arrival is one timeline.** `MENU_T` in `script.js` holds the
   whole sequence in milliseconds. Everything in it is on screen at load, so none
   of it may be left to the IntersectionObserver — the observer would fire the

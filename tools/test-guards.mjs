@@ -28,7 +28,7 @@ function boot(scriptSrc) {
   const { window } = dom;
 
   /* Reduced motion is the honest stub: a real code path the site supports,
-     and it keeps Lenis and the choreography out of a test about error
+     and it keeps SmoothScroll and the choreography out of a test about error
      handling. jsdom has none of these three. */
   window.matchMedia = () => ({ matches: true, addListener() {}, addEventListener() {} });
   window.IntersectionObserver = class { observe() {} unobserve() {} disconnect() {} };

@@ -117,11 +117,11 @@ export function boot(page, {
 
   /* Read off the page rather than listed here, for the same reason
      verify-phase1.mjs does it: a page that starts loading a new file must not
-     go on passing a test that never loads it. lenis is a third-party animation
-     library with nothing to say about any of this. */
+     go on passing a test that never loads it. SmoothScroll is a third-party
+     wheel library with nothing to say about any of this. */
   const srcs = [...window.document.querySelectorAll("script[src]")]
     .map((s) => s.getAttribute("src"))
-    .filter((src) => !/lenis|config\.js/.test(src));
+    .filter((src) => !/smoothscroll|config\.js/.test(src));
   for (const src of srcs) {
     if (!existsSync(src)) throw new Error(`${page} loads ${src}, which does not exist`);
     inject(readFileSync(src, "utf8"));

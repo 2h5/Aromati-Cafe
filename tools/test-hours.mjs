@@ -54,7 +54,7 @@ function run(hours, nowNY) {
 
   if (nowNY) {
     /* script.js expects a browser. Reporting reduced motion is the honest stub
-       here — it is a real code path the site supports, and it keeps Lenis and
+     here — it is a real code path the site supports, and it keeps SmoothScroll and
        the choreography out of a test that is only about the hours pill. */
     window.matchMedia = () => ({ matches: true, addListener() {}, addEventListener() {} });
     window.IntersectionObserver = class { observe() {} unobserve() {} disconnect() {} };

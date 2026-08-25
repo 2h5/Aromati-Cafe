@@ -25,22 +25,50 @@
   }
 
   /* ── smooth scrolling ────────────────────────── */
-  var lenis = null;
-  if (!prefersReduced) {
-    lenis = new Lenis({
-      duration: 1.4,
-      easing: function (t) { return Math.min(1, 1.001 - Math.pow(2, -10 * t)); },
-      smoothWheel: true,
-      wheelMultiplier: 0.9,
-      touchMultiplier: 1.5,
-      syncTouch: false,
-      anchors: true,
-    });
-    requestAnimationFrame(function raf(time) {
-      lenis.raf(time);
-      requestAnimationFrame(raf);
-    });
+  /* SmoothScroll is loaded before this file and owns wheel/keyboard input.
+     It is event-driven rather than a permanent animation rAF, which keeps the
+     supplied library's pulse, acceleration, and nested-overflow behavior
+     intact. Its tiny public cancel/stop/start additions are used only when a
+     site interaction must take ownership of the page. */
+  function cancelSmoothScroll() {
+    if (window.SmoothScroll && SmoothScroll.cancel) SmoothScroll.cancel();
   }
+
+  /* The library does not intercept same-page anchors, so keep the existing
+     smooth section jumps without introducing a second scroll controller. */
+  document.addEventListener("click", function (event) {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey ||
+        event.ctrlKey || event.shiftKey || event.altKey) return;
+    var link = event.target && event.target.closest
+      ? event.target.closest("a[href]") : null;
+    if (!link || (link.target && link.target !== "_self") ||
+        link.hasAttribute("download")) return;
+
+    var url;
+    try { url = new URL(link.href, location.href); }
+    catch (err) { return; }
+    if (url.origin !== location.origin || url.pathname !== location.pathname ||
+        url.search !== location.search || !url.hash) return;
+
+    var id;
+    try { id = decodeURIComponent(url.hash.slice(1)); }
+    catch (err) { return; }
+    var target = document.getElementById(id);
+    if (!target) return;
+
+    event.preventDefault();
+    if (url.hash !== location.hash) {
+      if (window.history && history.pushState) history.pushState(null, "", url.href);
+      else location.hash = url.hash;
+    }
+
+    /* Let menu/modal click handlers release their page locks in this task
+       before the browser starts the section motion. */
+    requestAnimationFrame(function () {
+      cancelSmoothScroll();
+      target.scrollIntoView({ behavior: prefersReduced ? "auto" : "smooth", block: "start" });
+    });
+  });
 
   /* ── split text into animated words ─────────── */
   function splitWords(el) {
@@ -1007,9 +1035,9 @@
         var deficit = keep - naturalMax;
         if (deficit > 0) reserve(deficit);
         if (window.scrollY !== keep) window.scrollTo(0, keep);
-        // resize() re-seats Lenis on the real scroll, so it can't animate out
-        // of a position it thinks it still holds
-        if (lenis) lenis.resize();
+        // The event-driven SmoothScroll controller reads the live scroll root
+        // for each wheel sequence, so there is no cached animation state to
+        // reseat after this DOM swap.
 
         menuBody.classList.remove("is-swapping");
         requestAnimationFrame(function () {
@@ -1028,8 +1056,8 @@
             var parked = Math.max(0, Math.min(tabsTop - navClearance(), naturalMax));
             release();
             if (keep - parked > 1) {
-              if (lenis) lenis.scrollTo(parked, { duration: 0.66, force: true });
-              else window.scrollTo({ top: parked, behavior: prefersReduced ? "auto" : "smooth" });
+              cancelSmoothScroll();
+              window.scrollTo({ top: parked, behavior: prefersReduced ? "auto" : "smooth" });
             }
           });
         });
@@ -1303,16 +1331,15 @@
         root.style.setProperty("--reservation-scrollbar", gutter + "px");
         root.classList.add("reservation-open");
         root.style.overflowY = "hidden";
-        /* Hiding overflow blocks native document scrolling, but Lenis owns the
-           site's wheel animation and can still advance window.scrollY. Pause
-           that controller as well. The modal carries data-lenis-prevent, so
-           its own scrollable slot (and the eventual widget) remains native. */
-        if (lenis) lenis.stop();
+        /* Hiding overflow blocks native document scrolling. Clear and pause
+           the event-driven controller too, so a wheel queue already in flight
+           cannot move the page behind the modal or after it closes. */
+        if (window.SmoothScroll && SmoothScroll.stop) SmoothScroll.stop();
       } else {
         root.style.overflowY = "";
         root.classList.remove("reservation-open");
         root.style.removeProperty("--reservation-scrollbar");
-        if (lenis) lenis.start();
+        if (window.SmoothScroll && SmoothScroll.start) SmoothScroll.start();
       }
     }
 
@@ -1370,7 +1397,7 @@
 
     /* The desktop masthead sits above the reservation layer on purpose, so its
        in-page links remain reachable. A section jump is also an implicit way
-       out of the modal: close it first, then let the site's normal anchor/Lenis
+     out of the modal: close it first, then let the site's normal anchor
        handling carry the visitor to the requested section. The three controls
        on the right stay outside this set — Reserve toggles the modal, Instagram
        leaves the page, and Menus owns its own dropdown. */
@@ -1574,9 +1601,8 @@
      An IntersectionObserver on that block means no scroll math and no listener
      running every frame. CSS keeps the puck off entirely above 760px.
 
-     The scroll goes through Lenis where Lenis is running: a native smooth
-     scrollTo would race the rAF loop, and the two would fight over the same
-     scrollTop the whole way up. */
+     SmoothScroll owns wheel input only, so programmatic return-to-top uses the
+     browser's native smooth scroll after clearing any queued wheel movement. */
   boot("back to top", function () {
     var btn = document.getElementById("toTop");
     var top = document.querySelector(".hero, .mhead");
@@ -1597,8 +1623,8 @@
     });
 
     btn.addEventListener("click", function () {
-      if (lenis) lenis.scrollTo(0, { duration: 1, force: true });
-      else window.scrollTo({ top: 0, behavior: prefersReduced ? "auto" : "smooth" });
+      cancelSmoothScroll();
+      window.scrollTo({ top: 0, behavior: prefersReduced ? "auto" : "smooth" });
       // the puck is about to hide itself, so the caret would be left on a
       // display:none element — hand it to the top of the document instead
       top.setAttribute("tabindex", "-1");
