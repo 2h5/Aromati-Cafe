@@ -84,10 +84,16 @@
   var dayValueOnFocus = "";
   var dayChangedWhileOpen = false;
   var dayPickerOpen = false;
+  var dayPickerCloseTimer = null;
   var customDayPicker = false;
   var dayDraftValue = "";
   var dayViewYear = 0;
   var dayViewMonth = 0;
+
+  var LOG_PICKERS = [
+    { select: "actorFilter", root: "actorFilterPicker", toggle: "actorFilterToggle", text: "actorFilterText", menu: "actorFilterMenu" },
+    { select: "dateFilter", root: "dateFilterPicker", toggle: "dateFilterToggle", text: "dateFilterText", menu: "dateFilterMenu" }
+  ];
 
   /* ═══════════════════════════════════════════════
      the list
@@ -196,6 +202,162 @@
     byId("tabSessionCount").textContent = "(" + sessions.length + ")";
   }
 
+  function pickerBySelect(id) {
+    for (var i = 0; i < LOG_PICKERS.length; i += 1) {
+      if (LOG_PICKERS[i].select === id) return LOG_PICKERS[i];
+    }
+    return null;
+  }
+
+  function pickerSelectedOption(select) {
+    for (var i = 0; i < select.options.length; i += 1) {
+      if (select.options[i].value === select.value) return select.options[i];
+    }
+    return select.options[0] || null;
+  }
+
+  function pickerOptionForValue(menu, value) {
+    var options = menu.querySelectorAll('[role="option"]');
+    for (var i = 0; i < options.length; i += 1) {
+      if (options[i].getAttribute("data-value") === value) return options[i];
+    }
+    return options[0] || null;
+  }
+
+  function closeLogPicker(config, returnFocus) {
+    var root = byId(config.root);
+    var toggle = byId(config.toggle);
+    var menu = byId(config.menu);
+    if (!root || !toggle || !menu) return;
+
+    root.classList.remove("is-open");
+    toggle.setAttribute("aria-expanded", "false");
+    if (root._logPickerCloseTimer) window.clearTimeout(root._logPickerCloseTimer);
+    root._logPickerCloseTimer = window.setTimeout(function () {
+      if (!root.classList.contains("is-open")) menu.hidden = true;
+    }, 240);
+    if (returnFocus) toggle.focus();
+  }
+
+  function openLogPicker(config, focusOption) {
+    var root = byId(config.root);
+    var toggle = byId(config.toggle);
+    var menu = byId(config.menu);
+    var select = byId(config.select);
+    if (!root || !toggle || !menu || !select) return;
+
+    closeDayPicker();
+    LOG_PICKERS.forEach(function (other) {
+      if (other !== config) closeLogPicker(other, false);
+    });
+    if (root._logPickerCloseTimer) window.clearTimeout(root._logPickerCloseTimer);
+    menu.hidden = false;
+    toggle.setAttribute("aria-expanded", "true");
+    void menu.offsetWidth;
+    window.requestAnimationFrame(function () {
+      if (toggle.getAttribute("aria-expanded") !== "true") return;
+      root.classList.add("is-open");
+      if (focusOption) {
+        var option = pickerOptionForValue(menu, select.value);
+        if (option) option.focus();
+      }
+    });
+  }
+
+  function chooseLogPickerValue(config, value) {
+    var select = byId(config.select);
+    if (!select) return;
+    select.value = value;
+    syncLogPicker(config.select);
+    closeLogPicker(config, true);
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+
+  function moveLogPickerFocus(config, current, direction) {
+    var menu = byId(config.menu);
+    if (!menu) return;
+    var options = menu.querySelectorAll('[role="option"]');
+    if (!options.length) return;
+    var index = Array.prototype.indexOf.call(options, current);
+    var next = index + direction;
+    if (index < 0) next = direction > 0 ? 0 : options.length - 1;
+    next = Math.max(0, Math.min(options.length - 1, next));
+    options[next].focus();
+  }
+
+  function syncLogPicker(selectId) {
+    var config = pickerBySelect(selectId);
+    if (!config) return;
+    var select = byId(config.select);
+    var toggle = byId(config.toggle);
+    var text = byId(config.text);
+    var menu = byId(config.menu);
+    if (!select || !toggle || !text || !menu) return;
+
+    var selected = pickerSelectedOption(select);
+    text.textContent = selected ? selected.textContent : "";
+    clear(menu);
+    Array.prototype.forEach.call(select.options, function (option) {
+      var item = el("button", "logfilter__option", option.textContent);
+      item.type = "button";
+      item.setAttribute("role", "option");
+      item.setAttribute("data-value", option.value);
+      item.setAttribute("aria-selected", option.value === select.value ? "true" : "false");
+      on(item, "click", function () { chooseLogPickerValue(config, option.value); });
+      on(item, "keydown", function (event) {
+        if (event.key === "ArrowDown") {
+          event.preventDefault();
+          moveLogPickerFocus(config, item, 1);
+        } else if (event.key === "ArrowUp") {
+          event.preventDefault();
+          moveLogPickerFocus(config, item, -1);
+        } else if (event.key === "Home") {
+          event.preventDefault();
+          var first = menu.querySelector('[role="option"]');
+          if (first) first.focus();
+        } else if (event.key === "End") {
+          event.preventDefault();
+          var options = menu.querySelectorAll('[role="option"]');
+          if (options.length) options[options.length - 1].focus();
+        } else if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          chooseLogPickerValue(config, option.value);
+        } else if (event.key === "Escape") {
+          event.preventDefault();
+          closeLogPicker(config, true);
+        }
+      });
+      menu.appendChild(item);
+    });
+  }
+
+  function initLogFilterPickers() {
+    LOG_PICKERS.forEach(function (config) {
+      var root = byId(config.root);
+      var toggle = byId(config.toggle);
+      if (!root || !toggle) return;
+      syncLogPicker(config.select);
+      on(toggle, "click", function () {
+        if (root.classList.contains("is-open")) closeLogPicker(config, false);
+        else openLogPicker(config, false);
+      });
+      on(toggle, "keydown", function (event) {
+        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+          event.preventDefault();
+          openLogPicker(config, true);
+        } else if (event.key === "Escape") {
+          closeLogPicker(config, false);
+        }
+      });
+    });
+    on(document, "pointerdown", function (event) {
+      LOG_PICKERS.forEach(function (config) {
+        var root = byId(config.root);
+        if (root && !root.contains(event.target)) closeLogPicker(config, false);
+      });
+    });
+  }
+
   function refreshActorOptions() {
     var select = byId("actorFilter");
     var kept = select.value;
@@ -212,6 +374,7 @@
       select.appendChild(el("option", "", email)).value = email;
     });
     select.value = kept;
+    syncLogPicker("actorFilter");
   }
 
   function logMessage(text) {
@@ -255,12 +418,6 @@
   function browserDay() {
     var d = new Date();
     return dateValue(d.getFullYear(), d.getMonth(), d.getDate());
-  }
-
-  function isIPhone() {
-    var ua = String(navigator.userAgent || "");
-    return /iPhone|iPod/i.test(ua) ||
-      (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1 && window.innerWidth < 700);
   }
 
   function pickerToday() {
@@ -313,28 +470,45 @@
   function closeDayPicker() {
     var picker = byId("dayPicker");
     if (!picker) return;
-    picker.hidden = true;
     dayPickerOpen = false;
     byId("dayFilter").setAttribute("aria-expanded", "false");
+    picker.classList.remove("is-open");
+    if (dayPickerCloseTimer) window.clearTimeout(dayPickerCloseTimer);
+    dayPickerCloseTimer = window.setTimeout(function () {
+      if (!dayPickerOpen) picker.hidden = true;
+    }, 240);
   }
 
   function openDayPicker() {
     var input = byId("dayFilter");
+    if (dayPickerOpen) {
+      closeDayPicker();
+      return;
+    }
     var current = dateParts(input.value);
     var start = current || dateParts(pickerToday()) || dateParts(browserDay());
+    LOG_PICKERS.forEach(function (config) { closeLogPicker(config, false); });
     dayDraftValue = current ? input.value : "";
     dayViewYear = start.year;
     dayViewMonth = start.month;
     dayPickerOpen = true;
-    byId("dayPicker").hidden = false;
+    var picker = byId("dayPicker");
+    if (dayPickerCloseTimer) window.clearTimeout(dayPickerCloseTimer);
+    picker.hidden = false;
+    picker.classList.remove("is-open");
     input.setAttribute("aria-expanded", "true");
     renderDayPicker();
+    void picker.offsetWidth;
+    window.requestAnimationFrame(function () {
+      if (dayPickerOpen) picker.classList.add("is-open");
+    });
   }
 
   function commitDayPicker(value) {
     if (!value) return;
     setDayValue(value);
     byId("dateFilter").value = "";
+    syncLogPicker("dateFilter");
     closeDayPicker();
     applyFilters();
   }
@@ -526,9 +700,13 @@
       sb.auth.signOut().then(function () { window.location.reload(); });
     });
     on(byId("refreshBtn"), "click", load);
+    initLogFilterPickers();
 
-    customDayPicker = isIPhone();
-    if (customDayPicker) initCustomDayPicker();
+    /* The calendar is custom everywhere now. It was introduced for iPhone
+       first, but keeping desktop on the browser's native date dialog made
+       the same field feel like two different controls. */
+    customDayPicker = true;
+    initCustomDayPicker();
 
     on(byId("dayFilterWrap"), "click", function (event) {
       var input = byId("dayFilter");
@@ -576,7 +754,10 @@
           dayPickerOpen = false;
           return;
         }
-        if (input.value) byId("dateFilter").value = "";
+        if (input.value) {
+          byId("dateFilter").value = "";
+          syncLogPicker("dateFilter");
+        }
         dayPickerOpen = false;
         syncDayField();
         applyFilters();

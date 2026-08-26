@@ -65,22 +65,42 @@
 
       <!-- Filters apply to the loaded rows; they do not query the database. -->
       <div class="logfilter">
-        <label class="logfilter__field">
-          <span class="logfilter__label">Who</span>
-          <select class="logfilter__input" id="actorFilter">
-            <option value="">Everyone</option>
-          </select>
-        </label>
-        <label class="logfilter__field">
-          <span class="logfilter__label">When</span>
-          <select class="logfilter__input" id="dateFilter">
-            <option value="">Any time</option>
-            <option value="today">Today</option>
-            <option value="yesterday">Yesterday</option>
-            <option value="week">The last 7 days</option>
-            <option value="month">The last 30 days</option>
-          </select>
-        </label>
+        <div class="logfilter__field">
+          <span class="logfilter__label" id="actorFilterLabel">Who</span>
+          <div class="logfilter__picker" id="actorFilterPicker">
+            <select class="logfilter__input" id="actorFilter" aria-hidden="true" tabindex="-1">
+              <option value="">Everyone</option>
+            </select>
+            <button class="logfilter__input logfilter__select-toggle" type="button"
+                    id="actorFilterToggle" aria-haspopup="listbox" aria-expanded="false"
+                    aria-controls="actorFilterMenu" aria-labelledby="actorFilterLabel actorFilterText">
+              <span id="actorFilterText">Everyone</span>
+              <span class="logfilter__select-chevron" aria-hidden="true"></span>
+            </button>
+            <div class="logfilter__menu" id="actorFilterMenu" role="listbox"
+                 aria-labelledby="actorFilterLabel" hidden></div>
+          </div>
+        </div>
+        <div class="logfilter__field">
+          <span class="logfilter__label" id="dateFilterLabel">When</span>
+          <div class="logfilter__picker" id="dateFilterPicker">
+            <select class="logfilter__input" id="dateFilter" aria-hidden="true" tabindex="-1">
+              <option value="">Any time</option>
+              <option value="today">Today</option>
+              <option value="yesterday">Yesterday</option>
+              <option value="week">The last 7 days</option>
+              <option value="month">The last 30 days</option>
+            </select>
+            <button class="logfilter__input logfilter__select-toggle" type="button"
+                    id="dateFilterToggle" aria-haspopup="listbox" aria-expanded="false"
+                    aria-controls="dateFilterMenu" aria-labelledby="dateFilterLabel dateFilterText">
+              <span id="dateFilterText">Any time</span>
+              <span class="logfilter__select-chevron" aria-hidden="true"></span>
+            </button>
+            <div class="logfilter__menu" id="dateFilterMenu" role="listbox"
+                 aria-labelledby="dateFilterLabel" hidden></div>
+          </div>
+        </div>
         <div class="logfilter__field logfilter__field--day">
           <label class="logfilter__label" for="dayFilter">On a day</label>
           <span class="logfilter__date" id="dayFilterWrap">
