@@ -281,8 +281,8 @@ for (const [what, sql] of ALLOWLIST) {
    table above, and it gets a fourth actor to prove it: the second editor.
    Any allowlisted account can add a row about itself, any allowlisted
    account can read the rows — admins are equal, and the history belongs to
-   all of them — and nobody through the API can change or remove one,
-   because a log that can be rewritten is a note board. */
+   all of them. The temporary cleanup control may remove login rows only;
+   saves, publishes, and unsaved-work records remain protected. */
 {
   /* Non-empty before anybody reads it: a refused SELECT and an empty table
      are both zero rows, and only one of them proves a policy is holding.
@@ -291,6 +291,9 @@ for (const [what, sql] of ALLOWLIST) {
   await db.exec(
     `insert into public.audit_log (actor, action, summary)
      values ('${OWNER}', 'save', 'Seeded so the reads below mean something')`);
+  await db.exec(
+    `insert into public.audit_log (actor, action, summary)
+     values ('${OWNER}', 'login', 'Seeded so session cleanup has a row to target')`);
 
   const NOBODY = { owner: false, editor: false, stranger: false, visitor: false };
   const FOUR = [
@@ -310,8 +313,11 @@ for (const [what, sql] of ALLOWLIST) {
     ["rewrite a history row",
      `update public.audit_log set summary = 'Rewritten'`,
      NOBODY],
-    ["erase the history",
-     `delete from public.audit_log`,
+    ["erase logged sessions",
+     `delete from public.audit_log where action = 'login'`,
+     { owner: true, editor: true, stranger: false, visitor: false }],
+    ["erase saved history",
+     `delete from public.audit_log where action = 'save'`,
      NOBODY]
   ];
 
@@ -321,7 +327,7 @@ for (const [what, sql] of ALLOWLIST) {
       const got = await allowed(uid, sql);
       if (got === may[kind]) pass(`${may[kind] ? "can    " : "cannot "} ${who} ${what}`);
       else fail(`${who} ${got ? "can" : "cannot"} ${what}`,
-                "20260822000000_audit_log.sql is not holding the shape POLICIES.md describes");
+                "the audit-log policies are not holding the shape POLICIES.md describes");
     }
   }
 

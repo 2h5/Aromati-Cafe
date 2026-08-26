@@ -5,7 +5,7 @@ This file is the technical handoff for whoever maintains the site next.
 owner-facing guide. `PHOTOGRAPHS.md` is the full account of the photograph
 pipeline and must be read before touching it.
 
-Last updated: 2026-08-22.
+Last updated: 2026-08-26.
 
 ## Current state
 
@@ -160,9 +160,10 @@ two accounts could each change anything and nothing recorded which one had.
   the allowlist loses the history the day it loses the editor. The first
   version of the table named one UUID as its only reader; the house turned
   out to have three admins, and the rule became simpler.
-- Nobody through the API can update or delete a row, every admin included —
-  there are no policies or grants for it. The SQL editor is the only escape
-  hatch, same as the allowlist.
+- No API caller may update or delete saved, published, or unsaved-work rows.
+  The temporary session cleanup control added by
+  `supabase/migrations/20260826000000_audit_session_cleanup.sql` can delete
+  `login` rows only, after confirmation, and only for an allowlisted admin.
 - `audit-log.html` at /audit-log is the reader. It asks `is_owner()`, the
   same question the editor asks; a stranger gets a sentence and a sign-out,
   not a blank page. The address is unlisted, not secret — the policy is the
@@ -176,7 +177,10 @@ two accounts could each change anything and nothing recorded which one had.
   screens the columns become tabs — one pane at a time, so reaching the
   sessions never means scrolling past every change. An "Unsaved changes"
   switch keeps only the red-badged rows — unsaved work, the only red badge
-  today. The page reads the most recent 1,000 rows.
+  today. The page reads the most recent 1,000 rows. The Sessions pane has a
+  temporary, confirmation-gated control for clearing its `login` rows; the
+  Unsaved changes switch replaces the session cards with a note because
+  sessions are never unsaved work.
 - `tools/test-rls.mjs` runs the log through four actors (owner, editor,
   stranger, logged-out), `tools/test-admin.mjs` asserts sign-ins, saves,
   discards and unsaved exits are recorded, and `tools/check-csp.mjs` holds the page to the editor's own
@@ -476,4 +480,5 @@ Migrations: `supabase/migrations/20260801000000_init_cms.sql`,
 `supabase/migrations/20260817000000_photo_captions.sql` and
 `supabase/migrations/20260822000000_audit_log.sql`,
 `supabase/migrations/20260822000100_audit_unsaved.sql` and
-`supabase/migrations/20260822000200_audit_shared_history.sql`.
+`supabase/migrations/20260822000200_audit_shared_history.sql` and
+`supabase/migrations/20260826000000_audit_session_cleanup.sql`.

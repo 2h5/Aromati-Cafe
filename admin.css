@@ -1823,7 +1823,8 @@ body.is-framing{ overflow: hidden; }
 }
 .daypicker__month{ color: var(--ink); font-size: 14px; }
 .daypicker__nav{
-  appearance: none; width: 32px; height: 32px; padding: 0;
+  appearance: none; display: flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; padding: 0;
   background: transparent; border: 1px solid var(--line); border-radius: 8px;
   color: var(--ink); font: 400 24px/1 var(--sans); cursor: pointer;
 }
@@ -1932,12 +1933,27 @@ body.is-framing{ overflow: hidden; }
   min-height: 0;
   display: grid; grid-template-rows: auto minmax(0, 1fr);
 }
+.logcol__head{
+  display: grid; gap: 10px;
+  margin-bottom: 10px;
+}
 .logcol__title{
   margin: 0 0 10px;
   color: var(--ink-faint);
   font-size: 11.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
 }
+.logcol__head .logcol__title{ margin: 0; }
 .logcol__count{ color: var(--ink-soft); font-weight: 400; }
+.logcol__clear{
+  justify-self: start;
+  appearance: none; padding: 6px 10px;
+  background: transparent; border: 1px solid var(--line); border-radius: 8px;
+  color: var(--ink-soft); font: 600 11px/1.2 var(--sans); cursor: pointer;
+  transition: border-color 180ms ease, color 180ms ease, opacity 180ms ease;
+}
+.logcol__clear:hover:not(:disabled){ border-color: var(--danger); color: var(--danger); }
+.logcol__clear:disabled{ opacity: .45; cursor: not-allowed; }
+.logcol__clear-note{ color: var(--ink-faint); font-weight: 500; }
 
 .loglist{
   display: grid; gap: 10px;
@@ -1979,6 +1995,23 @@ body.is-framing{ overflow: hidden; }
   margin: 0; padding: 28px 24px;
   background: var(--card); border: 1px solid var(--line); border-radius: 12px;
   color: var(--ink-soft); font-size: 14px; line-height: 1.55;
+}
+.loglist--session-exit > *{
+  animation: audit-session-out 220ms var(--ease) both;
+}
+.loglist--session-enter > *{
+  animation: audit-session-in 220ms var(--ease) both;
+}
+@keyframes audit-session-out{
+  from{ opacity: 1; transform: translateY(0) scale(1); }
+  to{ opacity: 0; transform: translateY(-8px) scale(.98); }
+}
+@keyframes audit-session-in{
+  from{ opacity: 0; transform: translateY(8px) scale(.98); }
+  to{ opacity: 1; transform: translateY(0) scale(1); }
+}
+@media (prefers-reduced-motion: reduce){
+  .loglist--session-exit > *, .loglist--session-enter > *{ animation: none; }
 }
 
 .logrow{
@@ -2029,6 +2062,7 @@ body.is-framing{ overflow: hidden; }
   .loglist--main{ grid-template-columns: none; }
   .logtabs{ display: flex; gap: 8px; margin: 0 0 14px; }
   .logcol__title{ display: none; }
+  .logcol__head{ margin-bottom: 10px; }
   .logcols:not(.logcols--sessions) .logcol--sessions{ display: none; }
   .logcols.logcols--sessions .logcol--main{ display: none; }
   .logcols--reveal:not(.logcols--sessions) .logcol--main,

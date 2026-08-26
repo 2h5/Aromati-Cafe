@@ -148,7 +148,13 @@
           <div class="loglist loglist--main" id="loglist"></div>
         </section>
         <aside class="logcol logcol--sessions">
-          <h2 class="logcol__title">Sessions <span class="logcol__count" id="sessionCount"></span></h2>
+          <div class="logcol__head">
+            <button class="logcol__clear" type="button" id="clearSessionsBtn" disabled
+                    aria-label="Clear logged sessions (temporary)">
+              Clear logged sessions <span class="logcol__clear-note">(temporary)</span>
+            </button>
+            <h2 class="logcol__title">Sessions <span class="logcol__count" id="sessionCount"></span></h2>
+          </div>
           <div class="loglist loglist--sessions" id="sessionlist"></div>
         </aside>
       </div>

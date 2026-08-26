@@ -16,10 +16,10 @@
    are owner-typed CMS text on the way back out — the whole reason the rule
    exists on the way in.
 
-   ── what this page is not ──
-   It is not a control. It changes nothing, deletes nothing, and offers no
-   button that writes. The table accepts inserts from any allowlisted account
-   and reads for allowlisted accounts; this page is only a window onto that. */
+   ── what this page is ──
+   It is mostly a window onto the history. The temporary session cleanup
+   control is deliberately narrower: after confirmation it can remove only
+   login rows, never saves, publishes, or unsaved-work records. */
 
 (function () {
   "use strict";
@@ -89,6 +89,9 @@
   var dayDraftValue = "";
   var dayViewYear = 0;
   var dayViewMonth = 0;
+  var sessionTransitionTimer = null;
+  var sessionTransitionToken = 0;
+  var SESSION_SWITCH_MS = 220;
 
   var LOG_PICKERS = [
     { select: "actorFilter", root: "actorFilterPicker", toggle: "actorFilterToggle", text: "actorFilterText", menu: "actorFilterMenu" },
@@ -141,6 +144,56 @@
     rows.forEach(function (entry) { list.appendChild(renderEntry(entry)); });
   }
 
+  function prefersReducedMotion() {
+    return typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }
+
+  /* The sessions rail has one meaningful state change when the attention
+     filter moves: cards leave and the explanatory empty box arrives. Keep
+     the old nodes long enough to animate them out before replacing them, so
+     the new box does not simply pop into an unrelated layout. */
+  function renderSessionList(rows, emptyText, animate) {
+    var list = byId("sessionlist");
+    var nextView = rows.length ? "rows" : "empty";
+    var currentView = list.getAttribute("data-session-view");
+    var canAnimate = Boolean(animate && currentView && currentView !== nextView &&
+      list.children.length && !prefersReducedMotion());
+
+    sessionTransitionToken += 1;
+    var token = sessionTransitionToken;
+    if (sessionTransitionTimer) {
+      window.clearTimeout(sessionTransitionTimer);
+      sessionTransitionTimer = null;
+    }
+    list.classList.remove("loglist--session-exit", "loglist--session-enter");
+
+    if (!canAnimate) {
+      renderList("sessionlist", rows, emptyText);
+      list.setAttribute("data-session-view", nextView);
+      list.scrollTop = 0;
+      return;
+    }
+
+    void list.offsetWidth;
+    list.classList.add("loglist--session-exit");
+    sessionTransitionTimer = window.setTimeout(function () {
+      if (token !== sessionTransitionToken) return;
+      sessionTransitionTimer = null;
+      renderList("sessionlist", rows, emptyText);
+      list.setAttribute("data-session-view", nextView);
+      list.scrollTop = 0;
+      list.classList.remove("loglist--session-exit");
+      void list.offsetWidth;
+      list.classList.add("loglist--session-enter");
+      sessionTransitionTimer = window.setTimeout(function () {
+        if (token !== sessionTransitionToken) return;
+        sessionTransitionTimer = null;
+        list.classList.remove("loglist--session-enter");
+      }, SESSION_SWITCH_MS);
+    }, SESSION_SWITCH_MS);
+  }
+
   /* "When" is answered in the café's day, not the reader's: today in New
      York, yesterday in New York. en-CA is the locale that spells a date as
      YYYY-MM-DD, the one spelling a comparison can be made in. */
@@ -157,7 +210,7 @@
   /* A day picked by hand beats a category — "on the 14th" is a narrower
      question than "this week", and asking it should not require un-asking
      the other first. Choosing either control clears the other. */
-  function applyFilters() {
+  function applyFilters(animateSessions) {
     var actor = byId("actorFilter").value;
     var span = byId("dateFilter").value;
     var day = byId("dayFilter").value;
@@ -191,15 +244,21 @@
       : filtered
         ? "No changes match those filters."
         : "Nothing yet. Saves, discards and publishes appear here as they happen.");
-    renderList("sessionlist", sessions, attentionOnly
+    renderSessionList(sessions, attentionOnly
       ? "Sessions are never unsaved work."
       : filtered
         ? "No sessions match those filters."
-        : "No sessions yet.");
+        : "No sessions yet.", animateSessions);
     byId("changeCount").textContent = "(" + changes.length + ")";
     byId("sessionCount").textContent = "(" + sessions.length + ")";
     byId("tabChangeCount").textContent = "(" + changes.length + ")";
     byId("tabSessionCount").textContent = "(" + sessions.length + ")";
+  }
+
+  function syncClearSessionsButton() {
+    var button = byId("clearSessionsBtn");
+    if (!button) return;
+    button.disabled = button.getAttribute("aria-busy") === "true";
   }
 
   function pickerBySelect(id) {
@@ -575,6 +634,7 @@
         }
         logMessage("");
         entries = res.data || [];
+        syncClearSessionsButton();
         refreshActorOptions();
         applyFilters();
       }, function (err) {
@@ -651,6 +711,47 @@
     byId("tabSessions").classList.toggle("is-on", !onChanges);
     byId("tabChanges").setAttribute("aria-selected", onChanges ? "true" : "false");
     byId("tabSessions").setAttribute("aria-selected", onChanges ? "false" : "true");
+  }
+
+  function logUsesTabs() {
+    if (typeof window.matchMedia === "function") {
+      return window.matchMedia("(max-width: 900px)").matches;
+    }
+    return window.innerWidth <= 900;
+  }
+
+  function clearLoggedSessions() {
+    var button = byId("clearSessionsBtn");
+    if (!button || button.disabled) return;
+    if (!window.confirm("Clear all logged sessions from the audit log? This cannot be undone.")) {
+      return;
+    }
+
+    button.disabled = true;
+    button.setAttribute("aria-busy", "true");
+    logMessage("Clearing logged sessions…");
+    sb.from("audit_log")
+      .delete()
+      .eq("action", "login")
+      .select("id")
+      .then(function (res) {
+        button.removeAttribute("aria-busy");
+        if (res.error) {
+          syncClearSessionsButton();
+          logMessage("The logged sessions would not clear: " + res.error.message);
+          return;
+        }
+        var clearedCount = Array.isArray(res.data) ? res.data.length : 0;
+        entries = entries.filter(function (entry) { return entry.action !== "login"; });
+        syncClearSessionsButton();
+        refreshActorOptions();
+        logMessage(clearedCount ? "Logged sessions cleared." : "No logged sessions to clear.");
+        applyFilters();
+      }, function (err) {
+        button.removeAttribute("aria-busy");
+        syncClearSessionsButton();
+        logMessage("The logged sessions would not clear: " + ((err && err.message) || err));
+      });
   }
 
   function setFilterOrigin(button, event) {
@@ -770,8 +871,11 @@
       var btn = byId("attentionBtn");
       btn.classList.toggle("is-on", attentionOnly);
       btn.setAttribute("aria-pressed", attentionOnly ? "true" : "false");
-      applyFilters();
+      if (attentionOnly && logUsesTabs()) showPane("changes");
+      applyFilters(true);
     });
+
+    on(byId("clearSessionsBtn"), "click", clearLoggedSessions);
 
     on(byId("tabChanges"), "click", function (event) {
       setFilterOrigin(this, event);
