@@ -2048,6 +2048,11 @@ body.is-framing{ overflow: hidden; }
 
 @media (max-width: 620px){
   .logmain__scroll{ padding-top: 28px; padding-bottom: 0; }
+  /* The phone field is narrower than the calendar. Anchoring the panel to
+     the field's right edge makes its left side fall outside the viewport and
+     the mobile log's clipped scroll area. Keep the whole seven-column grid in
+     view by opening it from the field's left edge instead. */
+  .daypicker{ left: 0; right: auto; transform-origin: top left; }
 }
 @media (max-width: 900px){
   /* Keep the filters and tabs above one independently scrolling log pane. */
