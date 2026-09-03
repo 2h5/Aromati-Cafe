@@ -105,6 +105,17 @@
   function renderEntry(entry) {
     var row = el("div", "logrow logrow--" + entry.action);
 
+    if (entry.action === "login") {
+      var clearButton = el("button", "logrow__clear-session", "×");
+      clearButton.type = "button";
+      clearButton.setAttribute("aria-label", "Clear session from " + when(entry.created_at));
+      clearButton.title = "Clear this session";
+      on(clearButton, "click", function () {
+        clearLoggedSession(entry, clearButton);
+      });
+      row.appendChild(clearButton);
+    }
+
     var head = el("div", "logrow__head");
     head.appendChild(el("span", "logrow__when", when(entry.created_at)));
     head.appendChild(el("span", "logrow__badge", ACTION_LABELS[entry.action] || entry.action));
@@ -623,7 +634,7 @@
     var btn = byId("refreshBtn");
     btn.disabled = true;
     return sb.from("audit_log")
-      .select("actor_email, action, summary, detail, created_at")
+      .select("id, actor_email, action, summary, detail, created_at")
       .order("created_at", { ascending: false })
       .limit(1000)
       .then(function (res) {
@@ -718,6 +729,39 @@
       return window.matchMedia("(max-width: 900px)").matches;
     }
     return window.innerWidth <= 900;
+  }
+
+  function clearLoggedSession(entry, button) {
+    if (!entry || !entry.id || !button || button.disabled) return;
+    if (!window.confirm("Clear this logged session from " + when(entry.created_at) +
+        "? This cannot be undone.")) {
+      return;
+    }
+
+    button.disabled = true;
+    button.setAttribute("aria-busy", "true");
+    logMessage("Clearing session…");
+    sb.from("audit_log")
+      .delete()
+      .eq("id", entry.id)
+      .eq("action", "login")
+      .select("id")
+      .then(function (res) {
+        button.removeAttribute("aria-busy");
+        if (res.error) {
+          button.disabled = false;
+          logMessage("The session would not clear: " + res.error.message);
+          return;
+        }
+        entries = entries.filter(function (candidate) { return candidate.id !== entry.id; });
+        refreshActorOptions();
+        logMessage("Session cleared.");
+        applyFilters(true);
+      }, function (err) {
+        button.removeAttribute("aria-busy");
+        button.disabled = false;
+        logMessage("The session would not clear: " + ((err && err.message) || err));
+      });
   }
 
   function clearLoggedSessions() {

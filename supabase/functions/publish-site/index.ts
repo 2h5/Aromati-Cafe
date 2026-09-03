@@ -42,7 +42,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
    deployments while something is being tried. Echoed rather than answered with
    `*`, because the browser will not send credentials to a wildcard — and the
    Authorization header is the entire point of the request. */
-const ALLOWED = /^https:\/\/([a-z0-9-]+\.)?aromati-cafe\.pages\.dev$/;
+const ALLOWED = /^https:\/\/([a-z0-9-]+\.)?(?:aromati-cafe|aromaticafe)\.pages\.dev$/;
 
 /* The requested headers are echoed rather than listed.
 
