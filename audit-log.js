@@ -755,6 +755,15 @@
           logMessage("The " + kind + " would not clear: " + res.error.message);
           return;
         }
+        var deletedRows = Array.isArray(res.data) ? res.data : [];
+        var deleted = deletedRows.some(function (row) {
+          return row && row.id === entry.id;
+        });
+        if (!deleted) {
+          button.disabled = false;
+          logMessage("The " + kind + " was not cleared. The database did not remove that row; the audit cleanup migration may still need to be applied.");
+          return;
+        }
         entries = entries.filter(function (candidate) { return candidate.id !== entry.id; });
         refreshActorOptions();
         logMessage(kind.charAt(0).toUpperCase() + kind.slice(1) + " cleared.");
