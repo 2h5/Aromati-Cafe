@@ -281,8 +281,8 @@ for (const [what, sql] of ALLOWLIST) {
    table above, and it gets a fourth actor to prove it: the second editor.
    Any allowlisted account can add a row about itself, any allowlisted
    account can read the rows — admins are equal, and the history belongs to
-   all of them. The temporary cleanup control may remove login rows only;
-   saves, publishes, and unsaved-work records remain protected. */
+   all of them. The viewer can clear individual login or change rows after
+   confirmation, while strangers and logged-out callers remain refused. */
 {
   /* Non-empty before anybody reads it: a refused SELECT and an empty table
      are both zero rows, and only one of them proves a policy is holding.
@@ -318,7 +318,7 @@ for (const [what, sql] of ALLOWLIST) {
      { owner: true, editor: true, stranger: false, visitor: false }],
     ["erase saved history",
      `delete from public.audit_log where action = 'save'`,
-     NOBODY]
+     { owner: true, editor: true, stranger: false, visitor: false }]
   ];
 
   for (const [what, sql, may] of AUDIT) {

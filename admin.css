@@ -1988,11 +1988,12 @@ body.is-framing{ overflow: hidden; }
 .loglist--main{
   grid-template-columns: repeat(auto-fill, minmax(430px, 1fr));
 }
+.loglist--main .logrow{ position: relative; padding-right: 52px; }
 .loglist--sessions .logrow{ padding: 10px 14px; }
 .loglist--sessions .logrow--login{ position: relative; padding-right: 46px; }
 .loglist--sessions .logrow__head{ margin-bottom: 2px; }
 .loglist--sessions .logrow__summary{ color: var(--ink); font-size: 13.5px; font-weight: 500; }
-.logrow__clear-session{
+.logrow__clear{
   position: absolute; top: 8px; right: 8px;
   display: grid; place-items: center;
   width: 24px; height: 24px; padding: 0;
@@ -2001,13 +2002,13 @@ body.is-framing{ overflow: hidden; }
   font: 600 19px/1 var(--sans); cursor: pointer;
   transition: background-color 140ms ease, color 140ms ease, opacity 140ms ease;
 }
-.logrow__clear-session:hover:not(:disabled){
+.logrow__clear:hover:not(:disabled){
   background: var(--danger-bg); color: var(--danger);
 }
-.logrow__clear-session:focus-visible{
+.logrow__clear:focus-visible{
   outline: 2px solid var(--maroon-600); outline-offset: 2px;
 }
-.logrow__clear-session:disabled{ opacity: .45; cursor: wait; }
+.logrow__clear:disabled{ opacity: .45; cursor: wait; }
 .loglist__empty{
   margin: 0; padding: 28px 24px;
   background: var(--card); border: 1px solid var(--line); border-radius: 12px;

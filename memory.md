@@ -5,7 +5,7 @@ This file is the technical handoff for whoever maintains the site next.
 owner-facing guide. `PHOTOGRAPHS.md` is the full account of the photograph
 pipeline and must be read before touching it.
 
-Last updated: 2026-08-26.
+Last updated: 2026-09-04.
 
 ## Current state
 
@@ -160,10 +160,11 @@ two accounts could each change anything and nothing recorded which one had.
   the allowlist loses the history the day it loses the editor. The first
   version of the table named one UUID as its only reader; the house turned
   out to have three admins, and the rule became simpler.
-- No API caller may update or delete saved, published, or unsaved-work rows.
-  The temporary session cleanup control added by
-  `supabase/migrations/20260826000000_audit_session_cleanup.sql` can delete
-  `login` rows only, after confirmation, and only for an allowlisted admin.
+- No API caller may update a history row. After confirmation, the audit viewer
+  can delete an individual saved, published, unsaved-work, or login row, and
+  the Sessions rail can clear login rows in bulk. The login cleanup was added
+  by `supabase/migrations/20260826000000_audit_session_cleanup.sql`; the
+  change-row policy is `supabase/migrations/20260904000000_audit_change_cleanup.sql`.
 - `audit-log.html` at /audit-log is the reader. It asks `is_owner()`, the
   same question the editor asks; a stranger gets a sentence and a sign-out,
   not a blank page. The address is unlisted, not secret — the policy is the

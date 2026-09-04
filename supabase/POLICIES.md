@@ -1,7 +1,7 @@
 # What the database allows, in plain words
 
-This describes the numbered migrations in this folder — 13 public content and
-system tables, 40 policies, including the isolated `menu_builder_options`
+This describes the numbered migrations in this folder — 12 public content and
+system tables, 41 policies, including the isolated `menu_builder_options`
 table and the shared-admin `audit_log`. If a sentence here says something you did not intend, that is the
 finding — the SQL is wrong, not this summary.
 
@@ -105,9 +105,10 @@ access and no way to entrench.
 ### The audit log — writable and readable by every admin
 
 `audit_log` (20260822000000, vocabulary widened by 20260822000100, read side
-widened by 20260822000200, with temporary session cleanup added by
-20260826000000) records who signed in, who saved what, who asked for a rebuild,
-and who left or threw away work without saving. Its shape is
+widened by 20260822000200, with session cleanup added by 20260826000000 and
+per-card change cleanup added by 20260904000000) records who signed in, who
+saved what, who asked for a rebuild, and who left or threw away work without
+saving. Its shape is
 unlike every table above, on purpose:
 
 - **Any allowlisted account can add a row, and only about itself.** The
@@ -118,10 +119,10 @@ unlike every table above, on purpose:
   equal, and the history of what admins did belongs to all of them. An
   account that leaves the allowlist loses the history the same day it loses
   the editor.
-- **Saved history stays protected.** No API caller may update or delete a
-  `save`, `publish`, or `unsaved` row. The temporary viewer control has one
-  narrowly scoped exception: after confirmation, an allowlisted admin may
-  delete `login` rows only. There is still no general audit-log delete path.
+- **History cannot be rewritten.** No API caller may update a row. After
+  confirmation, an allowlisted admin may delete one `login`, `save`, `publish`,
+  or `unsaved` row through the viewer; the Sessions rail also has a bulk
+  control for `login` rows. There is no delete policy for any other action.
 - `can_view_audit()` remains as `is_owner()` under another name, granted to
   `authenticated` only; the page itself asks `is_owner()` directly.
 

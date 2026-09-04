@@ -17,9 +17,9 @@
    exists on the way in.
 
    ── what this page is ──
-   It is mostly a window onto the history. The temporary session cleanup
-   control is deliberately narrower: after confirmation it can remove only
-   login rows, never saves, publishes, or unsaved-work records. */
+   It is mostly a window onto the history. After confirmation, the per-card
+   cleanup controls can remove one history row; the Sessions rail also has a
+   bulk control for its login rows. */
 
 (function () {
   "use strict";
@@ -105,13 +105,14 @@
   function renderEntry(entry) {
     var row = el("div", "logrow logrow--" + entry.action);
 
-    if (entry.action === "login") {
-      var clearButton = el("button", "logrow__clear-session", "×");
+    {
+      var kind = entry.action === "login" ? "session" : "change";
+      var clearButton = el("button", "logrow__clear", "×");
       clearButton.type = "button";
-      clearButton.setAttribute("aria-label", "Clear session from " + when(entry.created_at));
-      clearButton.title = "Clear this session";
+      clearButton.setAttribute("aria-label", "Clear " + kind + " from " + when(entry.created_at));
+      clearButton.title = "Clear this " + kind;
       on(clearButton, "click", function () {
-        clearLoggedSession(entry, clearButton);
+        clearLoggedEntry(entry, clearButton);
       });
       row.appendChild(clearButton);
     }
@@ -731,36 +732,37 @@
     return window.innerWidth <= 900;
   }
 
-  function clearLoggedSession(entry, button) {
+  function clearLoggedEntry(entry, button) {
     if (!entry || !entry.id || !button || button.disabled) return;
-    if (!window.confirm("Clear this logged session from " + when(entry.created_at) +
+    var kind = entry.action === "login" ? "session" : "change";
+    if (!window.confirm("Clear this logged " + kind + " from " + when(entry.created_at) +
         "? This cannot be undone.")) {
       return;
     }
 
     button.disabled = true;
     button.setAttribute("aria-busy", "true");
-    logMessage("Clearing session…");
+    logMessage("Clearing " + kind + "…");
     sb.from("audit_log")
       .delete()
       .eq("id", entry.id)
-      .eq("action", "login")
+      .eq("action", entry.action)
       .select("id")
       .then(function (res) {
         button.removeAttribute("aria-busy");
         if (res.error) {
           button.disabled = false;
-          logMessage("The session would not clear: " + res.error.message);
+          logMessage("The " + kind + " would not clear: " + res.error.message);
           return;
         }
         entries = entries.filter(function (candidate) { return candidate.id !== entry.id; });
         refreshActorOptions();
-        logMessage("Session cleared.");
-        applyFilters(true);
+        logMessage(kind.charAt(0).toUpperCase() + kind.slice(1) + " cleared.");
+        applyFilters(entry.action === "login");
       }, function (err) {
         button.removeAttribute("aria-busy");
         button.disabled = false;
-        logMessage("The session would not clear: " + ((err && err.message) || err));
+        logMessage("The " + kind + " would not clear: " + ((err && err.message) || err));
       });
   }
 
