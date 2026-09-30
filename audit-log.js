@@ -89,9 +89,6 @@
   var dayDraftValue = "";
   var dayViewYear = 0;
   var dayViewMonth = 0;
-  var sessionTransitionTimer = null;
-  var sessionTransitionToken = 0;
-  var SESSION_SWITCH_MS = 220;
 
   var LOG_PICKERS = [
     { select: "actorFilter", root: "actorFilterPicker", toggle: "actorFilterToggle", text: "actorFilterText", menu: "actorFilterMenu" },
@@ -102,8 +99,202 @@
      the list
      ═══════════════════════════════════════════════ */
 
+  /* The stamp on a card, split the way the card shows it: the moment on top,
+     the weekday and year underneath. Same café clock as when(). */
+  function whenParts(iso) {
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return { top: String(iso || ""), bottom: "" };
+    var zone = { timeZone: "America/New_York" };
+    function fmt(opts) {
+      try { return d.toLocaleString("en-US", Object.assign({}, zone, opts)); }
+      catch (err) { return d.toLocaleString("en-US", opts); }
+    }
+    return {
+      top: fmt({ month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }),
+      bottom: fmt({ weekday: "short" }) + ", " + fmt({ year: "numeric" })
+    };
+  }
+
+  /* One detail line as the editor wrote it — "Label: was → now", or
+     "Label: value" when nothing before/after applies. */
+  function parseLine(line) {
+    var s = String(line || "");
+    var at = s.indexOf(": ");
+    if (at === -1) return { label: "", value: s };
+    var label = s.slice(0, at);
+    var rest = s.slice(at + 2);
+    var parts = rest.split(" → ");
+    if (parts.length === 2) {
+      if (parts[0] === parts[1]) return { label: label, value: parts[0] };
+      return { label: label, was: parts[0], now: parts[1] };
+    }
+    return { label: label, value: rest };
+  }
+
+  /* The icon a collapsed card leads with: a publish is the site going out, a
+     change that touches a picture is a photograph, anything else is words. */
+  var PHOTO_WORDS = /photo|image|picture|width|height/i;
+  function entryKind(entry) {
+    if (entry.action === "publish") return "publish";
+    var photo = (entry.detail || []).some(function (d) {
+      return (d.lines || []).some(function (line) {
+        return PHOTO_WORDS.test(parseLine(line).label);
+      });
+    });
+    return photo ? "photo" : "text";
+  }
+
+  var SVG_NS = "http://www.w3.org/2000/svg";
+  var ICON_PATHS = {
+    publish: ["M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z", "M14 3v5h5", "M9 13h6", "M9 17h4"],
+    photo: ["M5 4h14a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z", "M4 16l5-5 4 4 2-2 5 5", "M15.5 9.5h.01"],
+    chevron: ["M6 9l6 6 6-6"]
+  };
+  function icon(name, cls) {
+    var svg = document.createElementNS(SVG_NS, "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("aria-hidden", "true");
+    svg.setAttribute("focusable", "false");
+    if (cls) svg.setAttribute("class", cls);
+    ICON_PATHS[name].forEach(function (d) {
+      var path = document.createElementNS(SVG_NS, "path");
+      path.setAttribute("d", d);
+      svg.appendChild(path);
+    });
+    return svg;
+  }
+  function kindIcon(kind) {
+    var wrap = el("span", "logrow__icon logrow__icon--" + kind);
+    if (kind === "text") wrap.textContent = "T";
+    else wrap.appendChild(icon(kind));
+    return wrap;
+  }
+
+  function detailTitle(d) {
+    var kind = d.kind === "added" ? "Added" : d.kind === "removed" ? "Removed" : "Changed";
+    return kind + " " + (d.title || "a row") + (d.where ? " — " + d.where : "");
+  }
+
+  var openRows = {};   // entry id → true while its card is expanded
+  var rowSeq = 0;
+
+  /* A change is one card in one column: a row that says what happened, and
+     a fold underneath that says exactly what moved. */
+  function renderChange(entry) {
+    var detail = entry.detail || [];
+    var hasDetail = detail.length > 0;
+    var kind = entryKind(entry);
+    var row = el("article", "logrow logrow--card logrow--" + entry.action);
+    if (entry.id != null) row.setAttribute("data-id", String(entry.id));
+    var bodyId = "logrow-body-" + (rowSeq += 1);
+
+    var head = el("button", "logrow__toggle");
+    head.type = "button";
+    head.setAttribute("aria-controls", bodyId);
+
+    var stamp = whenParts(entry.created_at);
+    var whenBox = el("span", "logrow__when");
+    whenBox.title = when(entry.created_at);
+    whenBox.appendChild(el("span", "logrow__when-top", stamp.top));
+    whenBox.appendChild(el("span", "logrow__when-bottom", stamp.bottom));
+    head.appendChild(whenBox);
+
+    var badgeCell = el("span", "logrow__badge-cell");
+    badgeCell.appendChild(el("span", "logrow__badge", ACTION_LABELS[entry.action] || entry.action));
+    head.appendChild(badgeCell);
+
+    head.appendChild(kindIcon(kind));
+
+    var main = el("span", "logrow__main");
+    main.appendChild(el("span", "logrow__summary", entry.summary));
+    if (hasDetail) {
+      var preview = detailTitle(detail[0]);
+      if (detail.length > 1) preview += " · +" + (detail.length - 1) + " more";
+      main.appendChild(el("span", "logrow__preview", preview));
+    }
+    head.appendChild(main);
+
+    head.appendChild(el("span", "logrow__actor", entry.actor_email || "unknown account"));
+    var chev = el("span", "logrow__chevron");
+    chev.appendChild(icon("chevron"));
+    head.appendChild(chev);
+    row.appendChild(head);
+
+    var body = el("div", "logrow__body");
+    body.id = bodyId;
+    var inner = el("div", "logrow__body-inner");
+    body.appendChild(inner);
+
+    /* detail is the folded-flat change list the editor captured at the moment
+       the save started — kind, title, and one line per field that moved. */
+    detail.forEach(function (d) {
+      var box = el("section", "logrow__change");
+      var boxHead = el("div", "logrow__change-head");
+      boxHead.appendChild(kindIcon(entryKind({ action: entry.action, detail: [d] })));
+      var names = el("div", "logrow__change-names");
+      var diffs = [];
+      var named = false;
+      (d.lines || []).forEach(function (line) {
+        var p = parseLine(line);
+        if (p.was !== undefined) { diffs.push(p); return; }
+        if (!named) {
+          names.appendChild(el("span", "logrow__change-title", p.label || p.value));
+          if (p.label) names.appendChild(el("span", "logrow__change-sub", p.value));
+          named = true;
+        } else {
+          diffs.push(p);
+        }
+      });
+      if (!named) names.appendChild(el("span", "logrow__change-title", detailTitle(d)));
+      else if (detail.length > 1) names.appendChild(el("span", "logrow__change-sub", detailTitle(d)));
+      boxHead.appendChild(names);
+      box.appendChild(boxHead);
+
+      if (diffs.length) {
+        var table = el("dl", "logrow__diff");
+        diffs.forEach(function (p) {
+          table.appendChild(el("dt", "logrow__diff-label", p.label));
+          var dd = el("dd", "logrow__diff-value");
+          if (p.was !== undefined) {
+            dd.appendChild(el("span", "logrow__diff-was", p.was));
+            dd.appendChild(el("span", "logrow__diff-arrow", "→"));
+            dd.appendChild(el("span", "logrow__diff-now", p.now));
+          } else {
+            dd.textContent = p.value;
+          }
+          table.appendChild(dd);
+        });
+        box.appendChild(table);
+      }
+      inner.appendChild(box);
+    });
+
+    var actions = el("div", "logrow__actions");
+    var clearButton = el("button", "logrow__clear-text", "Clear this change");
+    clearButton.type = "button";
+    clearButton.setAttribute("aria-label", "Clear change from " + when(entry.created_at));
+    on(clearButton, "click", function () { clearLoggedEntry(entry, clearButton); });
+    actions.appendChild(clearButton);
+    inner.appendChild(actions);
+    row.appendChild(body);
+
+    function setOpen(open) {
+      row.classList.toggle("is-open", open);
+      head.setAttribute("aria-expanded", open ? "true" : "false");
+      body.inert = !open;
+      if (open) openRows[entry.id] = true; else delete openRows[entry.id];
+    }
+    /* A change with nothing folded still opens: its fold holds the clear
+       control, which a collapsed card keeps out of the way. */
+    on(head, "click", function () { setOpen(!row.classList.contains("is-open")); });
+    setOpen(Boolean(openRows[entry.id]));
+    return row;
+  }
+
   function renderEntry(entry) {
+    if (entry.action !== "login") return renderChange(entry);
     var row = el("div", "logrow logrow--" + entry.action);
+    if (entry.id != null) row.setAttribute("data-id", String(entry.id));
 
     {
       var kind = entry.action === "login" ? "session" : "change";
@@ -118,7 +309,12 @@
     }
 
     var head = el("div", "logrow__head");
-    head.appendChild(el("span", "logrow__when", when(entry.created_at)));
+    var stamp = whenParts(entry.created_at);
+    var whenBox = el("span", "logrow__when");
+    whenBox.title = when(entry.created_at);
+    whenBox.appendChild(el("span", "logrow__when-top", stamp.top));
+    whenBox.appendChild(el("span", "logrow__when-bottom", stamp.bottom));
+    head.appendChild(whenBox);
     head.appendChild(el("span", "logrow__badge", ACTION_LABELS[entry.action] || entry.action));
     head.appendChild(el("span", "logrow__actor", entry.actor_email || "unknown account"));
     row.appendChild(head);
@@ -156,54 +352,106 @@
     rows.forEach(function (entry) { list.appendChild(renderEntry(entry)); });
   }
 
+  /* Either log list when a filter toggles (FLIP): cards that stay glide
+     from where they were to where they land, cards that leave fade out in
+     place, cards that arrive fade in once the others have made room. The
+     list is rebuilt exactly as renderList builds it; only the motion is
+     added on top, and each card is matched to its old self by its row id. */
+  var CARD_MOVE_MS = 380;
+  var CARD_EASE = "cubic-bezier(.22,.61,.36,1)";
+  function renderListAnimated(id, rows, emptyText) {
+    var list = byId(id);
+    if (prefersReducedMotion() || typeof list.animate !== "function") {
+      renderList(id, rows, emptyText);
+      return;
+    }
+
+    var listRect = list.getBoundingClientRect();
+    var before = {};
+    var leaving = [];
+    /* Typing in search re-renders on every key, often mid-animation, so each
+       card's state is read as it looks right now — its box already includes
+       any glide in progress, and its opacity any fade — and carried over. */
+    var ghosts = [];
+    Array.prototype.forEach.call(list.children, function (node) {
+      if (node.classList.contains("logrow--ghost")) { ghosts.push(node); return; }
+      var rect = node.getBoundingClientRect();
+      var key = node.getAttribute("data-id");
+      var opacity = parseFloat(getComputedStyle(node).opacity);
+      if (isNaN(opacity)) opacity = 1;
+      var old = { node: node, rect: rect, key: key, opacity: opacity };
+      if (key) before[key] = old;
+      leaving.push(old);
+    });
+    var scrollTop = list.scrollTop;
+
+    renderList(id, rows, emptyText);
+    /* Cards still fading out from the last keystroke finish where they are. */
+    ghosts.forEach(function (ghost) { list.appendChild(ghost); });
+
+    var staying = {};
+    Array.prototype.forEach.call(list.children, function (node) {
+      if (node.classList.contains("logrow--ghost")) return;
+      var key = node.getAttribute("data-id");
+      var was = key && before[key];
+      if (was) {
+        staying[key] = true;
+        var dy = was.rect.top - node.getBoundingClientRect().top;
+        var from = {}, to = {};
+        if (Math.abs(dy) > 0.5) {
+          from.transform = "translateY(" + dy + "px)";
+          to.transform = "none";
+        }
+        if (was.opacity < 0.99) {
+          from.opacity = was.opacity;
+          to.opacity = 1;
+        }
+        if (from.transform || from.opacity !== undefined) {
+          node.animate([from, to], { duration: CARD_MOVE_MS, easing: CARD_EASE });
+        }
+        return;
+      }
+      node.animate(
+        [{ opacity: 0, transform: "translateY(10px) scale(.985)" },
+         { opacity: 1, transform: "none" }],
+        { duration: 300, delay: 140, easing: CARD_EASE, fill: "backwards" });
+    });
+
+    /* Leavers go back in as absolutely placed ghosts over their old spot,
+       so they can fade without holding up the layout underneath them. */
+    leaving.forEach(function (old) {
+      if (old.key && staying[old.key]) return;
+      var ghost = old.node;
+      if (old.opacity < 0.02) return;   // never got as far as being seen
+      if (typeof ghost.getAnimations === "function") {
+        ghost.getAnimations().forEach(function (a) { a.cancel(); });
+      }
+      ghost.classList.add("logrow--ghost");
+      ghost.setAttribute("aria-hidden", "true");
+      ghost.inert = true;
+      ghost.style.top = (old.rect.top - listRect.top + scrollTop) + "px";
+      ghost.style.left = (old.rect.left - listRect.left) + "px";
+      ghost.style.width = old.rect.width + "px";
+      list.appendChild(ghost);
+      var fade = ghost.animate(
+        [{ opacity: old.opacity, transform: "none" },
+         { opacity: 0, transform: "scale(.97)" }],
+        { duration: 220 * old.opacity, easing: "ease-out", fill: "forwards" });
+      fade.onfinish = function () {
+        if (ghost.parentNode) ghost.parentNode.removeChild(ghost);
+      };
+    });
+  }
+
   function prefersReducedMotion() {
     return typeof window.matchMedia === "function" &&
       window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   }
 
-  /* The sessions rail has one meaningful state change when the attention
-     filter moves: cards leave and the explanatory empty box arrives. Keep
-     the old nodes long enough to animate them out before replacing them, so
-     the new box does not simply pop into an unrelated layout. */
+  /* The sessions column moves the same way the changes do when a filter
+     toggles — see renderListAnimated. */
   function renderSessionList(rows, emptyText, animate) {
-    var list = byId("sessionlist");
-    var nextView = rows.length ? "rows" : "empty";
-    var currentView = list.getAttribute("data-session-view");
-    var canAnimate = Boolean(animate && currentView && currentView !== nextView &&
-      list.children.length && !prefersReducedMotion());
-
-    sessionTransitionToken += 1;
-    var token = sessionTransitionToken;
-    if (sessionTransitionTimer) {
-      window.clearTimeout(sessionTransitionTimer);
-      sessionTransitionTimer = null;
-    }
-    list.classList.remove("loglist--session-exit", "loglist--session-enter");
-
-    if (!canAnimate) {
-      renderList("sessionlist", rows, emptyText);
-      list.setAttribute("data-session-view", nextView);
-      list.scrollTop = 0;
-      return;
-    }
-
-    void list.offsetWidth;
-    list.classList.add("loglist--session-exit");
-    sessionTransitionTimer = window.setTimeout(function () {
-      if (token !== sessionTransitionToken) return;
-      sessionTransitionTimer = null;
-      renderList("sessionlist", rows, emptyText);
-      list.setAttribute("data-session-view", nextView);
-      list.scrollTop = 0;
-      list.classList.remove("loglist--session-exit");
-      void list.offsetWidth;
-      list.classList.add("loglist--session-enter");
-      sessionTransitionTimer = window.setTimeout(function () {
-        if (token !== sessionTransitionToken) return;
-        sessionTransitionTimer = null;
-        list.classList.remove("loglist--session-enter");
-      }, SESSION_SWITCH_MS);
-    }, SESSION_SWITCH_MS);
+    (animate ? renderListAnimated : renderList)("sessionlist", rows, emptyText);
   }
 
   /* "When" is answered in the café's day, not the reader's: today in New
@@ -219,6 +467,17 @@
     }
   }
 
+  /* Everything a card says, in one lowercase string the search box can
+     look through — the summary, who, the badge, and every detail line. */
+  function searchText(entry) {
+    var parts = [entry.summary, entry.actor_email, ACTION_LABELS[entry.action] || entry.action];
+    (entry.detail || []).forEach(function (d) {
+      parts.push(detailTitle(d));
+      (d.lines || []).forEach(function (line) { parts.push(line); });
+    });
+    return parts.join("\n").toLowerCase();
+  }
+
   /* A day picked by hand beats a category — "on the 14th" is a narrower
      question than "this week", and asking it should not require un-asking
      the other first. Choosing either control clears the other. */
@@ -231,9 +490,12 @@
     var yesterday = etDay(new Date(now - 86400000).toISOString());
     var DAY_MS = 86400000;
 
-    var filtered = Boolean(actor || span || day);
+    var query = t(byId("logSearch").value).toLowerCase();
+
+    var filtered = Boolean(actor || span || day || query);
     var shown = entries.filter(function (entry) {
       if (actor && entry.actor_email !== actor) return false;
+      if (query && searchText(entry).indexOf(query) === -1) return false;
       if (day) return etDay(entry.created_at) === day;
       var age = now - new Date(entry.created_at).getTime();
       if (span === "today") return etDay(entry.created_at) === today;
@@ -251,7 +513,8 @@
       changes = changes.filter(function (e) { return ATTENTION.indexOf(e.action) !== -1; });
       sessions = [];
     }
-    renderList("loglist", changes, attentionOnly
+    var renderChanges = animateSessions ? renderListAnimated : renderList;
+    renderChanges("loglist", changes, attentionOnly
       ? "No unsaved work."
       : filtered
         ? "No changes match those filters."
@@ -261,8 +524,9 @@
       : filtered
         ? "No sessions match those filters."
         : "No sessions yet.", animateSessions);
+    byId("changeTotal").textContent = changes.length + (changes.length === 1 ? " change" : " changes");
     byId("changeCount").textContent = "(" + changes.length + ")";
-    byId("sessionCount").textContent = "(" + sessions.length + ")";
+    byId("sessionCount").textContent = String(sessions.length);
     byId("tabChangeCount").textContent = "(" + changes.length + ")";
     byId("tabSessionCount").textContent = "(" + sessions.length + ")";
   }
@@ -883,6 +1147,7 @@
     });
 
     on(byId("actorFilter"), "change", applyFilters);
+    on(byId("logSearch"), "input", function () { applyFilters(true); });
     on(byId("dateFilter"), "change", function () {
       if (customDayPicker) closeDayPicker();
       if (byId("dateFilter").value) setDayValue("");

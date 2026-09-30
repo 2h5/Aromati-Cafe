@@ -61,11 +61,22 @@
 
   <main class="logmain">
     <div class="logmain__scroll">
-      <h1 class="logmain__title">History</h1>
+      <div class="loghead">
+        <div class="loghead__text">
+          <h1 class="logmain__title">History</h1>
+          <p class="loghead__sub">View changes, actions, and editor activity for this site.</p>
+        </div>
+        <label class="logsearch">
+          <span class="logsearch__icon" aria-hidden="true"></span>
+          <input class="logsearch__input" type="search" id="logSearch"
+                 placeholder="Search changes…" aria-label="Search changes" autocomplete="off">
+        </label>
+      </div>
 
       <!-- Filters apply to the loaded rows; they do not query the database. -->
       <div class="logfilter">
         <div class="logfilter__field">
+          <span class="logfilter__icon logfilter__icon--who" aria-hidden="true"></span>
           <span class="logfilter__label" id="actorFilterLabel">Who</span>
           <div class="logfilter__picker" id="actorFilterPicker">
             <select class="logfilter__input" id="actorFilter" aria-hidden="true" tabindex="-1">
@@ -82,6 +93,7 @@
           </div>
         </div>
         <div class="logfilter__field">
+          <span class="logfilter__icon logfilter__icon--date" aria-hidden="true"></span>
           <span class="logfilter__label" id="dateFilterLabel">When</span>
           <div class="logfilter__picker" id="dateFilterPicker">
             <select class="logfilter__input" id="dateFilter" aria-hidden="true" tabindex="-1">
@@ -102,12 +114,13 @@
           </div>
         </div>
         <div class="logfilter__field logfilter__field--day">
+          <span class="logfilter__icon logfilter__icon--date" aria-hidden="true"></span>
           <label class="logfilter__label" for="dayFilter">On a day</label>
           <span class="logfilter__date" id="dayFilterWrap">
             <input class="logfilter__input" type="date" id="dayFilter"
                    aria-haspopup="dialog" aria-controls="dayPicker" aria-expanded="false">
             <span class="logfilter__date-value" id="dayFilterText" aria-hidden="true">Select a date</span>
-            <span class="logfilter__date-icon" aria-hidden="true"></span>
+            <span class="logfilter__select-chevron" aria-hidden="true"></span>
           </span>
           <div class="daypicker" id="dayPicker" role="dialog" aria-label="Choose a date" hidden>
             <div class="daypicker__head">
@@ -131,6 +144,7 @@
         </div>
         <button class="logfilter__attention" type="button" id="attentionBtn"
                 aria-pressed="false"><span>Unsaved changes</span></button>
+        <span class="logfilter__total" id="changeTotal" aria-live="polite"></span>
       </div>
 
       <!-- On small screens, tabs switch between the two log columns. -->
@@ -149,11 +163,12 @@
         </section>
         <aside class="logcol logcol--sessions">
           <div class="logcol__head">
+            <h2 class="logcol__title">Sessions <span class="logcol__count" id="sessionCount"></span></h2>
+            <p class="logcol__sub">Editor sessions on this site.</p>
             <button class="logcol__clear" type="button" id="clearSessionsBtn" disabled
                     aria-label="Clear logged sessions (temporary)">
               Clear logged sessions <span class="logcol__clear-note">(temporary)</span>
             </button>
-            <h2 class="logcol__title">Sessions <span class="logcol__count" id="sessionCount"></span></h2>
           </div>
           <div class="loglist loglist--sessions" id="sessionlist"></div>
         </aside>
