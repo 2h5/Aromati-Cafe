@@ -712,10 +712,61 @@
     syncLogPicker("actorFilter");
   }
 
+  var msgHoldTimer = null;
+  var msgHideTimer = null;
+  var MSG_HOLD_MS = 3200;
+  var MSG_LEAVE_MS = 260;
+
+  function stopMessageTimers() {
+    window.clearTimeout(msgHoldTimer);
+    window.clearTimeout(msgHideTimer);
+    msgHoldTimer = msgHideTimer = null;
+  }
+
+  /* A message that stays until something replaces it — errors, mostly,
+     which must never time out before they are read. */
   function logMessage(text) {
     var node = byId("logMsg");
+    stopMessageTimers();
+    node.classList.remove("is-flash", "is-leaving");
     node.textContent = text || "";
     node.hidden = !text;
+  }
+
+  /* A message that arrives with a small pop. Called again while it is still
+     up, the pop replays, so a second press visibly registers instead of
+     changing nothing on screen. */
+  function flashMessage(text) {
+    var node = byId("logMsg");
+    logMessage(text);
+    void node.offsetWidth;
+    node.classList.add("is-flash");
+  }
+
+  /* Swap the words quietly (no second pop) and let the message go on its own. */
+  function settleMessage(text) {
+    var node = byId("logMsg");
+    stopMessageTimers();
+    node.classList.remove("is-leaving");
+    /* load() cleared the message a moment ago; putting is-flash back in the
+       same task leaves a pop that is still playing undisturbed. */
+    node.classList.add("is-flash");
+    node.textContent = text;
+    node.hidden = false;
+    msgHoldTimer = window.setTimeout(function () {
+      node.classList.add("is-leaving");
+      msgHideTimer = window.setTimeout(function () {
+        node.hidden = true;
+        node.classList.remove("is-flash", "is-leaving");
+      }, MSG_LEAVE_MS);
+    }, MSG_HOLD_MS);
+  }
+
+  function refresh() {
+    flashMessage("Refreshing…");
+    load().then(function (ok) {
+      if (ok) settleMessage("History is up to date");
+    });
   }
 
   function setDayValue(value) {
@@ -906,16 +957,18 @@
         btn.disabled = false;
         if (res.error) {
           logMessage("The history would not load: " + res.error.message);
-          return;
+          return false;
         }
         logMessage("");
         entries = res.data || [];
         syncClearSessionsButton();
         refreshActorOptions();
         applyFilters();
+        return true;
       }, function (err) {
         btn.disabled = false;
         logMessage("The history would not load: " + ((err && err.message) || err));
+        return false;
       });
   }
 
@@ -1119,7 +1172,7 @@
     on(byId("signOut"), "click", function () {
       sb.auth.signOut().then(function () { window.location.reload(); });
     });
-    on(byId("refreshBtn"), "click", load);
+    on(byId("refreshBtn"), "click", refresh);
     initLogFilterPickers();
 
     /* The calendar is custom everywhere now. It was introduced for iPhone

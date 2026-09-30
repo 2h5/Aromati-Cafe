@@ -179,6 +179,21 @@ button{ font-family: inherit; }
    one thing an error must never be. */
 .topbar__msg--bad{ color: #f0a48f; }
 .topbar__msg[hidden]{ display: none; }
+/* The audit log's Refresh note (flashMessage in audit-log.js): pops in,
+   replays the pop on every press, and fades on its own. */
+.topbar__msg{ transition: opacity 260ms ease, transform 260ms var(--ease); }
+/* backwards, not both: a held end state would outrank .is-leaving's fade. */
+.topbar__msg.is-flash{ animation: topbar-msg-pop 420ms var(--ease) backwards; }
+.topbar__msg.is-leaving{ opacity: 0; transform: translateY(-3px); }
+@keyframes topbar-msg-pop{
+  0%{ opacity: 0; transform: translateY(4px) scale(.94); }
+  55%{ opacity: 1; transform: translateY(0) scale(1.04); }
+  100%{ opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce){
+  .topbar__msg{ transition: none; }
+  .topbar__msg.is-flash{ animation: none; }
+}
 .topbar__link{
   display: inline-flex; align-items: baseline; gap: 5px;
   color: var(--gold-soft); font-size: 13px; text-decoration: none;
