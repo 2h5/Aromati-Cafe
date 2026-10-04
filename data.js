@@ -136,8 +136,11 @@ var AROMATI_DATA = (function () {
     }
   }
 
+  var liveContent = null;
+
   /* What the page renders right now, with no network involved. */
   function current() {
+    if (liveContent) return liveContent;
     var cached = readCache();
     return cached || seedContent();
   }
@@ -229,16 +232,30 @@ var AROMATI_DATA = (function () {
   }
 
   function get(path) {
-    return fetch(AROMATI_CONFIG.url + "/rest/v1/" + path, {
-      headers: {
-        apikey: AROMATI_CONFIG.anonKey,
-        Authorization: "Bearer " + AROMATI_CONFIG.anonKey,
-        Accept: "application/json"
-      }
-    }).then(function (res) {
-      if (!res.ok) throw new Error(path + " → " + res.status);
-      return res.json();
-    });
+    var rows = [];
+    function page() {
+      return fetch(AROMATI_CONFIG.url + "/rest/v1/" + path + "&limit=200&offset=" + rows.length, {
+        headers: {
+          apikey: AROMATI_CONFIG.anonKey,
+          Authorization: "Bearer " + AROMATI_CONFIG.anonKey,
+          Accept: "application/json",
+          Prefer: "count=exact"
+        }
+      }).then(function (res) {
+        if (!res.ok) throw new Error(path + " → " + res.status);
+        var range = res.headers && res.headers.get("Content-Range");
+        var total = range && /\/(\d+)$/.exec(range);
+        return res.json().then(function (batch) {
+          rows = rows.concat(batch);
+          if (total && rows.length < Number(total[1])) {
+            if (!batch.length) throw new Error("the content response stopped before all rows arrived");
+            return page();
+          }
+          return rows;
+        });
+      });
+    }
+    return page();
   }
 
   /* ── shaping rows into what render.js already reads ──
@@ -523,6 +540,8 @@ var AROMATI_DATA = (function () {
       var group = row && row.group_key;
       if (!Object.prototype.hasOwnProperty.call(out, group) || row.is_hidden) return;
       if (typeof row.label !== "string" || !row.label.trim()) return;
+      if (group !== "bagel" &&
+          !/^(?:\d+(?:\.\d{1,2})?|\.\d{1,2})$/.test(String(row.price == null ? "" : row.price).trim())) return;
 
       var option = { label: row.label };
       if (row.price !== null && row.price !== undefined && String(row.price) !== "") {
@@ -554,12 +573,12 @@ var AROMATI_DATA = (function () {
     }
 
     var wanted = [
-      get("site_settings?select=key,value"),
-      get("business_hours?select=day_of_week,is_closed,opens_at,closes_at"),
-      get("site_copy?select=key,value"),
-      get("menu_courses?select=id,page,course_key,tab_label,heading,sizes,is_static,static_id,is_hidden,sort_order&order=sort_order"),
+      get("site_settings?select=key,value&order=id"),
+      get("business_hours?select=day_of_week,is_closed,opens_at,closes_at&order=day_of_week"),
+      get("site_copy?select=key,value&order=id"),
+      get("menu_courses?select=id,page,course_key,tab_label,heading,sizes,is_static,static_id,is_hidden,sort_order&order=sort_order,id"),
       get("menu_items?select=id,course_id,name,tag,description,price,prices,price_all_sizes,no_price,is_hidden,options_dom_id,sort_order," +
-          "menu_item_pours(id,label,price,sort_order),menu_item_options(id,name,price,sort_order)&order=sort_order"),
+          "menu_item_pours(id,label,price,sort_order),menu_item_options(id,name,price,sort_order)&order=sort_order,id"),
       /* Nothing on a public page reads the result of this one any more — the
          runtime photograph swap it fed was deleted on 2026-08-07 and a
          photograph now reaches the site only through tools/bake-photos.mjs at
@@ -568,13 +587,13 @@ var AROMATI_DATA = (function () {
          what the site would render rather than its own opinion of the table's
          shape. Deleting it costs no round trip and loses that check.
          PHOTOGRAPHS.md §8. */
-      get("photos?select=slot,storage_path,alt,caption"),
-      get("hours_exceptions?select=on_date,is_closed,opens_at,closes_at,note&order=on_date"),
+      get("photos?select=slot,storage_path,alt,caption&order=id"),
+      get("hours_exceptions?select=on_date,is_closed,opens_at,closes_at,note&order=on_date,id"),
       /* This table was added after the first CMS schema. It is deliberately
          optional while an older deployment is being migrated: a 404 must not
          take the rest of the live content down, and the seed builder remains
          correct until the migration is applied. */
-      get("menu_builder_options?select=id,group_key,label,price,hint,sub_key,is_hidden,sort_order&order=sort_order")
+      get("menu_builder_options?select=id,group_key,label,price,hint,sub_key,is_hidden,sort_order&order=sort_order,id")
         .catch(function () { return null; })
     ];
 
@@ -613,6 +632,7 @@ var AROMATI_DATA = (function () {
       };
 
       var before = current();
+      liveContent = fresh;
       writeCache(fresh);
 
       if (same(fresh, before)) { done(null); return; }

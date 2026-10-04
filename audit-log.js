@@ -949,18 +949,12 @@
   function load() {
     var btn = byId("refreshBtn");
     btn.disabled = true;
-    return sb.from("audit_log")
-      .select("id, actor_email, action, summary, detail, created_at")
-      .order("created_at", { ascending: false })
-      .limit(1000)
-      .then(function (res) {
+    return AROMATI_CMS.readAll(sb, "audit_log",
+      "id, actor_email, action, summary, detail, created_at", "created_at", false)
+      .then(function (rows) {
         btn.disabled = false;
-        if (res.error) {
-          logMessage("The history would not load: " + res.error.message);
-          return false;
-        }
         logMessage("");
-        entries = res.data || [];
+        entries = rows;
         syncClearSessionsButton();
         refreshActorOptions();
         applyFilters();

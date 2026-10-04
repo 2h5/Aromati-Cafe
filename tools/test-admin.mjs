@@ -192,6 +192,9 @@ const SEED_PHOTOS = {
 function fakeSupabase(data, log, opts) {
   opts = opts || {};
   let nextId = 100;
+  let revision = 0;
+  const revisionFor = () => new Date(Date.UTC(2026, 9, 3, 0, 0, ++revision)).toISOString();
+  Object.values(data).forEach(rows => rows.forEach(row => { row.updated_at = row.updated_at || revisionFor(); }));
 
   function result(value) {
     /* A PostgrestBuilder is a thenable that also chains, which is the only part
@@ -200,8 +203,20 @@ function fakeSupabase(data, log, opts) {
       _table: value._table,
       select() { return p; },
       order() { return p; },
-      eq(col, v) { p._eq = [col, v]; return p; },
-      then(ok, no) { return Promise.resolve(value.settle(p)).then(ok, no); }
+      range(start, end) { p._range = [start, end]; return p; },
+      eq(col, v) {
+        (p._filters || (p._filters = [])).push([col, v]);
+        if (col === "id") p._eq = [col, v];
+        return p;
+      },
+      then(ok, no) {
+        const res = value.settle(p);
+        if (opts.hold && value._table === opts.hold) {
+          opts.hold = null;
+          return new Promise(resolve => { opts.release = () => resolve(res); }).then(ok, no);
+        }
+        return Promise.resolve(res).then(ok, no);
+      }
     };
     return p;
   }
@@ -216,7 +231,8 @@ function fakeSupabase(data, log, opts) {
         }
         return Promise.resolve({ data: { user: { email: creds.email }, session: { access_token: "test-token" } }, error: null });
       },
-      signOut: () => { log.push({ what: "signOut" }); return Promise.resolve({ error: null }); }
+      signOut: () => { log.push({ what: "signOut" }); return Promise.resolve({ error: null }); },
+      onAuthStateChange: fn => { opts.authChange = fn; return { data: { subscription: { unsubscribe() {} } } }; }
     },
 
     rpc: (name) => {
@@ -243,6 +259,10 @@ function fakeSupabase(data, log, opts) {
           if (opts.refuseUpload) {
             return Promise.resolve({ data: null, error: { message: opts.refuseUpload } });
           }
+          if (opts.objects) {
+            if (opts.objects.has(path)) return Promise.resolve({ data: null, error: { message: "The resource already exists" } });
+            opts.objects.add(path);
+          }
           log.push({ what: "upload", bucket, path, type: blob && blob.type,
                      bytes: blob && blob.size, options });
           return Promise.resolve({ data: { path }, error: null });
@@ -257,7 +277,11 @@ function fakeSupabase(data, log, opts) {
     from: (table) => ({
       select: (cols) => result({
         _table: table,
-        settle: () => ({ data: data[table] || [], error: null, cols })
+        settle: builder => {
+          const rows = data[table] || [];
+          return { data: JSON.parse(JSON.stringify(builder._range ? rows.slice(builder._range[0], builder._range[1] + 1) : rows)),
+            count: rows.length, error: null, cols };
+        }
       }),
       insert: (payload) => result({
         _table: table,
@@ -266,8 +290,10 @@ function fakeSupabase(data, log, opts) {
             return { data: null, error: { message: opts.refuse.message } };
           }
           const id = "new-" + (nextId += 1);
+          const row = { ...payload, id, updated_at: revisionFor() };
+          (data[table] || (data[table] = [])).push(row);
           log.push({ what: "insert", table, payload, id });
-          return { data: [{ id }], error: null };
+          return { data: [{ id, updated_at: row.updated_at }], error: null };
         }
       }),
       update: (payload) => result({
@@ -276,15 +302,21 @@ function fakeSupabase(data, log, opts) {
           if (opts.refuse && opts.refuse.table === table && opts.refuse.what === "update") {
             return { data: null, error: { message: opts.refuse.message } };
           }
+          const row = (data[table] || []).find(row => (builder._filters || []).every(([col, value]) => row[col] === value));
+          if (!row) return { data: [], error: null };
+          Object.assign(row, payload, { updated_at: revisionFor() });
           log.push({ what: "update", table, payload, id: builder._eq && builder._eq[1] });
-          return { data: null, error: null };
+          return { data: [{ id: row.id, updated_at: row.updated_at }], error: null };
         }
       }),
       delete: () => result({
         _table: table,
         settle: (builder) => {
+          const row = (data[table] || []).find(row => (builder._filters || []).every(([col, value]) => row[col] === value));
+          if (!row) return { data: [], error: null };
+          data[table] = data[table].filter(candidate => candidate !== row);
           log.push({ what: "delete", table, id: builder._eq && builder._eq[1] });
-          return { data: null, error: null };
+          return { data: [{ id: row.id }], error: null };
         }
       })
     })
@@ -406,6 +438,7 @@ async function boot(opts) {
   });
 
   const script = window.document.createElement("script");
+  window.eval(readFileSync("cms-client.js", "utf8"));
   script.textContent = opts.source || ADMIN_JS;
   window.document.body.appendChild(script);
 
@@ -2856,6 +2889,95 @@ console.log("\nthe audit trail");
   check("and how much was still only typed", body.summary,
         "Left the editor with 1 unsaved change; nothing was written");
   check("naming who was typing", body.actor_email, "owner@aromatiNY.com");
+}
+
+console.log("\nsweep regressions: confirmed saves and retryable photos");
+{
+  const data = Object.assign(fixture(), {
+    menu_courses: [{ id: "k9", page: "food", course_key: "build", tab_label: "Build Your Own",
+      heading: "Build Your Own Breakfast", sizes: null, is_static: true, static_id: "build", is_hidden: false, sort_order: 1 }],
+    menu_items: [], menu_item_pours: []
+  });
+  const r = await boot({ data });
+  await r.signIn();
+  r.tab("Menus");
+  const price = r.fieldShowing("6");
+  for (const value of ["$6", "NaN", "-1", "6.123"]) {
+    r.type(price, value);
+    await r.save();
+    check("CMS refuses breakfast price " + value, r.writes().length, 0);
+    check("CMS explains the decimal rule", r.problems().some(p => /nonnegative number/.test(p)), true);
+  }
+  r.type(price, "0.50");
+  await r.save();
+  check("CMS preserves a valid decimal price", r.writes()[0].payload.price, "0.50");
+  r.window.close();
+}
+{
+  const opts = {};
+  const r = await boot(opts);
+  await r.signIn();
+  r.tab("Contact");
+  const field = r.fieldShowing("3322073847");
+  r.type(field, "5551234567");
+  opts.hold = "site_settings";
+  r.q("#saveBtn").click();
+  await settle(2);
+  check("panels are inert while the save is waiting", r.q("#panels").inert, true);
+  // A pending input event must not be acknowledged by an earlier request.
+  r.type(field, "5559876543");
+  opts.release();
+  await settle();
+  check("the request contains the earlier value", r.writes()[0].payload.value, "5551234567");
+  check("the later value remains an unsaved change", r.window.AROMATI_ADMIN._test.changeEntries().length, 1);
+  check("panels become usable again", r.q("#panels").inert, false);
+  await r.save();
+  check("a second save sends the later value", r.writes()[1].payload.value, "5559876543");
+  r.window.close();
+}
+{
+  const opts = { objects: new Set(), refuse: { table: "photos", what: "update", message: "temporary failure" } };
+  const r = await boot(opts);
+  await r.signIn();
+  r.tab("Photos");
+  await r.pick(r.photo("The photograph behind the opening headline"), r.file("kitchen.jpg", "image/jpeg", jpeg()));
+  await r.save();
+  check("the first attempt confirms both uploads", r.uploads().length, 2);
+  delete opts.refuse;
+  await r.save();
+  check("metadata retry does not upload either object again", r.uploads().length, 2);
+  check("the metadata write completes", r.writes().filter(w => w.table === "photos").length, 1);
+  check("retry clears the pending change", r.window.AROMATI_ADMIN._test.changeEntries().length, 0);
+  r.window.close();
+}
+for (const deleted of [false, true]) {
+  const r = await boot();
+  await r.signIn();
+  r.tab("Contact");
+  r.type(r.fieldShowing("3322073847"), "5551234567");
+  if (deleted) r.data.site_settings = r.data.site_settings.filter(row => row.id !== "s1");
+  else Object.assign(r.data.site_settings.find(row => row.id === "s1"), { value: "5550000000", updated_at: "2026-10-04T00:00:00Z" });
+  await r.save();
+  check(deleted ? "removed row is not reported saved" : "another editor's revision is not overwritten", r.writes(), []);
+  check("the refused write remains unsaved", r.window.AROMATI_ADMIN._test.changeEntries().length, 1);
+  check("the conflict is explained", r.problems().some(p => /changed or was removed/.test(p)), true);
+  r.window.close();
+}
+{
+  const opts = {};
+  const r = await boot(opts);
+  await r.signIn();
+  r.tab("Contact");
+  r.type(r.fieldShowing("3322073847"), "5551234567");
+  const posted = [];
+  r.window.fetch = (url, options) => { posted.push(options); return Promise.resolve({ ok: true }); };
+  opts.authChange("TOKEN_REFRESHED", { access_token: "fresh-token" });
+  r.window.dispatchEvent(new r.window.Event("pagehide"));
+  check("unload logging uses the refreshed token", posted[0].headers.Authorization, "Bearer fresh-token");
+  opts.authChange("SIGNED_OUT", null);
+  r.window.dispatchEvent(new r.window.Event("pagehide"));
+  check("a signed-out session sends no further audit request", posted.length, 1);
+  r.window.close();
 }
 
 console.log(failures

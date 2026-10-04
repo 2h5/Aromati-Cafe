@@ -5,7 +5,7 @@ This file is the technical handoff for whoever maintains the site next.
 owner-facing guide. `PHOTOGRAPHS.md` is the full account of the photograph
 pipeline and must be read before touching it.
 
-Last updated: 2026-09-04.
+Last updated: 2026-10-03.
 
 ## Current state
 
@@ -461,7 +461,7 @@ Tools: `tools/add-content-hooks.mjs`, `tools/apply-site-url.mjs`, `tools/check-c
 `tools/test-hours-exceptions.mjs`, `tools/test-hours-live.mjs`,
 `tools/test-hours.mjs`, `tools/test-live.mjs`,
 `tools/test-menu-hidden.mjs`, `tools/test-menu-shapes.mjs`,
-`tools/test-ordering.mjs`, `tools/test-photos.mjs`,
+`tools/test-ordering.mjs`, `tools/test-photos.mjs`, `tools/test-sweep-fixes.mjs`,
 `tools/test-policies.mjs`, `tools/test-replay.mjs`, `tools/test-resilience.mjs`,
 `tools/test-rls.mjs`, `tools/test-sql.mjs`, `tools/verify-phase1.mjs` and
 `tools/wire-scripts.mjs`.
@@ -482,4 +482,26 @@ Migrations: `supabase/migrations/20260801000000_init_cms.sql`,
 `supabase/migrations/20260822000000_audit_log.sql`,
 `supabase/migrations/20260822000100_audit_unsaved.sql` and
 `supabase/migrations/20260822000200_audit_shared_history.sql` and
-`supabase/migrations/20260826000000_audit_session_cleanup.sql`.
+`supabase/migrations/20260826000000_audit_session_cleanup.sql` and
+`supabase/migrations/20261003000000_breakfast_numeric_prices.sql`.
+
+## 2026-10-03 maintenance sweep
+
+`active-running.md` records each reported issue, implementation status, and
+verification boundary. The public content reader keeps fresh data in memory
+when localStorage is unavailable. Breakfast refresh preserves available choices
+and recalculates the ticket; invalid decimal prices are refused by the editor
+and ignored by the public reader. The numeric-price migration checks new writes
+without rejecting existing invalid rows (`NOT VALID`); hosted application and
+validation remain pending.
+
+`cms-client.js` paginates editor and history reads. Existing-row saves and deletes
+check the loaded `updated_at` and require a returned row. Confirmed snapshots
+describe what was sent, and confirmed uploads are reused on retry. Session
+refreshes update the unload audit token. Vite is now 6.4.3; supported Node versions
+are 22.13+ in the 22 branch or 24+.
+
+`npm run test:sweep` runs `tools/test-sweep-fixes.mjs` for storage failure,
+breakfast refresh, and pagination. Save races, conflicts, photo retries, and
+token refresh are covered by `tools/test-admin.mjs`; database price refusals are
+covered by `tools/test-sql.mjs`. These checks use mocks and local databases.

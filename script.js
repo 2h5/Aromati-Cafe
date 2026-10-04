@@ -1187,6 +1187,7 @@
     }
 
     render(false);
+    document.addEventListener("aromati:content-changed", function () { render(false); });
   });
 
   /* ── book a table ─────────────────────────────

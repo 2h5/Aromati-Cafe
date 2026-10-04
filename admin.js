@@ -4215,6 +4215,10 @@ var AROMATI_ADMIN = (function () {
       if ((group === "base" || group === "add") && isBlank(option.price)) {
         add("A visible breakfast base or topping needs a price.",
             "menu_builder_options", option.id, "price");
+      } else if ((group === "base" || group === "add") &&
+                 !/^(?:\d+(?:\.\d{1,2})?|\.\d{1,2})$/.test(t(option.price))) {
+        add("A breakfast price must be a nonnegative number with at most two decimal places, such as 6 or 0.50.",
+            "menu_builder_options", option.id, "price");
       }
       if (group !== "base" && option.sub_key !== null && option.sub_key !== undefined &&
           !isBlank(option.sub_key)) {
@@ -4935,12 +4939,12 @@ var AROMATI_ADMIN = (function () {
     return out;
   }
 
-  function snapshot(table, row) {
+  function snapshot(table, row, liveRow) {
     /* The picked file has done its job: it is in the bucket, and the row naming
        it has just been written. Holding on to it would keep a blob: URL alive
        and would put a Blob into the deep copy Discard restores from, where it
        would survive as an empty object. */
-    if (table === "photos") forgetUpload(row);
+    if (table === "photos" && liveRow && liveRow.storage_path === row.storage_path) forgetUpload(liveRow);
 
     var copy = {};
     WRITABLE[table].forEach(function (col) { copy[col] = row[col]; });
@@ -4995,6 +4999,7 @@ var AROMATI_ADMIN = (function () {
     }
 
     saving = true;
+    byId("panels").inert = true;
     byId("savebar").className = "savebar savebar--busy";
     byId("saveBtn").disabled = true;
     byId("discardBtn").disabled = true;
@@ -5026,10 +5031,11 @@ var AROMATI_ADMIN = (function () {
         if (was.source_path && was.source_path !== row.source_path) superseded.push(was.source_path);
       }
       if (!row._upload) return;
-      steps.push({ what: "upload", table: "photos", row: row,
-                   path: row._upload.path, blob: row._upload.blob });
-      if (row._upload.source) {
+      if (!row._upload.uploaded) steps.push({ what: "upload", table: "photos", row: row,
+                   upload: row._upload, path: row._upload.path, blob: row._upload.blob });
+      if (row._upload.source && !row._upload.sourceUploaded) {
         steps.push({ what: "upload", table: "photos", row: row,
+                     upload: row._upload, original: true,
                      path: row._upload.sourcePath, blob: row._upload.source });
       }
     });
@@ -5066,6 +5072,7 @@ var AROMATI_ADMIN = (function () {
 
     function finish(error) {
       saving = false;
+      byId("panels").inert = false;
       byId("savebar").className = "savebar";
       byId("saveBtn").disabled = false;
       byId("discardBtn").disabled = false;
@@ -5104,6 +5111,7 @@ var AROMATI_ADMIN = (function () {
            Said for a mixed save too. If a batch touched photographs at all,
            Publish is the outstanding action, and the words that survive have
            to be the ones with something left to do in them. */
+        if (changeCount() > 0) return;
         flash(steps.some(function (s) { return s.table === "photos"; })
           ? "Saved. Press Publish to put the photographs on the site."
           : "Saved. The site is showing it now.");
@@ -5133,6 +5141,13 @@ var AROMATI_ADMIN = (function () {
       var step = steps[i];
 
       var request;
+      if (step.row && step.what !== "upload") {
+        step.sent = {};
+        Object.keys(step.row).forEach(function (key) {
+          if (key.charAt(0) !== "_") step.sent[key] = step.row[key];
+        });
+        step.sent = JSON.parse(JSON.stringify(step.sent));
+      }
       if (step.what === "upload") {
         /* upsert:false — the path carries a timestamp, so a collision would
            mean two different photographs claiming the same name, and silently
@@ -5143,17 +5158,34 @@ var AROMATI_ADMIN = (function () {
           upsert: false
         });
       } else if (step.what === "delete") {
-        request = sb.from(step.table).delete().eq("id", step.id);
+        request = sb.from(step.table).delete().eq("id", step.id).select("id");
       } else if (step.what === "insert") {
-        request = sb.from(step.table).insert(payload(step.table, step.row, idMap)).select("id");
+        request = sb.from(step.table).insert(payload(step.table, step.sent, idMap)).select("id,updated_at");
       } else {
-        request = sb.from(step.table).update(payload(step.table, step.row, idMap)).eq("id", step.row.id);
+        request = sb.from(step.table).update(payload(step.table, step.sent, idMap))
+          .eq("id", step.row.id).select("id,updated_at");
+      }
+      if (step.what === "update" || step.what === "delete") {
+        var previous = (loaded[step.table] || []).filter(function (row) {
+          return row.id === (step.id || step.row.id);
+        })[0];
+        if (!previous || !previous.updated_at) {
+          finish("The saved revision is missing. Reload the editor before trying again.");
+          return;
+        }
+        request = request.eq("updated_at", previous.updated_at);
       }
 
       request.then(function (res) {
         if (res.error) { finish(res.error.message || String(res.error)); return; }
+        if ((step.what === "update" || step.what === "delete") &&
+            (!res.data || res.data.length !== 1)) {
+          finish("This row changed or was removed in another editor. Your remaining changes are still unsaved. Reload the editor to review the current content before trying again.");
+          return;
+        }
 
         if (step.what === "upload") {
+          step.upload[step.original ? "sourceUploaded" : "uploaded"] = true;
           /* The file is in the bucket. The row that names it is updated later
              in this same plan; nothing is folded into the baseline here,
              because until that update lands the site is still showing the old
@@ -5180,9 +5212,14 @@ var AROMATI_ADMIN = (function () {
             if (key.indexOf(step.row.id) >= 0) ui.open[key.replace(step.row.id, realId)] = true;
           });
           step.row.id = realId;
-          snapshot(step.table, step.row);
+          step.sent.id = realId;
+          step.sent.updated_at = res.data[0].updated_at;
+          step.row.updated_at = step.sent.updated_at;
+          snapshot(step.table, step.sent, step.row);
         } else {
-          snapshot(step.table, step.row);
+          step.sent.updated_at = res.data[0].updated_at;
+          step.row.updated_at = step.sent.updated_at;
+          snapshot(step.table, step.sent, step.row);
         }
 
         done += 1;
@@ -5352,6 +5389,7 @@ var AROMATI_ADMIN = (function () {
   }
 
   function discard() {
+    if (saving) return;
     if (changeCount() === 0) return;
     if (!window.confirm("Throw away every change you have made since the last save?")) return;
     /* The change list is captured before the draft is rebuilt, because after
@@ -5405,10 +5443,9 @@ var AROMATI_ADMIN = (function () {
 
   function load() {
     return Promise.all(TABLES.map(function (table) {
-      return sb.from(table).select(SELECTS[table]).order(ORDER_BY[table], { ascending: true })
-        .then(function (res) {
-          if (res.error) throw new Error(table + ": " + res.error.message);
-          loaded[table] = res.data || [];
+      return AROMATI_CMS.readAll(sb, table, SELECTS[table] + ",updated_at", ORDER_BY[table], true)
+        .then(function (rows) {
+          loaded[table] = rows;
         });
     })).then(function () {
       buildDraft();
@@ -5492,6 +5529,7 @@ var AROMATI_ADMIN = (function () {
   }
 
   function signOut() {
+    if (saving) return;
     if (changeCount() > 0 &&
         !window.confirm("You have unsaved changes. Sign out and lose them?")) return;
     sb.auth.signOut().then(function () { window.location.reload(); });
@@ -5573,6 +5611,11 @@ var AROMATI_ADMIN = (function () {
     sb = supabase.createClient(AROMATI_CONFIG.url, AROMATI_CONFIG.anonKey, {
       auth: { persistSession: true, autoRefreshToken: true }
     });
+    if (typeof sb.auth.onAuthStateChange === "function") {
+      sb.auth.onAuthStateChange(function (_event, session) {
+        sessionToken = session && session.access_token || null;
+      });
+    }
 
     restoreTab();
     restoreSections();

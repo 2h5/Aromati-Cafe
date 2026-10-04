@@ -151,7 +151,11 @@ for (const f of files) {
       values ('add', 'Wrong link', '1', 'bagel', 94)`],
     ["an unsupported base sub-choice",
      `insert into public.menu_builder_options (group_key, label, price, sub_key, sort_order)
-      values ('base', 'Wrong link', '1', 'not-bagel', 95)`]
+      values ('base', 'Wrong link', '1', 'not-bagel', 95)`],
+    ...["$6", "NaN", "Infinity", "-1", "6.123", "6 dollars", "1e2"].map(price => [
+      "a nondecimal breakfast price: " + price,
+      `insert into public.menu_builder_options (group_key, label, price) values ('add', 'Bad price', '${price}')`
+    ])
   ];
   const builderSlipped = [];
   for (const [what, sql] of builderMustRefuse) {

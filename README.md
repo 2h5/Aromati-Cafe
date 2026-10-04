@@ -33,7 +33,8 @@ they are baked into `dist/` during a build and reach visitors after Publish.
 
 ## Local development
 
-Node 22 is pinned in `.nvmrc`.
+Node 22 is pinned in `.nvmrc`; use Node 22.13 or newer in that branch, or Node 24+,
+to satisfy the SDK and DOM-test dependencies.
 
 ```sh
 npm install

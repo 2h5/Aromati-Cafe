@@ -784,10 +784,24 @@
     ["base", "bagel", "add"].forEach(function (name) {
       var host = group(name);
       var options = Array.isArray(builder[name]) ? builder[name] : [];
+      if (name !== "bagel") options = options.filter(function (option) {
+        var price = String(option.price == null ? "" : option.price).trim();
+        return /^(?:\d+(?:\.\d{1,2})?|\.\d{1,2})$/.test(price) && isFinite(Number(price));
+      });
       if (!host) return;
+      var selected = Array.prototype.filter.call(host.querySelectorAll(".chip"), function (node) {
+        return node.classList.contains("is-on");
+      }).map(function (node) { return node.getAttribute("data-name"); });
+      var retained = options.some(function (option) { return selected.indexOf(option.label) >= 0; });
+      var picked = false;
       while (host.firstChild) host.removeChild(host.firstChild);
       options.forEach(function (option, i) {
-        host.appendChild(chip(option, name !== "add" && i === 0));
+        var isOn = retained
+          ? selected.indexOf(option.label) >= 0
+          : name !== "add" && i === 0;
+        if (name !== "add" && picked) isOn = false;
+        if (isOn) picked = true;
+        host.appendChild(chip(option, isOn));
       });
     });
   }
