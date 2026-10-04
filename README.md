@@ -54,7 +54,7 @@ npm run check:headers                 # check the deployed response
 npm run check:headers -- https://…    # check a preview deployment
 ```
 
-`npm test` runs 30 harnesses covering the public pages, CMS behavior, content
+`npm test` runs 31 harnesses covering the public pages, CMS behavior, content
 and security rules, migrations/RLS, build output, resilience, and browser
 checks. The live-project checker is separate because it needs the real
 Supabase project:

@@ -3352,7 +3352,10 @@ var AROMATI_ADMIN = (function () {
            without anything having to be looked up. */
         var stem = row.slot + "/" + String(Date.now());
 
-        return sourceFor(work, row, plan, stem).then(function (kept) {
+        if (saving) view.say("Waiting for the save to finish…", "busy");
+        return whenIdle().then(function () {
+          return sourceFor(work, row, plan, stem);
+        }).then(function (kept) {
           forgetUpload(row);
 
           row._upload = {
@@ -3366,6 +3369,9 @@ var AROMATI_ADMIN = (function () {
                back out later. Null when there is nothing truthful to keep. */
             source: kept.blob,
             sourcePath: kept.path,
+            /* A reused original that a failed save already put in the bucket
+               must not be sent again: the upload refuses to overwrite. */
+            sourceUploaded: !!kept.uploaded,
             /* Held for the rest of this sitting so a second trip through the
                framing box costs nothing and needs no network at all. */
             work: work
@@ -3394,7 +3400,8 @@ var AROMATI_ADMIN = (function () {
        same path rather than making a second one nothing points at. */
     var pending = row._upload;
     if (pending && pending.source && pending.sourcePath) {
-      return Promise.resolve({ blob: pending.source, path: pending.sourcePath });
+      return Promise.resolve({ blob: pending.source, path: pending.sourcePath,
+                               uploaded: !!pending.sourceUploaded });
     }
     if (plan === "keep" && row.source_path) {
       return Promise.resolve({ blob: null, path: row.source_path });
@@ -4711,6 +4718,7 @@ var AROMATI_ADMIN = (function () {
      writable columns move, which is the same set the save would have sent —
      so this cannot restore something the editor was never allowed to change. */
   function revertRow(table, id) {
+    if (saving) return;
     var row = findRow(table, id);
     var was = baseline[table] && baseline[table][id];
     if (!row || !was) return;
@@ -4922,6 +4930,15 @@ var AROMATI_ADMIN = (function () {
      what is and is not saved. */
 
   var saving = false;
+  var idleWaiters = [];
+
+  /* Work that finishes on its own time — a photograph coming out of the
+     framing box — must not change a row underneath a save that has already
+     planned what to send. It waits here and lands once the save is over. */
+  function whenIdle() {
+    if (!saving) return Promise.resolve();
+    return new Promise(function (resolve) { idleWaiters.push(resolve); });
+  }
 
   function payload(table, row, idMap) {
     var out = {};
@@ -5000,6 +5017,7 @@ var AROMATI_ADMIN = (function () {
 
     saving = true;
     byId("panels").inert = true;
+    byId("changes").inert = true;
     byId("savebar").className = "savebar savebar--busy";
     byId("saveBtn").disabled = true;
     byId("discardBtn").disabled = true;
@@ -5064,6 +5082,18 @@ var AROMATI_ADMIN = (function () {
 
     planned = steps.length;
 
+    /* What each row step sends is fixed now, with the plan. Anything that
+       changes the draft after this point stays a change for the next save
+       rather than slipping into this one without the uploads it may need. */
+    steps.forEach(function (step) {
+      if (!step.row || step.what === "upload") return;
+      var sent = {};
+      Object.keys(step.row).forEach(function (key) {
+        if (key.charAt(0) !== "_") sent[key] = step.row[key];
+      });
+      step.sent = JSON.parse(JSON.stringify(sent));
+    });
+
     /* Taken now, before the first write lands: finish() runs after each
        landed step has been folded into the baseline, and asking then would
        describe the save as nothing. The summary says how much landed; this
@@ -5073,6 +5103,8 @@ var AROMATI_ADMIN = (function () {
     function finish(error) {
       saving = false;
       byId("panels").inert = false;
+      byId("changes").inert = false;
+      idleWaiters.splice(0).forEach(function (resolve) { resolve(); });
       byId("savebar").className = "savebar";
       byId("saveBtn").disabled = false;
       byId("discardBtn").disabled = false;
@@ -5141,13 +5173,6 @@ var AROMATI_ADMIN = (function () {
       var step = steps[i];
 
       var request;
-      if (step.row && step.what !== "upload") {
-        step.sent = {};
-        Object.keys(step.row).forEach(function (key) {
-          if (key.charAt(0) !== "_") step.sent[key] = step.row[key];
-        });
-        step.sent = JSON.parse(JSON.stringify(step.sent));
-      }
       if (step.what === "upload") {
         /* upsert:false — the path carries a timestamp, so a collision would
            mean two different photographs claiming the same name, and silently
@@ -5207,6 +5232,11 @@ var AROMATI_ADMIN = (function () {
           });
           rowsOf("menu_item_pours").forEach(function (pour) {
             if (pour.item_id === step.row.id) pour.item_id = realId;
+          });
+          steps.forEach(function (later) {
+            if (!later.sent) return;
+            if (later.sent.course_id === step.row.id) later.sent.course_id = realId;
+            if (later.sent.item_id === step.row.id) later.sent.item_id = realId;
           });
           Object.keys(ui.open).forEach(function (key) {
             if (key.indexOf(step.row.id) >= 0) ui.open[key.replace(step.row.id, realId)] = true;

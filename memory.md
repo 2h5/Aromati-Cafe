@@ -428,7 +428,7 @@ visual behavior — check navigation, long headings, menu filtering, mobile
 layout and photo placement, and confirm the site still opens with its
 fallback data when the network is off.
 
-### The thirty harnesses
+### The thirty-one harnesses
 
 `npm test` currently covers: `check:fonts`, `test:fonts`, `check:csp`,
 `check:vendor`, `test:pages`, `test:hours`, `test:copy`, `test:ordering`,
@@ -436,7 +436,8 @@ fallback data when the network is off.
 `test:rls`, `test:dbguards`, `test:live`, `test:policies`, `check:policies`,
 `check:seed`, `check:photosql`, `check:memory`, `check:layout`,
 `test:replay`, `test:resilience`, `test:hourslive`, `test:hoursexceptions`,
-`test:menushapes`, `test:menuhidden`, `test:hostile` and `check:seo`.
+`test:menushapes`, `test:menuhidden`, `test:hostile`, `test:sweep` and
+`check:seo`.
 
 The Phase 1 snapshot check is `tools/verify-phase1.mjs` and uses baseline
 `53b3d5e`. Do not silently change that baseline when changing the renderer.

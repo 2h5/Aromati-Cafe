@@ -108,12 +108,22 @@ if (!BASE || !KEY || KEY.length < 20) {
   skip("config.js names no Supabase project — this build has no live content");
 }
 
+/* Paged like data.js reads the same table, so the API's row limit can never
+   quietly leave a photograph unbaked. */
 async function rest(path) {
-  const res = await fetch(`${BASE}/rest/v1/${path}`, {
-    headers: { apikey: KEY, Authorization: `Bearer ${KEY}`, Accept: "application/json" }
-  });
-  if (!res.ok) throw new Error(`${path} → ${res.status}`);
-  return res.json();
+  let rows = [];
+  for (;;) {
+    const res = await fetch(`${BASE}/rest/v1/${path}&limit=200&offset=${rows.length}`, {
+      headers: { apikey: KEY, Authorization: `Bearer ${KEY}`, Accept: "application/json",
+                 Prefer: "count=exact" }
+    });
+    if (!res.ok) throw new Error(`${path} → ${res.status}`);
+    const total = /\/(\d+)$/.exec((res.headers && res.headers.get("Content-Range")) || "");
+    const batch = await res.json();
+    rows = rows.concat(batch);
+    if (!total || rows.length >= Number(total[1])) return rows;
+    if (!batch.length) throw new Error(`${path} stopped before all rows arrived`);
+  }
 }
 
 /* Same shape data.js builds, and for the same reason it builds it there: the
@@ -125,7 +135,7 @@ const publicUrl = (p) =>
 
 let rows;
 try {
-  rows = await rest("photos?select=slot,storage_path,alt,caption");
+  rows = await rest("photos?select=slot,storage_path,alt,caption&order=id");
 } catch (err) {
   skip(`the database did not answer — ${err.message}`);
 }

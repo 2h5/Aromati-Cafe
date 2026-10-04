@@ -946,21 +946,46 @@
     });
   }
 
+  /* While a load is running, what was cleared in the meantime — a page read
+     before the clear still carries the row, and must not bring it back. */
+  var clearedDuringLoad = null;
+
+  function withoutCleared(rows) {
+    if (!clearedDuringLoad) return rows;
+    return rows.filter(function (row) {
+      return !clearedDuringLoad.ids[row.id] &&
+             !(clearedDuringLoad.sessions && row.action === "login");
+    });
+  }
+
   function load() {
     var btn = byId("refreshBtn");
     btn.disabled = true;
+    clearedDuringLoad = { ids: {}, sessions: false };
+    /* The newest page is on screen as soon as it arrives; older history keeps
+       loading underneath it, so a long log is usable without waiting for all
+       of it. Search and filters cover everything once the read completes. */
+    function show(rows) {
+      entries = withoutCleared(rows);
+      syncClearSessionsButton();
+      refreshActorOptions();
+      applyFilters();
+    }
     return AROMATI_CMS.readAll(sb, "audit_log",
-      "id, actor_email, action, summary, detail, created_at", "created_at", false)
+      "id, actor_email, action, summary, detail, created_at", "created_at", false,
+      function (rows) {
+        show(rows);
+        logMessage("Loading older history… " + rows.length + " entries so far.");
+      })
       .then(function (rows) {
         btn.disabled = false;
         logMessage("");
-        entries = rows;
-        syncClearSessionsButton();
-        refreshActorOptions();
-        applyFilters();
+        show(rows);
+        clearedDuringLoad = null;
         return true;
       }, function (err) {
         btn.disabled = false;
+        clearedDuringLoad = null;
         logMessage("The history would not load: " + ((err && err.message) || err));
         return false;
       });
@@ -1075,6 +1100,7 @@
           logMessage("The " + kind + " was not cleared. The database did not remove that row; the audit cleanup migration may still need to be applied.");
           return;
         }
+        if (clearedDuringLoad) clearedDuringLoad.ids[entry.id] = true;
         entries = entries.filter(function (candidate) { return candidate.id !== entry.id; });
         refreshActorOptions();
         logMessage(kind.charAt(0).toUpperCase() + kind.slice(1) + " cleared.");
@@ -1108,6 +1134,7 @@
           return;
         }
         var clearedCount = Array.isArray(res.data) ? res.data.length : 0;
+        if (clearedDuringLoad) clearedDuringLoad.sessions = true;
         entries = entries.filter(function (entry) { return entry.action !== "login"; });
         syncClearSessionsButton();
         refreshActorOptions();

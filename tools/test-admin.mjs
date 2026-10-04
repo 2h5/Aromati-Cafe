@@ -2980,6 +2980,66 @@ for (const deleted of [false, true]) {
   r.window.close();
 }
 
+console.log("\npost-push regressions: work that lands during a save");
+{
+  /* A photograph framed while a save of the same row is in flight must wait
+     for it, not ride along in a request that planned no upload for it. */
+  const opts = {};
+  const r = await boot(opts);
+  await r.signIn();
+  /* An earlier step in the same save, so the photograph row has not been sent
+     yet when the framing finishes. */
+  r.tab("Contact");
+  r.type(r.fieldShowing("3322073847"), "5551234567");
+  r.tab("Photos");
+  const before = r.data.photos.find(p => p.slot === "hero.main").storage_path;
+  const hero = r.photo("The photograph behind the opening headline");
+  const describe = [...hero.querySelectorAll(".field")]
+    .find(f => f.textContent.includes("What is in the photograph")).querySelector("textarea, input");
+  r.type(describe, "The dining room at dusk");
+  await r.pick(r.photo("The photograph behind the opening headline"),
+               r.file("kitchen.jpg", "image/jpeg", jpeg()), "leave");
+  opts.hold = "site_settings";
+  r.q("#saveBtn").click();
+  await settle(2);
+  await r.frame("use");
+  opts.release();
+  await settle();
+  const first = r.writes().filter(w => w.table === "photos");
+  check("the in-flight save sends the row as it was planned",
+        [first.length, first[0] && first[0].payload.storage_path, r.uploads().length], [1, before, 0]);
+  check("the framed photograph is still waiting to be saved",
+        r.window.AROMATI_ADMIN._test.changeEntries().length, 1);
+  await r.save();
+  const uploads = r.uploads();
+  const rows = r.writes().filter(w => w.table === "photos");
+  check("the next save uploads it before naming it",
+        [uploads.length, rows.length, rows[1] && rows[1].payload.storage_path === uploads[0].path], [2, 2, true]);
+  check("and then nothing is outstanding", r.window.AROMATI_ADMIN._test.changeEntries().length, 0);
+  r.window.close();
+}
+{
+  /* Put back is in the change list, outside the inert panels. */
+  const opts = {};
+  const r = await boot(opts);
+  await r.signIn();
+  r.tab("Contact");
+  r.type(r.fieldShowing("3322073847"), "5551234567");
+  await r.openChanges();
+  opts.hold = "site_settings";
+  r.q("#saveBtn").click();
+  await settle(2);
+  check("the change list is inert while the save is waiting", r.q("#changes").inert, true);
+  const undo = r.q(".change__undo");
+  if (undo) undo.click();
+  opts.release();
+  await settle();
+  check("put back during a save does nothing", r.writes()[0].payload.value, "5551234567");
+  check("and the save lands as sent", r.window.AROMATI_ADMIN._test.changeEntries().length, 0);
+  check("the change list is usable again", r.q("#changes").inert, false);
+  r.window.close();
+}
+
 console.log(failures
   ? `\n${failures} failure(s) — the editor does not do what it says\n`
   : "\nthe editor writes what it shows, and refuses what the database would\n");

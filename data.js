@@ -231,8 +231,11 @@ var AROMATI_DATA = (function () {
       typeof AROMATI_CONFIG.anonKey === "string" && AROMATI_CONFIG.anonKey.length > 20;
   }
 
+  /* Offset pages shift if the owner saves between two of them, so a total that
+     changes partway restarts the read (three tries) rather than publishing a
+     list with a row doubled or missing. */
   function get(path) {
-    var rows = [];
+    var rows = [], first = null, tries = 1;
     function page() {
       return fetch(AROMATI_CONFIG.url + "/rest/v1/" + path + "&limit=200&offset=" + rows.length, {
         headers: {
@@ -246,6 +249,16 @@ var AROMATI_DATA = (function () {
         var range = res.headers && res.headers.get("Content-Range");
         var total = range && /\/(\d+)$/.exec(range);
         return res.json().then(function (batch) {
+          if (total) {
+            if (first === null) first = total[1];
+            else if (first !== total[1]) {
+              if (tries >= 3) throw new Error(path + " kept changing while it was read");
+              tries += 1;
+              rows = [];
+              first = null;
+              return page();
+            }
+          }
           rows = rows.concat(batch);
           if (total && rows.length < Number(total[1])) {
             if (!batch.length) throw new Error("the content response stopped before all rows arrived");

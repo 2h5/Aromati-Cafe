@@ -158,4 +158,66 @@ await check("a failed later page never replaces complete content with a partial 
   await assert.rejects(sandbox.AROMATI_CMS.readAll(client, "audit_log", "id", "created_at", false), /stopped before all rows/);
 });
 
+await check("a history read restarts when rows shift between pages, and never repeats a row", async () => {
+  const sandbox = {};
+  runInNewContext(readFileSync("cms-client.js", "utf8"), sandbox);
+  let rows = Array.from({ length: 450 }, (_, i) => ({ id: "r" + i }));
+  let calls = 0, inserted = false, pages = [];
+  const client = { from() { return { select() { return {
+    order() { return this; },
+    range(start, end) {
+      calls += 1;
+      /* Another editor saves while the second page is being asked for. */
+      if (start > 0 && !inserted) { inserted = true; rows = [{ id: "new" }, ...rows]; }
+      return Promise.resolve({ data: rows.slice(start, end + 1), count: rows.length, error: null });
+    }
+  }; } }; } };
+  const all = await sandbox.AROMATI_CMS.readAll(client, "audit_log", "id", "created_at", false,
+    got => pages.push(got.length));
+  assert.equal(all.length, 451);
+  assert.equal(new Set(all.map(r => r.id)).size, 451);
+  assert(calls > 3, "the read started again after the total changed");
+  assert(pages.length > 0, "progress was reported while older pages loaded");
+
+  /* Same total, shifted window: the boundary row comes back twice. */
+  const base = Array.from({ length: 300 }, (_, i) => ({ id: "s" + i }));
+  const shifted = { from() { return { select() { return {
+    order() { return this; },
+    range(start) {
+      const data = start === 0 ? base.slice(0, 200) : [base[199], ...base.slice(200)];
+      return Promise.resolve({ data, count: 300, error: null });
+    }
+  }; } }; } };
+  const deduped = await sandbox.AROMATI_CMS.readAll(shifted, "audit_log", "id", "created_at", false);
+  assert.equal(new Set(deduped.map(r => r.id)).size, deduped.length);
+});
+
+await check("public content restarts a paged read whose total changed partway", async () => {
+  const rows = seedRows();
+  const first = rows.menu_items[0];
+  rows.menu_items = Array.from({ length: 300 }, (_, i) => ({ ...first, id: "paged-" + i, name: "Paged item " + i, sort_order: i }));
+  let shifted = false;
+  const p = boot("menu-food.html", { fetcher: async url => {
+    const u = new URL(url), table = u.pathname.split("/").pop();
+    const offset = Number(u.searchParams.get("offset") || 0);
+    let list = rows[table];
+    /* The first pass sees one extra row on page one, then the real total. */
+    if (table === "menu_items" && !shifted) {
+      if (offset === 0) list = [{ ...first, id: "ghost", name: "Paged item 0" }, ...list];
+      else shifted = true;
+    }
+    return { ok: true, headers: { get: () => offset + "-" + (offset + 199) + "/" + list.length },
+      json: async () => structuredClone(list.slice(offset, offset + 200)) };
+  } });
+  try {
+    await settle();
+    const names = Array.from(p.doc.querySelectorAll("#carteBody .mi"))
+      .map(n => n.textContent).filter(text => /Paged item \d+/.test(text))
+      .map(text => /Paged item \d+/.exec(text)[0]);
+    assert.equal(names.length, 300);
+    assert.equal(new Set(names).size, 300);
+    assert.deepEqual(p.errors, []);
+  } finally { p.window.close(); }
+});
+
 console.log("\n" + checks.length + " sweep regression checks passed");
