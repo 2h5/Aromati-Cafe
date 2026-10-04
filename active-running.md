@@ -11,7 +11,7 @@ Status meanings: `PENDING`, `IN PROGRESS`, `VERIFIED LOCALLY`, `PENDING LIVE`. L
 | B1 | Edits made during Save are falsely marked saved. Confirmed snapshots must represent the request actually sent; later edits must remain unsaved. | VERIFIED LOCALLY |
 | B2 | Photo retries collide after uploads succeed and metadata fails. Retry must reuse confirmed uploads without overwriting another object. | VERIFIED LOCALLY |
 | B3 | Live breakfast choices change without updating the ticket. Prices, selections, hints, bagel disclosure, and total must agree after refresh. | VERIFIED LOCALLY |
-| B4 | Breakfast prices accept `$6` and produce `NaN`. CMS and database must require a nonnegative decimal; public rendering must safely handle legacy invalid values. | VERIFIED LOCALLY; PENDING LIVE migration |
+| B4 | Breakfast prices accept `$6` and produce `NaN`. CMS and database must require a nonnegative decimal; public rendering must safely handle legacy invalid values. | VERIFIED LOCALLY; migration applied and validated live 2026-10-03 |
 | B5 | Blocked storage causes the hours pill to use seeds while the table uses live hours. Current content must remain available in memory independently of storage. | VERIFIED LOCALLY |
 
 ## Additional risks
@@ -55,7 +55,7 @@ Status meanings: `PENDING`, `IN PROGRESS`, `VERIFIED LOCALLY`, `PENDING LIVE`. L
 ### Pending live / release work
 
 - The user authorized commit and push on 2026-10-03. Source fixes and this tracker are included in that release; push confirmation is recorded in chat. The Cloudflare build and deployed behavior remain unverified. No manual deployment, deploy-hook call, or live database mutation was performed.
-- Apply `supabase/migrations/20261003000000_breakfast_numeric_prices.sql` in the hosted database as part of an explicitly authorized release. Existing invalid prices, if any, need correction before separately validating `menu_builder_price_decimal`.
+- Applied `20261003000000_breakfast_numeric_prices.sql` in the hosted database (user, SQL editor, 2026-10-03). The pre-check for invalid existing prices returned no rows. `menu_builder_price_decimal` was added `NOT VALID` and then validated, so it now covers existing rows as well.
 - Hosted auth, PostgREST revision matching/pagination, real photo storage retries, and the deployed admin UI remain unverified live. Local tests use mocks and PGlite; they do not establish those hosted behaviors.
 - Visual acceptance of the editor and public pages remains available to the user; browser automation checks were limited to the repository's existing layout/replay harnesses.
 
