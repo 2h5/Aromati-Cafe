@@ -220,4 +220,84 @@ await check("public content restarts a paged read whose total changed partway", 
   } finally { p.window.close(); }
 });
 
+await check("a delete plus an insert between pages keeps the total and still loses no row", async () => {
+  const sandbox = {};
+  runInNewContext(readFileSync("cms-client.js", "utf8"), sandbox);
+  let rows = Array.from({ length: 300 }, (_, i) => ({ id: "r" + String(i).padStart(3, "0") }));
+  let edited = false;
+  const client = { from() { return { select() { return {
+    order() { return this; },
+    range(start, end) {
+      /* Another editor removes an early row and adds a late one: same total. */
+      if (start > 0 && !edited) { edited = true; rows = [...rows.filter(r => r.id !== "r010"), { id: "r999" }]; }
+      return Promise.resolve({ data: rows.slice(start, end + 1), count: rows.length, error: null });
+    }
+  }; } }; } };
+  const all = await sandbox.AROMATI_CMS.readAll(client, "menu_items", "id", "sort_order", true);
+  assert.equal(JSON.stringify(all.map(r => r.id)), JSON.stringify(rows.map(r => r.id)));
+});
+
+await check("public content survives a same-total shift between pages", async () => {
+  const rows = seedRows();
+  const first = rows.menu_items[0];
+  rows.menu_items = Array.from({ length: 300 }, (_, i) => ({ ...first, id: "shift-" + i, name: "Shift item " + i, sort_order: i }));
+  let edited = false;
+  const p = boot("menu-food.html", { fetcher: async url => {
+    const u = new URL(url), table = u.pathname.split("/").pop();
+    const offset = Number(u.searchParams.get("offset") || 0);
+    const limit = Number(u.searchParams.get("limit") || 200);
+    if (table === "menu_items" && offset > 0 && !edited) {
+      edited = true;
+      rows.menu_items = [...rows.menu_items.filter(r => r.id !== "shift-10"),
+        { ...first, id: "shift-late", name: "Shift item late", sort_order: 999 }];
+    }
+    const list = rows[table];
+    return { ok: true, headers: { get: () => offset + "-" + (offset + limit - 1) + "/" + list.length },
+      json: async () => structuredClone(list.slice(offset, offset + limit)) };
+  } });
+  try {
+    for (let i = 0; i < 30 && !p.doc.body.textContent.includes("Shift item late"); i++) await settle();
+    const text = p.doc.querySelector("#carteBody").textContent;
+    assert(text.includes("Shift item 200"), "the row at the page boundary was read");
+    assert(text.includes("Shift item late"));
+    assert(!/Shift item 10(?!\d)/.test(text));
+    assert.deepEqual(p.errors, []);
+  } finally { p.window.close(); }
+});
+
+await check("keyboard focus stays on its card while older history loads", async () => {
+  const rows = Array.from({ length: 450 }, (_, i) => ({ id: String(i), actor_email: "editor@example.invalid",
+    action: "save", summary: "Change " + i, detail: null, created_at: "2026-10-03T12:00:00Z" }));
+  let release;
+  const held = new Promise(resolve => { release = resolve; });
+  const dom = new JSDOM(readFileSync("audit-log.html", "utf8"), { runScripts: "dangerously", url: "https://stub.invalid/audit-log" });
+  const w = dom.window;
+  try {
+    w.AROMATI_CONFIG = { url: "https://stub.invalid", anonKey: "x".repeat(40) };
+    w.matchMedia = () => ({ matches: true });
+    w.supabase = { createClient: () => ({
+      auth: { getSession: async () => ({ data: { session: { user: { email: "editor@example.invalid" } } } }) },
+      rpc: async () => ({ data: true, error: null }),
+      from: () => ({ select: () => ({ order() { return this; },
+        range: async (start, end) => {
+          if (start > 0) await held;
+          return { data: rows.slice(start, end + 1), count: rows.length, error: null };
+        } }) })
+    }) };
+    w.eval(readFileSync("cms-client.js", "utf8"));
+    w.eval(readFileSync("audit-log.js", "utf8"));
+    await settle();
+    const toggle = w.document.querySelector('#loglist [data-id="3"] .logrow__toggle');
+    assert(toggle, "the first page is on screen");
+    toggle.focus();
+    release();
+    await settle(); await settle();
+    assert(w.document.getElementById("loglist").textContent.includes("Change 449"), "older history arrived");
+    const active = w.document.activeElement;
+    assert(active && active.isConnected, "focus is on a live element");
+    assert(active.classList.contains("logrow__toggle"));
+    assert.equal(active.closest("[data-id]").getAttribute("data-id"), "3");
+  } finally { w.close(); }
+});
+
 console.log("\n" + checks.length + " sweep regression checks passed");

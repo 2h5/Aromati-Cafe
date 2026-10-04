@@ -278,7 +278,7 @@ function fakeSupabase(data, log, opts) {
       select: (cols) => result({
         _table: table,
         settle: builder => {
-          const rows = data[table] || [];
+          const rows = (data[table] || []).filter(row => (builder._filters || []).every(([col, value]) => row[col] === value));
           return { data: JSON.parse(JSON.stringify(builder._range ? rows.slice(builder._range[0], builder._range[1] + 1) : rows)),
             count: rows.length, error: null, cols };
         }
@@ -315,6 +315,16 @@ function fakeSupabase(data, log, opts) {
           const row = (data[table] || []).find(row => (builder._filters || []).every(([col, value]) => row[col] === value));
           if (!row) return { data: [], error: null };
           data[table] = data[table].filter(candidate => candidate !== row);
+          /* The foreign keys are ON DELETE CASCADE, so the children go too —
+             silently, which is exactly what the editor has to guard against. */
+          const cascade = (parent, childTable, col) => {
+            (data[childTable] || []).filter(c => c[col] === parent.id).forEach(c => {
+              if (childTable === "menu_items") cascade(c, "menu_item_pours", "item_id");
+            });
+            data[childTable] = (data[childTable] || []).filter(c => c[col] !== parent.id);
+          };
+          if (table === "menu_courses") cascade(row, "menu_items", "course_id");
+          if (table === "menu_items") cascade(row, "menu_item_pours", "item_id");
           log.push({ what: "delete", table, id: builder._eq && builder._eq[1] });
           return { data: [{ id: row.id }], error: null };
         }
@@ -1117,10 +1127,67 @@ console.log("\ndeleting");
   await r.save();
 
   const writes = r.writes();
-  check("the item is deleted", writes.map((w) => [w.what, w.table, w.id]),
-        [["delete", "menu_items", "i1"]]);
-  check("and its pour is not deleted separately — the database cascades it",
-        writes.some((w) => w.table === "menu_item_pours"), false);
+  check("the item is deleted, its pour first on a guarded delete of its own",
+        writes.map((w) => [w.what, w.table, w.id]),
+        [["delete", "menu_item_pours", "p1"], ["delete", "menu_items", "i1"]]);
+  check("and the owner is told about the one change they made",
+        r.changeCount(), "Saved. The site is showing it now.");
+}
+
+console.log("\ndeleting never takes another editor's work with it");
+for (const kind of ["changed pour", "added pour", "added item"]) {
+  const r = await boot();
+  await r.signIn();
+  r.tab("Menus");
+  if (kind === "added item") {
+    r.all(".btn--danger").find((b) => b.textContent === "Delete this section").click();
+  } else {
+    r.all(".item__head")[0].click();
+    r.all(".btn--danger").find((b) => b.textContent === "Delete this item").click();
+  }
+  /* Another editor saves while this page is open. */
+  if (kind === "changed pour") Object.assign(r.data.menu_item_pours[0], { price: "65", updated_at: "2026-10-04T00:00:00Z" });
+  if (kind === "added pour") r.data.menu_item_pours.push({ id: "p9", item_id: "i1", label: "Glass", price: "14", sort_order: 2, updated_at: "2026-10-04T00:00:00Z" });
+  if (kind === "added item") r.data.menu_items.push({ ...r.data.menu_items[0], id: "i9", name: "Late Plate", updated_at: "2026-10-04T00:00:00Z" });
+  await r.save();
+  check("another editor's " + kind + " stops the delete with nothing deleted", r.writes(), []);
+  check("the " + kind + " is still in the database",
+        kind === "added item" ? r.data.menu_items.some((i) => i.id === "i9")
+          : r.data.menu_item_pours.some((p) => p.item_id === "i1"), true);
+  check("the delete stays unsaved", r.window.AROMATI_ADMIN._test.changeEntries().length > 0, true);
+  check("and the conflict is explained",
+        r.problems().some((p) => /changed or was removed|Another editor added/.test(p)), true);
+  r.window.close();
+}
+{
+  /* A child that arrives after the check, while the known ones are being
+     deleted, is caught by the second check, before the parent goes. */
+  const opts = {};
+  const r = await boot(opts);
+  await r.signIn();
+  r.tab("Menus");
+  r.all(".item__head")[0].click();
+  r.all(".btn--danger").find((b) => b.textContent === "Delete this item").click();
+  const data = r.data;
+  const pourDelete = data.menu_item_pours[0];
+  let added = false;
+  Object.defineProperty(data, "menu_item_pours", {
+    configurable: true,
+    get() { return this._pours; },
+    set(v) {
+      this._pours = v;
+      if (!added && !v.includes(pourDelete)) {
+        added = true;
+        this._pours = [...v, { id: "p8", item_id: "i1", label: "Carafe", price: "30", sort_order: 3, updated_at: "2026-10-04T00:00:00Z" }];
+      }
+    }
+  });
+  data._pours = [pourDelete];
+  await r.save();
+  check("a child added mid-save keeps its parent", r.data.menu_items.some((i) => i.id === "i1"), true);
+  check("and the late child survives", r.data.menu_item_pours.some((p) => p.id === "p8"), true);
+  check("and the conflict is explained", r.problems().some((p) => /Another editor added/.test(p)), true);
+  r.window.close();
 }
 
 /* Hiding is the gentler half of the pair the Delete button belongs to: the item

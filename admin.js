@@ -5001,6 +5001,13 @@ var AROMATI_ADMIN = (function () {
     }
   }
 
+  /* What the foreign keys delete along with a row: table → its child table,
+     and the column there that points back. */
+  var CASCADES = {
+    menu_courses: { table: "menu_items", col: "course_id" },
+    menu_items: { table: "menu_item_pours", col: "item_id" }
+  };
+
   function save() {
     if (saving) return;
 
@@ -5058,11 +5065,32 @@ var AROMATI_ADMIN = (function () {
       }
     });
 
+    /* A course or item delete cascades in the database, and the revision check
+       on the parent says nothing about what is under it: a child another
+       editor changed or added since this page loaded would go with it,
+       unseen. So every child this editor loaded gets a guarded delete of its
+       own first (`cascade` steps, which are bookkeeping rather than changes
+       the owner made, so they are not counted), and the parent's own step
+       then checks that nothing it has not seen is still under it. */
+    var deleting = {};
+    function planDelete(table, id, cascade) {
+      if (deleting[table + ":" + id]) return;
+      deleting[table + ":" + id] = true;
+      var child = CASCADES[table];
+      if (child) {
+        var known = (loaded[child.table] || []).filter(function (row) {
+          return row[child.col] === id;
+        }).map(function (row) { return row.id; });
+        /* Asked before anything under it is touched, so the usual conflict
+           stops the save with nothing deleted. */
+        steps.push({ what: "verify", table: table, id: id, known: known, cascade: true });
+        known.forEach(function (childId) { planDelete(child.table, childId, true); });
+      }
+      steps.push({ what: "delete", table: table, id: id, cascade: Boolean(cascade) });
+    }
     ["menu_builder_options", "menu_item_pours", "menu_items", "menu_courses", "hours_exceptions"]
       .forEach(function (table) {
-        (removed[table] || []).forEach(function (id) {
-          steps.push({ what: "delete", table: table, id: id });
-        });
+        (removed[table] || []).forEach(function (id) { planDelete(table, id, false); });
       });
 
     ["menu_courses", "menu_items", "menu_builder_options", "menu_item_pours", "hours_exceptions"]
@@ -5080,7 +5108,7 @@ var AROMATI_ADMIN = (function () {
       });
     });
 
-    planned = steps.length;
+    planned = steps.filter(function (step) { return !step.cascade; }).length;
 
     /* What each row step sends is fixed now, with the plan. Anything that
        changes the draft after this point stays a change for the next save
@@ -5172,6 +5200,30 @@ var AROMATI_ADMIN = (function () {
       if (i >= steps.length) { finish(null); return; }
       var step = steps[i];
 
+      /* A "verify" step asks whether anything is under the parent that this
+         editor never loaded. The parent's own delete asks again, after its
+         known children are gone, so a child added in between is caught too:
+         at that point anything still under it is a row nobody here has seen. */
+      var child = (step.what === "verify" || step.what === "delete") && CASCADES[step.table];
+      if (child && !step.checked) {
+        var known = step.known || [];
+        sb.from(child.table).select("id").eq(child.col, step.id).then(function (res) {
+          if (res.error) { finish(res.error.message || String(res.error)); return; }
+          var unseen = (res.data || []).filter(function (row) {
+            return step.what === "delete" || known.indexOf(row.id) === -1;
+          });
+          if (unseen.length) {
+            finish("Another editor added to this since it was loaded, and deleting it would delete that too. Your remaining changes are still unsaved. Reload the editor to review the current content before trying again.");
+            return;
+          }
+          step.checked = true;
+          if (step.what === "verify") next(i + 1); else next(i);
+        }, function (err) {
+          finish((err && err.message) || String(err));
+        });
+        return;
+      }
+
       var request;
       if (step.what === "upload") {
         /* upsert:false — the path carries a timestamp, so a collision would
@@ -5252,7 +5304,7 @@ var AROMATI_ADMIN = (function () {
           snapshot(step.table, step.sent, step.row);
         }
 
-        done += 1;
+        if (!step.cascade) done += 1;
         next(i + 1);
       }, function (err) {
         finish((err && err.message) || String(err));

@@ -958,6 +958,40 @@
     });
   }
 
+  /* A page arriving rebuilds both lists and the actor picker underneath
+     whoever is using them, and a removed node takes keyboard focus with it to
+     the top of the document. So what had focus is noted by what it was — the
+     same control on the same entry, or the same option in the same menu — and
+     found again in the rebuilt markup. */
+  function focusedPlace() {
+    var active = document.activeElement;
+    if (!active || active === document.body || !active.closest) return null;
+    var row = active.closest("[data-id]");
+    if (row && row.parentNode && row.parentNode.id) {
+      return { node: active, parent: row.parentNode.id, attr: "data-id",
+               value: row.getAttribute("data-id"), cls: active.classList[0] || "" };
+    }
+    if (active.hasAttribute("data-value") && active.parentNode && active.parentNode.id) {
+      return { node: active, parent: active.parentNode.id, attr: "data-value",
+               value: active.getAttribute("data-value"), cls: "" };
+    }
+    return null;
+  }
+
+  function restoreFocus(place) {
+    if (!place || place.node.isConnected) return;
+    var parent = byId(place.parent);
+    if (!parent) return;
+    var match = Array.prototype.filter.call(parent.children, function (node) {
+      return node.getAttribute(place.attr) === place.value &&
+             !node.classList.contains("logrow--ghost");
+    })[0];
+    if (match && place.cls && !match.classList.contains(place.cls)) {
+      match = match.querySelector("." + place.cls);
+    }
+    if (match) match.focus({ preventScroll: true });
+  }
+
   function load() {
     var btn = byId("refreshBtn");
     btn.disabled = true;
@@ -966,10 +1000,12 @@
        loading underneath it, so a long log is usable without waiting for all
        of it. Search and filters cover everything once the read completes. */
     function show(rows) {
+      var place = focusedPlace();
       entries = withoutCleared(rows);
       syncClearSessionsButton();
       refreshActorOptions();
       applyFilters();
+      restoreFocus(place);
     }
     return AROMATI_CMS.readAll(sb, "audit_log",
       "id, actor_email, action, summary, detail, created_at", "created_at", false,

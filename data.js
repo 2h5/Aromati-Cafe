@@ -231,13 +231,26 @@ var AROMATI_DATA = (function () {
       typeof AROMATI_CONFIG.anonKey === "string" && AROMATI_CONFIG.anonKey.length > 20;
   }
 
-  /* Offset pages shift if the owner saves between two of them, so a total that
+  /* Offset pages shift if the owner saves between two of them. A total that
      changes partway restarts the read (three tries) rather than publishing a
-     list with a row doubled or missing. */
+     list with a row doubled or missing — but a delete plus an insert keeps the
+     total and still shifts the window, so every page after the first also
+     starts one row early, on the last row already read. If that row is not
+     exactly where it was, the window moved, and the read starts again. */
   function get(path) {
-    var rows = [], first = null, tries = 1;
+    var rows = [], first = null, tries = 1, anchor = null;
+    function restart() {
+      if (tries >= 3) throw new Error(path + " kept changing while it was read");
+      tries += 1;
+      rows = [];
+      first = null;
+      anchor = null;
+      return page();
+    }
     function page() {
-      return fetch(AROMATI_CONFIG.url + "/rest/v1/" + path + "&limit=200&offset=" + rows.length, {
+      var limit = anchor === null ? 200 : 201;
+      var offset = anchor === null ? rows.length : rows.length - 1;
+      return fetch(AROMATI_CONFIG.url + "/rest/v1/" + path + "&limit=" + limit + "&offset=" + offset, {
         headers: {
           apikey: AROMATI_CONFIG.anonKey,
           Authorization: "Bearer " + AROMATI_CONFIG.anonKey,
@@ -251,15 +264,14 @@ var AROMATI_DATA = (function () {
         return res.json().then(function (batch) {
           if (total) {
             if (first === null) first = total[1];
-            else if (first !== total[1]) {
-              if (tries >= 3) throw new Error(path + " kept changing while it was read");
-              tries += 1;
-              rows = [];
-              first = null;
-              return page();
-            }
+            else if (first !== total[1]) return restart();
+          }
+          if (anchor !== null) {
+            if (!batch.length || JSON.stringify(batch[0]) !== anchor) return restart();
+            batch = batch.slice(1);
           }
           rows = rows.concat(batch);
+          if (batch.length) anchor = JSON.stringify(batch[batch.length - 1]);
           if (total && rows.length < Number(total[1])) {
             if (!batch.length) throw new Error("the content response stopped before all rows arrived");
             return page();
