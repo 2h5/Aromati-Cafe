@@ -91,3 +91,4 @@ Read the full diff and re-ran the targeted checks: `test:sweep`, `test:admin`, `
 - N3: closed. On 2026-10-03 the user decided `architecture.md` stays untracked, and `.gitignore` is unchanged.
 - Verification: full `npm test` (31 harnesses) passed, `vite build` passed with `cms-client.js` in `dist/`, `git diff --check` was clean, and `node --check` passed on the changed scripts. Nothing was committed, pushed, deployed, or written to live data. Visual QA of the audit viewer's progressive load is left to the user.
 
+
